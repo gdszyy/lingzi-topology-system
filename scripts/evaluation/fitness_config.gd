@@ -58,11 +58,13 @@ enum ScenarioType {
 @export var complexity_bonus_combo: float = 20.0         # 组合效果奖励（如裂变+状态）
 @export var max_complexity_bonus: float = 100.0          # 复杂度奖励上限
 
-## 多样性保护配置（新增）
+## 多样性保护配置（增强版）
 @export_group("多样性保护")
-@export var diversity_weight: float = 0.1                # 多样性权重
-@export var similarity_penalty: float = 0.2              # 相似度惩罚
-@export var niche_radius: float = 0.15                   # 生态位半径（用于物种形成）
+@export var diversity_weight: float = 0.25               # 多样性权重（提高）
+@export var similarity_penalty: float = 0.35             # 相似度惩罚（加强）
+@export var niche_radius: float = 0.25                   # 生态位半径（扩大，更容易触发惩罚）
+@export var duplicate_penalty: float = 0.7               # 完全重复惩罚（新增）
+@export var rare_type_bonus: float = 0.2                 # 稀有类型奖励（新增）
 
 ## 场景配置
 @export_group("场景配置")

@@ -211,61 +211,242 @@ func calculate_complexity_score(spell: SpellCoreData) -> float:
 	
 	return minf(score, config.max_complexity_bonus)
 
-## 计算多样性奖励（新增）
+## 计算多样性奖励（增强版）
 func calculate_diversity_bonus(spell: SpellCoreData) -> float:
 	if population_cache.is_empty():
 		return 1.0
 	
 	var total_distance = 0.0
 	var min_distance = INF
+	var duplicate_count = 0
+	var very_similar_count = 0
+	var spell_fingerprint = calculate_spell_fingerprint(spell)
 	
 	for other_spell in population_cache:
 		if other_spell.spell_id == spell.spell_id:
 			continue
 		
+		# 快速检测完全重复
+		if calculate_spell_fingerprint(other_spell) == spell_fingerprint:
+			if is_duplicate_spell(spell, other_spell):
+				duplicate_count += 1
+				continue
+		
 		var distance = calculate_spell_distance(spell, other_spell)
 		total_distance += distance
 		min_distance = minf(min_distance, distance)
+		
+		# 统计非常相似的法术
+		if distance < config.niche_radius:
+			very_similar_count += 1
+	
+	# 完全重复的法术受到严重惩罚
+	if duplicate_count > 0:
+		return maxf(0.1, 0.3 - duplicate_count * 0.1)
+	
+	# 计算有效比较数量
+	var valid_comparisons = population_cache.size() - 1 - duplicate_count
+	if valid_comparisons <= 0:
+		return 1.0
 	
 	# 平均距离
-	var avg_distance = total_distance / maxf(population_cache.size() - 1, 1)
+	var avg_distance = total_distance / maxf(valid_comparisons, 1)
 	
-	# 如果太相似，施加惩罚
+	# 多个非常相似的法术也受惩罚
+	if very_similar_count >= 2:
+		return maxf(0.4, 0.8 - very_similar_count * 0.1)
+	
+	# 如果最近邻居太相似，施加惩罚
 	if min_distance < config.niche_radius:
 		return maxf(0.5, 1.0 - config.similarity_penalty)
 	
-	# 多样性奖励
-	return minf(1.5, 1.0 + avg_distance * 0.5)
+	# 多样性奖励（基于平均距离）
+	var diversity_score = 1.0 + avg_distance * 0.4
+	
+	# 额外奖励：如果这个法术使用了稀有的载体类型
+	if spell.carrier != null:
+		var type_count = _count_carrier_type_in_population(spell.carrier.carrier_type)
+		var type_ratio = float(type_count) / maxf(population_cache.size(), 1)
+		if type_ratio < 0.15:  # 稀有类型
+			diversity_score += 0.2
+	
+	return minf(1.8, diversity_score)
 
-## 计算两个法术之间的"距离"（新增）
+## 统计种群中某种载体类型的数量
+func _count_carrier_type_in_population(carrier_type: int) -> int:
+	var count = 0
+	for spell in population_cache:
+		if spell.carrier != null and spell.carrier.carrier_type == carrier_type:
+			count += 1
+	return count
+
+## 计算法术指纹哈希（用于快速检测完全重复）
+func calculate_spell_fingerprint(spell: SpellCoreData) -> int:
+	var hash_value: int = 0
+	
+	# 载体指纹
+	if spell.carrier != null:
+		var c = spell.carrier
+		hash_value ^= int(c.velocity * 10) << 0
+		hash_value ^= int(c.mass * 100) << 8
+		hash_value ^= c.phase << 16
+		hash_value ^= c.carrier_type << 18
+		hash_value ^= int(c.homing_strength * 100) << 20
+		hash_value ^= c.piercing << 27
+	
+	# 规则结构指纹
+	hash_value ^= spell.topology_rules.size() << 30
+	
+	for i in range(mini(spell.topology_rules.size(), 4)):
+		var rule = spell.topology_rules[i]
+		if rule.trigger != null:
+			hash_value ^= rule.trigger.trigger_type << (i * 3)
+		for j in range(mini(rule.actions.size(), 3)):
+			hash_value ^= rule.actions[j].action_type << (i * 3 + j + 12)
+	
+	return hash_value
+
+## 检查两个法术是否完全重复
+func is_duplicate_spell(spell_a: SpellCoreData, spell_b: SpellCoreData) -> bool:
+	# 先用指纹快速过滤
+	if calculate_spell_fingerprint(spell_a) != calculate_spell_fingerprint(spell_b):
+		return false
+	# 指纹相同时进行详细比较
+	return calculate_spell_distance(spell_a, spell_b) < 0.05
+
+## 计算两个法术之间的"距离"（增强版）
 func calculate_spell_distance(spell_a: SpellCoreData, spell_b: SpellCoreData) -> float:
 	var distance = 0.0
 	
-	# 载体差异
+	# === 载体差异 ===
 	if spell_a.carrier != null and spell_b.carrier != null:
 		var ca = spell_a.carrier
 		var cb = spell_b.carrier
 		
-		distance += absf(ca.velocity - cb.velocity) / 500.0
+		# 载体类型差异（重要）
+		if ca.carrier_type != cb.carrier_type:
+			distance += 0.8
+		
+		# 速度差异（使用实际速度）
+		var vel_diff = absf(ca.get_effective_velocity() - cb.get_effective_velocity())
+		distance += vel_diff / 400.0
+		
+		# 质量差异
 		distance += absf(ca.mass - cb.mass) / 5.0
-		distance += absf(ca.homing_strength - cb.homing_strength)
-		distance += 0.5 if ca.phase != cb.phase else 0.0
+		
+		# 追踪差异
+		distance += absf(ca.homing_strength - cb.homing_strength) * 0.5
+		
+		# 相态差异
+		if ca.phase != cb.phase:
+			distance += 0.3
+		
+		# 穿透差异
+		distance += absf(ca.piercing - cb.piercing) * 0.15
+		
+		# 寿命差异
+		var life_diff = absf(ca.get_effective_lifetime() - cb.get_effective_lifetime())
+		distance += life_diff / 10.0
 	
-	# 规则结构差异
-	distance += absf(spell_a.topology_rules.size() - spell_b.topology_rules.size()) * 0.2
+	# === 规则结构差异 ===
+	var rule_count_diff = absf(spell_a.topology_rules.size() - spell_b.topology_rules.size())
+	distance += rule_count_diff * 0.25
+	
+	# === 触发器差异 ===
+	var triggers_a = _get_trigger_signature(spell_a)
+	var triggers_b = _get_trigger_signature(spell_b)
+	
+	# 触发器类型差异
+	for type_key in triggers_a.types:
+		if not triggers_b.types.has(type_key):
+			distance += 0.4
+	for type_key in triggers_b.types:
+		if not triggers_a.types.has(type_key):
+			distance += 0.4
+	
+	# 触发器参数差异
+	if triggers_a.has_timer and triggers_b.has_timer:
+		distance += absf(triggers_a.timer_delay - triggers_b.timer_delay) / 3.0
+	if triggers_a.has_proximity and triggers_b.has_proximity:
+		distance += absf(triggers_a.proximity_radius - triggers_b.proximity_radius) / 200.0
+	
+	# === 动作差异 ===
+	var actions_a = _get_action_signature(spell_a)
+	var actions_b = _get_action_signature(spell_b)
 	
 	# 动作类型差异
-	var types_a = _get_action_types(spell_a)
-	var types_b = _get_action_types(spell_b)
+	for type_key in actions_a.types:
+		if not actions_b.types.has(type_key):
+			distance += 0.35
+	for type_key in actions_b.types:
+		if not actions_a.types.has(type_key):
+			distance += 0.35
 	
-	for type_key in types_a:
-		if not types_b.has(type_key):
-			distance += 0.3
-	for type_key in types_b:
-		if not types_a.has(type_key):
-			distance += 0.3
+	# 伤害值差异
+	if actions_a.total_damage > 0 and actions_b.total_damage > 0:
+		var dmg_ratio = maxf(actions_a.total_damage, actions_b.total_damage) / minf(actions_a.total_damage, actions_b.total_damage)
+		distance += (dmg_ratio - 1.0) * 0.2
 	
-	return clampf(distance, 0.0, 2.0)
+	# 裂变差异
+	if actions_a.has_fission != actions_b.has_fission:
+		distance += 0.5
+	elif actions_a.has_fission and actions_b.has_fission:
+		distance += absf(actions_a.fission_count - actions_b.fission_count) * 0.1
+	
+	return clampf(distance, 0.0, 3.0)
+
+## 获取触发器特征签名
+func _get_trigger_signature(spell: SpellCoreData) -> Dictionary:
+	var sig = {
+		"types": {},
+		"has_timer": false,
+		"timer_delay": 0.0,
+		"has_proximity": false,
+		"proximity_radius": 0.0
+	}
+	
+	for rule in spell.topology_rules:
+		if rule.trigger != null:
+			sig.types[rule.trigger.trigger_type] = true
+			
+			if rule.trigger is OnTimerTrigger:
+				sig.has_timer = true
+				sig.timer_delay = maxf(sig.timer_delay, (rule.trigger as OnTimerTrigger).delay)
+			elif rule.trigger is OnProximityTrigger:
+				sig.has_proximity = true
+				sig.proximity_radius = maxf(sig.proximity_radius, (rule.trigger as OnProximityTrigger).detection_radius)
+	
+	return sig
+
+## 获取动作特征签名
+func _get_action_signature(spell: SpellCoreData) -> Dictionary:
+	var sig = {
+		"types": {},
+		"total_damage": 0.0,
+		"has_fission": false,
+		"fission_count": 0,
+		"has_aoe": false,
+		"aoe_radius": 0.0
+	}
+	
+	for rule in spell.topology_rules:
+		for action in rule.actions:
+			sig.types[action.action_type] = true
+			
+			if action is DamageActionData:
+				var dmg = action as DamageActionData
+				sig.total_damage += dmg.damage_value * dmg.damage_multiplier
+			elif action is FissionActionData:
+				var fission = action as FissionActionData
+				sig.has_fission = true
+				sig.fission_count += fission.spawn_count
+			elif action is AreaEffectActionData:
+				var area = action as AreaEffectActionData
+				sig.has_aoe = true
+				sig.aoe_radius = maxf(sig.aoe_radius, area.radius)
+				sig.total_damage += area.damage_value
+	
+	return sig
 
 ## 获取法术的动作类型集合
 func _get_action_types(spell: SpellCoreData) -> Dictionary:

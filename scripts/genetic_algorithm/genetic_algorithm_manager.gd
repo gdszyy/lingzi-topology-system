@@ -201,7 +201,13 @@ func _evolve_one_generation() -> void:
 		new_population.append(elite.clone_deep())
 	
 	# 2. 选择、交叉、变异生成新个体
-	while new_population.size() < population_size:
+	var duplicate_rejections = 0
+	var max_attempts = population_size * 3  # 防止无限循环
+	var attempts = 0
+	
+	while new_population.size() < population_size and attempts < max_attempts:
+		attempts += 1
+		
 		# 选择父代
 		var parents = selection_methods.tournament_selection(population, fitness_scores, 2)
 		
@@ -212,6 +218,15 @@ func _evolve_one_generation() -> void:
 			# 变异
 			for child in offspring:
 				genetic_operators.mutate(child)
+				
+				# 检查是否与新种群中已有的法术重复
+				var is_duplicate = _check_duplicate_in_population(child, new_population)
+				
+				if is_duplicate:
+					duplicate_rejections += 1
+					# 尝试额外变异以增加多样性
+					genetic_operators.mutate(child)
+					genetic_operators.mutate(child)  # 再次变异
 				
 				if new_population.size() < population_size:
 					new_population.append(child)
@@ -227,7 +242,10 @@ func _evolve_one_generation() -> void:
 	best_fitness_history.append(stats.max)
 	avg_fitness_history.append(stats.avg)
 	
-	# 6. 检查停滞
+	# 6. 计算多样性统计
+	var diversity_stats = _calculate_diversity_stats()
+	
+	# 7. 检查停滞
 	if best_fitness_history.size() >= 2:
 		var improvement = best_fitness_history[-1] - best_fitness_history[-2]
 		if improvement < min_improvement:
@@ -235,13 +253,63 @@ func _evolve_one_generation() -> void:
 		else:
 			stagnation_counter = 0
 	
-	# 7. 发送信号
+	# 8. 发送信号
 	generation_completed.emit(current_generation, stats.max, stats.avg)
 	evolution_progress.emit(current_generation, max_generations, best_fitness)
 	
-	print("第 %d 代 - 最佳: %.2f, 平均: %.2f, 停滞: %d" % [
-		current_generation, stats.max, stats.avg, stagnation_counter
+	print("第 %d 代 - 最佳: %.2f, 平均: %.2f, 停滞: %d, 多样性: %.2f, 拒绝重复: %d" % [
+		current_generation, stats.max, stats.avg, stagnation_counter, 
+		diversity_stats.avg_distance, duplicate_rejections
 	])
+
+## 检查法术是否与种群中已有的重复
+func _check_duplicate_in_population(spell: SpellCoreData, pop: Array) -> bool:
+	var eval_manager = get_node_or_null("/root/EvaluationManager")
+	if eval_manager == null or eval_manager.fitness_calculator == null:
+		return false
+	
+	var calculator = eval_manager.fitness_calculator
+	var spell_fingerprint = calculator.calculate_spell_fingerprint(spell)
+	
+	for other in pop:
+		if other is SpellCoreData:
+			if calculator.calculate_spell_fingerprint(other) == spell_fingerprint:
+				if calculator.is_duplicate_spell(spell, other):
+					return true
+	return false
+
+## 计算种群多样性统计
+func _calculate_diversity_stats() -> Dictionary:
+	var eval_manager = get_node_or_null("/root/EvaluationManager")
+	if eval_manager == null or eval_manager.fitness_calculator == null:
+		return {"avg_distance": 0.0, "unique_types": 0}
+	
+	var calculator = eval_manager.fitness_calculator
+	var total_distance = 0.0
+	var comparisons = 0
+	var carrier_types = {}
+	
+	# 统计载体类型分布
+	for spell in population:
+		if spell.carrier != null:
+			var ctype = spell.carrier.carrier_type
+			carrier_types[ctype] = carrier_types.get(ctype, 0) + 1
+	
+	# 计算平均距离（采样以提高性能）
+	var sample_size = mini(population.size(), 20)
+	for i in range(sample_size):
+		for j in range(i + 1, sample_size):
+			var dist = calculator.calculate_spell_distance(population[i], population[j])
+			total_distance += dist
+			comparisons += 1
+	
+	var avg_distance = total_distance / maxf(comparisons, 1)
+	
+	return {
+		"avg_distance": avg_distance,
+		"unique_types": carrier_types.size(),
+		"type_distribution": carrier_types
+	}
 
 ## 检查终止条件
 func _check_termination() -> bool:
