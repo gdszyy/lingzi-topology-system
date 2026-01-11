@@ -274,7 +274,11 @@ func clear_projectiles() -> void:
 ## 处理爆炸请求
 func _on_explosion_requested(pos: Vector2, damage: float, radius: float, falloff: float, damage_type: int) -> void:
 	print("[爆炸请求] 位置: %s, 伤害: %.1f, 半径: %.1f" % [pos, damage, radius])
-	
+	# 使用 call_deferred 避免在物理查询期间创建节点
+	call_deferred("_spawn_explosion", pos, damage, radius, falloff, damage_type)
+
+## 延迟生成爆炸
+func _spawn_explosion(pos: Vector2, damage: float, radius: float, falloff: float, damage_type: int) -> void:
 	var explosion_scene = preload("res://scenes/battle_test/entities/explosion.tscn")
 	var explosion = explosion_scene.instantiate() as Explosion
 	get_tree().current_scene.add_child(explosion)
@@ -286,7 +290,11 @@ func _on_explosion_requested(pos: Vector2, damage: float, radius: float, falloff
 ## 处理伤害区域请求
 func _on_damage_zone_requested(pos: Vector2, damage: float, radius: float, duration: float, interval: float, damage_type: int, slow: float) -> void:
 	print("[伤害区域请求] 位置: %s, 伤害: %.1f, 半径: %.1f, 持续: %.1fs" % [pos, damage, radius, duration])
-	
+	# 使用 call_deferred 避免在物理查询期间创建节点
+	call_deferred("_spawn_damage_zone", pos, damage, radius, duration, interval, damage_type, slow)
+
+## 延迟生成伤害区域
+func _spawn_damage_zone(pos: Vector2, damage: float, radius: float, duration: float, interval: float, damage_type: int, slow: float) -> void:
 	var zone_scene = preload("res://scenes/battle_test/entities/damage_zone.tscn")
 	var zone = zone_scene.instantiate() as DamageZone
 	get_tree().current_scene.add_child(zone)

@@ -269,8 +269,8 @@ func _handle_enemy_collision(enemy: Node2D) -> void:
 	if piercing_remaining > 0:
 		piercing_remaining -= 1
 	else:
-		# 穿透次数耗尽，触发死亡规则后消亡
-		_trigger_death_rules()
+		# 穿透次数耗尽，延迟触发死亡规则以避免物理查询冲突
+		call_deferred("_trigger_death_rules")
 		_die()
 
 ## 执行接触规则
