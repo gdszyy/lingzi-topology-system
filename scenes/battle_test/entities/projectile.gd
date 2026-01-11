@@ -70,18 +70,25 @@ func initialize(data: SpellCoreData, direction: Vector2, start_pos: Vector2) -> 
 ## 设置视觉效果
 func _setup_visuals() -> void:
 	if carrier == null:
+		print("[子弹] 警告: carrier 为 null，无法设置视觉效果")
 		return
 	
 	# 设置颜色
 	var color = PHASE_COLORS.get(carrier.phase, Color.WHITE)
 	modulate = color
 	
-	# 设置大小
-	var base_scale = carrier.size * 0.5
+	# 设置大小 - 确保最小可见
+	var base_scale = maxf(carrier.size, 0.5)  # 最小 0.5 保证可见
 	scale = Vector2(base_scale, base_scale)
 	
 	# 设置朝向
 	rotation = velocity.angle()
+	
+	# 确保可见
+	visible = true
+	modulate.a = 1.0
+	
+	print("[子弹] 视觉设置: 颜色=%s, 缩放=%.2f, 位置=%s" % [color, base_scale, global_position])
 
 func _physics_process(delta: float) -> void:
 	if carrier == null:

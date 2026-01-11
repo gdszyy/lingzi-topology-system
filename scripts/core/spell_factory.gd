@@ -161,8 +161,8 @@ func _generate_simple_child_spell() -> SpellCoreData:
 	spell.carrier.phase = randi() % 3
 	spell.carrier.mass = randf_range(0.3, 1.5)
 	spell.carrier.velocity = randf_range(300.0, 600.0)
-	spell.carrier.lifetime = randf_range(1.0, 3.0)
-	spell.carrier.size = randf_range(0.3, 1.0)
+	spell.carrier.lifetime = randf_range(1.5, 4.0)  # 增加生命时间
+	spell.carrier.size = randf_range(0.8, 1.5)  # 增大尺寸确保可见
 	
 	# 只有一条简单规则
 	var rule = TopologyRuleData.new()

@@ -168,10 +168,11 @@ func _create_simple_fission_spell() -> SpellCoreData:
 	spell.spell_name = "裂变碎片"
 	
 	spell.carrier = CarrierConfigData.new()
-	spell.carrier.velocity = 300.0
-	spell.carrier.lifetime = 1.5
+	spell.carrier.velocity = 350.0
+	spell.carrier.lifetime = 3.0  # 增加生命时间
 	spell.carrier.mass = 0.5
-	spell.carrier.size = 0.5
+	spell.carrier.size = 1.0  # 增大尺寸确保可见
+	spell.carrier.phase = randi() % 3  # 随机相态以便有不同颜色
 	
 	var rule = TopologyRuleData.new()
 	rule.trigger = TriggerData.new()
