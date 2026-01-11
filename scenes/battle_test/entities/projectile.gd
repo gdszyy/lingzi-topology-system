@@ -29,6 +29,8 @@ var rule_triggered: Array[bool] = []  # 规则是否已触发（用于 trigger_o
 ## 视觉组件
 @onready var sprite: Sprite2D = $Sprite2D
 @onready var collision: CollisionShape2D = $CollisionShape2D
+@onready var visual_circle: Polygon2D = $VisualCircle
+@onready var trail: Line2D = $Trail
 
 ## 颜色映射（按相态）
 const PHASE_COLORS = {
@@ -76,6 +78,15 @@ func _setup_visuals() -> void:
 	# 设置颜色
 	var color = PHASE_COLORS.get(carrier.phase, Color.WHITE)
 	modulate = color
+	
+	# 直接设置VisualCircle的颜色（确保可见）
+	if visual_circle != null:
+		visual_circle.color = color
+		visual_circle.visible = true
+	
+	# 设置拖尾颜色
+	if trail != null:
+		trail.default_color = Color(color.r, color.g, color.b, 0.5)
 	
 	# 设置大小 - 确保最小可见
 	var base_scale = maxf(carrier.size, 0.5)  # 最小 0.5 保证可见
@@ -135,6 +146,26 @@ func _update_rule_timers(delta: float) -> void:
 					rule_timers[i] = 0.0
 					if rule.trigger.trigger_once:
 						rule_triggered[i] = true
+		
+		# 检查接近触发器
+		elif rule.trigger is OnProximityTrigger:
+			var prox_trigger = rule.trigger as OnProximityTrigger
+			if not rule_triggered[i] or not rule.trigger.trigger_once:
+				if _check_proximity_trigger(prox_trigger):
+					_execute_rule(rule, i)
+					if rule.trigger.trigger_once:
+						rule_triggered[i] = true
+
+## 检查接近触发条件
+func _check_proximity_trigger(trigger: OnProximityTrigger) -> bool:
+	var enemies = get_tree().get_nodes_in_group("enemies")
+	for enemy in enemies:
+		if not is_instance_valid(enemy):
+			continue
+		var dist = global_position.distance_to(enemy.global_position)
+		if dist <= trigger.detection_radius:
+			return true
+	return false
 
 ## 执行规则
 func _execute_rule(rule: TopologyRuleData, _rule_index: int) -> void:

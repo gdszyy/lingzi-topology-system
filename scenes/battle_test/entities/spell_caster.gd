@@ -149,7 +149,13 @@ func _spawn_fission_projectile(spell: SpellCoreData, direction: Vector2, pos: Ve
 		print("  [错误] 无法实例化子弹场景!")
 		return
 	
+	# 先添加到场景树，让@onready变量生效
 	get_tree().current_scene.add_child(projectile)
+	
+	# 等待一帧确保_ready()已执行
+	await get_tree().process_frame
+	
+	# 再初始化
 	projectile.initialize(spell, direction, pos)
 	
 	# 连接所有信号
