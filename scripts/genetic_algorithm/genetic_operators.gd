@@ -175,7 +175,7 @@ func _mutate_carrier(spell: SpellCoreData) -> void:
 func _mutate_rules_structure(spell: SpellCoreData) -> void:
 	# 添加新规则
 	if randf() < mutation_config.add_rule_rate and spell.topology_rules.size() < mutation_config.max_rules:
-		var new_rule = SpellFactory.new()._generate_random_rule()
+		var new_rule = _generate_random_rule()
 		new_rule.rule_name = "变异规则_%d" % spell.topology_rules.size()
 		spell.topology_rules.append(new_rule)
 	
@@ -188,7 +188,7 @@ func _mutate_rules_structure(spell: SpellCoreData) -> void:
 func _mutate_rule(rule: TopologyRuleData) -> void:
 	# 触发器变异
 	if randf() < mutation_config.replace_trigger_rate:
-		rule.trigger = SpellFactory.new()._generate_random_trigger()
+		rule.trigger = _generate_random_trigger()
 	elif rule.trigger != null:
 		_mutate_trigger(rule.trigger)
 	
@@ -217,7 +217,7 @@ func _mutate_trigger(trigger: TriggerData) -> void:
 func _mutate_actions_structure(rule: TopologyRuleData) -> void:
 	# 添加动作
 	if randf() < mutation_config.add_action_rate and rule.actions.size() < mutation_config.max_actions_per_rule:
-		var new_action = SpellFactory.new()._generate_random_action(false)  # 不生成裂变
+		var new_action = _generate_random_action(false)  # 不生成裂变
 		rule.actions.append(new_action)
 	
 	# 删除动作
@@ -292,3 +292,89 @@ func _ensure_valid_spell(spell: SpellCoreData) -> void:
 		if rule.actions.is_empty():
 			var damage = DamageActionData.new()
 			rule.actions.append(damage)
+
+
+# ==================== 辅助生成函数 ====================
+
+## 生成随机规则
+func _generate_random_rule() -> TopologyRuleData:
+	var rule = TopologyRuleData.new()
+	rule.rule_name = "规则_%d" % randi()
+	rule.trigger = _generate_random_trigger()
+	
+	# 添加1-3个动作
+	var action_count = randi_range(1, 3)
+	var actions_array: Array[ActionData] = []
+	for i in range(action_count):
+		actions_array.append(_generate_random_action(i == 0))  # 只有第一个动作可能是裂变
+	rule.actions = actions_array
+	
+	return rule
+
+## 生成随机触发器
+func _generate_random_trigger() -> TriggerData:
+	var trigger_type = randi() % 4  # 0-3
+	var trigger: TriggerData
+	
+	match trigger_type:
+		TriggerData.TriggerType.ON_CONTACT:
+			trigger = TriggerData.new()
+			trigger.trigger_type = TriggerData.TriggerType.ON_CONTACT
+		TriggerData.TriggerType.ON_TIMER:
+			var timer_trigger = OnTimerTrigger.new()
+			timer_trigger.delay = randf_range(0.5, 3.0)
+			timer_trigger.repeat_interval = randf_range(0.5, 2.0) if randf() < 0.3 else 0.0
+			trigger = timer_trigger
+		TriggerData.TriggerType.ON_PROXIMITY:
+			var prox_trigger = OnProximityTrigger.new()
+			prox_trigger.detection_radius = randf_range(50.0, 200.0)
+			trigger = prox_trigger
+		_:
+			trigger = TriggerData.new()
+			trigger.trigger_type = TriggerData.TriggerType.ON_DEATH
+	
+	trigger.trigger_once = randf() > 0.3
+	return trigger
+
+## 生成随机动作
+func _generate_random_action(allow_fission: bool = true) -> ActionData:
+	var action_type = randi() % 4  # 0-3
+	
+	# 控制裂变的生成概率
+	if action_type == ActionData.ActionType.FISSION and (not allow_fission or randf() > 0.4):
+		action_type = ActionData.ActionType.DAMAGE
+	
+	match action_type:
+		ActionData.ActionType.DAMAGE:
+			var damage = DamageActionData.new()
+			damage.damage_value = randf_range(5.0, 40.0)
+			damage.damage_type = randi() % 4
+			damage.damage_multiplier = randf_range(0.8, 1.5)
+			return damage
+		
+		ActionData.ActionType.FISSION:
+			var fission = FissionActionData.new()
+			fission.spawn_count = randi_range(2, 8)
+			fission.spread_angle = randf_range(30.0, 180.0)
+			fission.inherit_velocity = randf_range(0.3, 1.0)
+			return fission
+		
+		ActionData.ActionType.APPLY_STATUS:
+			var status = ApplyStatusActionData.new()
+			status.status_type = randi() % 6
+			status.duration = randf_range(1.0, 5.0)
+			status.effect_value = randf_range(2.0, 15.0)
+			return status
+		
+		ActionData.ActionType.AREA_EFFECT:
+			var area = AreaEffectActionData.new()
+			area.area_shape = randi() % 4
+			area.radius = randf_range(30.0, 120.0)
+			area.damage_value = randf_range(5.0, 30.0)
+			area.duration = randf_range(0.0, 2.0)
+			return area
+		
+		_:
+			var damage = DamageActionData.new()
+			damage.damage_value = randf_range(5.0, 40.0)
+			return damage
