@@ -9,7 +9,7 @@ enum ScenarioType {
 	MULTI_TARGET,      # 群体目标场景
 	HIGH_MOBILITY,     # 高机动性场景
 	SURVIVAL,          # 生存场景
-	CLOSE_RANGE        # 近战场景（新增）
+	CLOSE_RANGE        # 近战场景
 }
 
 ## 性能指标权重
@@ -20,7 +20,7 @@ enum ScenarioType {
 @export var weight_resource_efficiency: float = 0.15  # 资源效率权重
 @export var weight_overkill: float = 0.10         # 过量伤害惩罚权重
 @export var weight_instability: float = 0.10      # 不稳定性惩罚权重
-@export var weight_complexity: float = 0.15       # 复杂度/华丽度奖励（新增）
+@export var weight_complexity: float = 0.15       # 复杂度/华丽度奖励
 
 ## 场景权重
 @export_group("场景权重")
@@ -28,7 +28,7 @@ enum ScenarioType {
 @export var weight_multi_target: float = 0.25     # 群体场景权重
 @export var weight_high_mobility: float = 0.20    # 高机动性场景权重
 @export var weight_survival: float = 0.15         # 生存场景权重
-@export var weight_close_range: float = 0.15      # 近战场景权重（新增）
+@export var weight_close_range: float = 0.15      # 近战场景权重
 
 ## 归一化参数
 @export_group("归一化参数")
@@ -37,18 +37,27 @@ enum ScenarioType {
 @export var max_expected_resource: float = 100.0  # 预期最大资源消耗
 @export var max_instability: float = 20.0         # 最大不稳定性
 
-## Cost 限制（新增）
+## Cost 限制（支持1-4层嵌套）
 @export_group("Cost 限制")
 @export var max_total_cost: float = 100.0         # 法术最大总 cost
 @export var max_damage_per_action: float = 50.0   # 单个动作最大伤害
-@export var max_fission_depth: int = 3            # 最大裂变深度
-@export var max_fission_count: int = 12           # 单次裂变最大数量
-@export var cost_per_damage: float = 0.5          # 每点伤害的 cost
-@export var cost_per_fission: float = 2.0         # 每个裂变子弹的 cost
-@export var cost_per_status: float = 1.0          # 每个状态效果的 cost
-@export var cost_per_aoe_radius: float = 0.1      # 每单位 AOE 半径的 cost
+@export var max_fission_depth: int = 4            # 最大裂变深度（支持4层）
+@export var max_fission_count: int = 10           # 单次裂变最大数量
+@export var cost_per_damage: float = 0.3          # 每点伤害的 cost（降低以支持更多嵌套）
+@export var cost_per_fission: float = 2.5         # 每个裂变子弹的 cost
+@export var cost_per_status: float = 0.8          # 每个状态效果的 cost
+@export var cost_per_aoe_radius: float = 0.08     # 每单位 AOE 半径的 cost
 
-## 复杂度奖励配置（新增）
+## 嵌套层级 Cost 预算（确保1-4层嵌套在100 cost内可行）
+@export_group("嵌套 Cost 预算")
+@export var layer_1_budget: float = 80.0          # 1层嵌套：主法术最多80 cost
+@export var layer_2_budget: float = 60.0          # 2层嵌套：主法术最多60 cost
+@export var layer_3_budget: float = 45.0          # 3层嵌套：主法术最多45 cost
+@export var layer_4_budget: float = 35.0          # 4层嵌套：主法术最多35 cost
+@export var child_cost_decay: float = 0.4         # 子法术 cost 衰减系数
+@export var child_cost_decay_rate: float = 1.5    # 子法术 cost 衰减率（每层）
+
+## 复杂度奖励配置
 @export_group("复杂度奖励")
 @export var complexity_bonus_per_rule: float = 5.0       # 每条规则的奖励
 @export var complexity_bonus_per_trigger_type: float = 8.0  # 每种不同触发器类型的奖励
@@ -57,21 +66,34 @@ enum ScenarioType {
 @export var complexity_bonus_status: float = 10.0        # 使用状态效果的奖励
 @export var complexity_bonus_combo: float = 20.0         # 组合效果奖励（如裂变+状态）
 @export var max_complexity_bonus: float = 100.0          # 复杂度奖励上限
-@export var nesting_depth_bonus: float = 12.0            # 每层嵌套的奖励（鼓励多层嵌套法术）
-@export var nesting_depth_multiplier: float = 1.5        # 嵌套层数奖励乘数（每层递增）
+@export var nesting_depth_bonus: float = 15.0            # 每层嵌套的奖励（提高鼓励多层嵌套）
+@export var nesting_depth_multiplier: float = 1.3        # 嵌套层数奖励乘数（每层递增）
 
-## 多样性保护配置（增强版）
+## 多样性保护配置
 @export_group("多样性保护")
-@export var diversity_weight: float = 0.25               # 多样性权重（提高）
-@export var similarity_penalty: float = 0.35             # 相似度惩罚（加强）
-@export var niche_radius: float = 0.25                   # 生态位半径（扩大，更容易触发惩罚）
-@export var duplicate_penalty: float = 0.7               # 完全重复惩罚（新增）
-@export var rare_type_bonus: float = 0.2                 # 稀有类型奖励（新增）
+@export var diversity_weight: float = 0.25               # 多样性权重
+@export var similarity_penalty: float = 0.35             # 相似度惩罚
+@export var niche_radius: float = 0.25                   # 生态位半径
+@export var duplicate_penalty: float = 0.7               # 完全重复惩罚
+@export var rare_type_bonus: float = 0.2                 # 稀有类型奖励
 
 ## 场景配置
 @export_group("场景配置")
 @export var simulation_duration: float = 30.0     # 模拟持续时间
 @export var cast_interval: float = 1.0            # 施法间隔
+
+## 获取指定嵌套层数的 cost 预算
+func get_layer_budget(nesting_depth: int) -> float:
+	match nesting_depth:
+		1: return layer_1_budget
+		2: return layer_2_budget
+		3: return layer_3_budget
+		4: return layer_4_budget
+		_: return layer_4_budget * 0.8  # 更深层使用更低预算
+
+## 计算子法术的 cost 系数
+func get_child_cost_ratio(depth: int) -> float:
+	return child_cost_decay / pow(child_cost_decay_rate, depth)
 
 ## 验证权重总和
 func validate_weights() -> bool:
@@ -130,7 +152,7 @@ static func create_single_target_focused() -> FitnessConfig:
 	config.weight_close_range = 0.10
 	return config
 
-## 创建偏向华丽效果的配置（新增）
+## 创建偏向华丽效果的配置
 static func create_flashy_focused() -> FitnessConfig:
 	var config = FitnessConfig.new()
 	config.weight_damage = 0.15
@@ -139,7 +161,7 @@ static func create_flashy_focused() -> FitnessConfig:
 	config.complexity_bonus_combo = 30.0
 	return config
 
-## 创建偏向近战的配置（新增）
+## 创建偏向近战的配置
 static func create_close_range_focused() -> FitnessConfig:
 	var config = FitnessConfig.new()
 	config.weight_single_target = 0.15
@@ -149,11 +171,22 @@ static func create_close_range_focused() -> FitnessConfig:
 	config.weight_close_range = 0.35
 	return config
 
-## 创建平衡多样性的配置（新增）
+## 创建平衡多样性的配置
 static func create_diversity_focused() -> FitnessConfig:
 	var config = FitnessConfig.new()
 	config.diversity_weight = 0.2
 	config.similarity_penalty = 0.3
 	config.weight_damage = 0.15
 	config.weight_complexity = 0.20
+	return config
+
+## 创建支持深层嵌套的配置
+static func create_deep_nesting_focused() -> FitnessConfig:
+	var config = FitnessConfig.new()
+	config.max_fission_depth = 4
+	config.nesting_depth_bonus = 20.0
+	config.nesting_depth_multiplier = 1.5
+	config.cost_per_damage = 0.25
+	config.cost_per_fission = 2.0
+	config.child_cost_decay = 0.35
 	return config

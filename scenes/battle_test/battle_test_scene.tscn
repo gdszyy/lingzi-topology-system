@@ -82,13 +82,21 @@ layout_mode = 2
 text = "可用法术"
 
 [node name="SpellList" type="ItemList" parent="UI/LeftPanel"]
-custom_minimum_size = Vector2(220, 400)
+custom_minimum_size = Vector2(220, 350)
 layout_mode = 2
 size_flags_vertical = 3
 
 [node name="LoadFromGAButton" type="Button" parent="UI/LeftPanel"]
 layout_mode = 2
 text = "从GA加载最佳法术"
+
+[node name="GenerateBatchButton" type="Button" parent="UI/LeftPanel"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.3, 0.8, 0.5, 1)
+text = "批量生成法术 (3批)"
+
+[node name="HSeparator" type="HSeparator" parent="UI/LeftPanel"]
+layout_mode = 2
 
 [node name="SpellEditButtons" type="HBoxContainer" parent="UI/LeftPanel"]
 layout_mode = 2
@@ -145,4 +153,4 @@ offset_top = 665.0
 offset_right = 1020.0
 offset_bottom = 710.0
 horizontal_alignment = 1
-text = "提示: 选择法术后点击\"开始测试\"自动发射，或在停止状态下点击战斗区域手动发射"
+text = "提示: 选择法术后点击\"开始测试\"自动发射，或在停止状态下点击战斗区域手动发射。沙包场景敌人不会死亡。"
