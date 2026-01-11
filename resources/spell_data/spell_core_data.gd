@@ -44,10 +44,11 @@ func clone_deep() -> SpellCoreData:
 		copy.carrier = carrier.clone_deep()
 	
 	# 深拷贝拓扑规则
-	copy.topology_rules = []
+	var rules_copy: Array[TopologyRuleData] = []
 	for rule in topology_rules:
 		if rule != null:
-			copy.topology_rules.append(rule.clone_deep())
+			rules_copy.append(rule.clone_deep())
+	copy.topology_rules = rules_copy
 	
 	return copy
 
@@ -86,9 +87,10 @@ static func from_dict(data: Dictionary) -> SpellCoreData:
 	
 	# 加载拓扑规则
 	var rules_data = data.get("topology_rules", [])
-	spell.topology_rules = []
+	var loaded_rules: Array[TopologyRuleData] = []
 	for rule_data in rules_data:
-		spell.topology_rules.append(TopologyRuleData.from_dict(rule_data))
+		loaded_rules.append(TopologyRuleData.from_dict(rule_data))
+	spell.topology_rules = loaded_rules
 	
 	return spell
 

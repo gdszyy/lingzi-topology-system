@@ -19,10 +19,11 @@ func clone_deep() -> TopologyRuleData:
 		copy.trigger = trigger.clone_deep()
 	
 	# 深拷贝动作列表
-	copy.actions = []
+	var actions_copy: Array[ActionData] = []
 	for action in actions:
 		if action != null:
-			copy.actions.append(action.clone_deep())
+			actions_copy.append(action.clone_deep())
+	copy.actions = actions_copy
 	
 	return copy
 
@@ -53,9 +54,10 @@ static func from_dict(data: Dictionary) -> TopologyRuleData:
 	
 	# 加载动作列表
 	var actions_data = data.get("actions", [])
-	rule.actions = []
+	var loaded_actions: Array[ActionData] = []
 	for action_data in actions_data:
-		rule.actions.append(ActionData.from_dict(action_data))
+		loaded_actions.append(ActionData.from_dict(action_data))
+	rule.actions = loaded_actions
 	
 	return rule
 
