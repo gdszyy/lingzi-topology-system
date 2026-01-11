@@ -242,20 +242,6 @@ func _on_projectile_hit(_enemy: Node2D, damage: float) -> void:
 func _on_projectile_died(projectile: Projectile) -> void:
 	active_projectiles.erase(projectile)
 
-## 查找最近敌人
-func _find_nearest_enemy() -> Node2D:
-	var enemies = get_tree().get_nodes_in_group("enemies")
-	var nearest: Node2D = null
-	var nearest_dist = INF
-	
-	for enemy in enemies:
-		var dist = global_position.distance_to(enemy.global_position)
-		if dist < nearest_dist:
-			nearest_dist = dist
-			nearest = enemy
-	
-	return nearest
-
 ## 重置统计
 func reset_stats() -> void:
 	stats.total_shots = 0
