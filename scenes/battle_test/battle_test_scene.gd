@@ -7,7 +7,8 @@ enum TestScenario {
 	SINGLE_TARGET,      # 单体目标
 	GROUP_TARGETS,      # 群体目标
 	MOVING_TARGETS,     # 移动目标
-	SURVIVAL            # 生存模式
+	SURVIVAL,           # 生存模式（敌人接近）
+	CLOSE_RANGE         # 近战场景（新增）
 }
 
 ## UI 引用
@@ -44,17 +45,33 @@ var total_damage_dealt: float = 0.0
 var enemies_killed: int = 0
 var test_start_time: float = 0.0
 
+## 玩家位置（用于敌人接近）
+var player_position: Vector2
+
+## 生存模式计时器
+var survival_timer: Timer = null
+
 func _ready():
 	enemy_scene = preload("res://scenes/battle_test/entities/enemy.tscn")
 	
 	_setup_ui()
 	_setup_scenario_options()
 	_create_default_spell()
+	
+	# 设置玩家位置（发射器位置）
+	player_position = spell_caster.global_position
 
 func _process(delta: float) -> void:
 	if is_running:
 		test_duration += delta
 		_update_stats_display()
+		
+		# 更新敌人目标位置
+		_update_enemy_targets()
+		
+		# 检查近战场景中敌人是否到达玩家
+		if current_scenario == TestScenario.CLOSE_RANGE or current_scenario == TestScenario.SURVIVAL:
+			_check_enemy_reach_player()
 
 ## 设置 UI
 func _setup_ui() -> void:
@@ -78,7 +95,8 @@ func _setup_scenario_options() -> void:
 	scenario_option.add_item("单体目标", TestScenario.SINGLE_TARGET)
 	scenario_option.add_item("群体目标 (5个)", TestScenario.GROUP_TARGETS)
 	scenario_option.add_item("移动目标", TestScenario.MOVING_TARGETS)
-	scenario_option.add_item("生存模式", TestScenario.SURVIVAL)
+	scenario_option.add_item("生存模式 (敌人接近)", TestScenario.SURVIVAL)
+	scenario_option.add_item("近战场景", TestScenario.CLOSE_RANGE)
 
 ## 创建默认测试法术
 func _create_default_spell() -> void:
@@ -183,6 +201,10 @@ func _on_stop_pressed() -> void:
 	start_button.disabled = false
 	stop_button.disabled = true
 	
+	# 停止生存模式计时器
+	if survival_timer != null:
+		survival_timer.stop()
+	
 	_show_final_results()
 
 ## 重置
@@ -225,28 +247,48 @@ func _spawn_enemies_for_scenario() -> void:
 	
 	match current_scenario:
 		TestScenario.SINGLE_TARGET:
-			_spawn_enemy(battle_center + Vector2(300, 0), 200.0, Enemy.MovePattern.STATIC)
+			_spawn_enemy_deferred(battle_center + Vector2(300, 0), 200.0, Enemy.MovePattern.STATIC)
 		
 		TestScenario.GROUP_TARGETS:
-			_spawn_enemy(battle_center + Vector2(250, -100), 80.0, Enemy.MovePattern.STATIC)
-			_spawn_enemy(battle_center + Vector2(300, 0), 80.0, Enemy.MovePattern.STATIC)
-			_spawn_enemy(battle_center + Vector2(250, 100), 80.0, Enemy.MovePattern.STATIC)
-			_spawn_enemy(battle_center + Vector2(350, -50), 80.0, Enemy.MovePattern.STATIC)
-			_spawn_enemy(battle_center + Vector2(350, 50), 80.0, Enemy.MovePattern.STATIC)
+			_spawn_enemy_deferred(battle_center + Vector2(250, -100), 80.0, Enemy.MovePattern.STATIC)
+			_spawn_enemy_deferred(battle_center + Vector2(300, 0), 80.0, Enemy.MovePattern.STATIC)
+			_spawn_enemy_deferred(battle_center + Vector2(250, 100), 80.0, Enemy.MovePattern.STATIC)
+			_spawn_enemy_deferred(battle_center + Vector2(350, -50), 80.0, Enemy.MovePattern.STATIC)
+			_spawn_enemy_deferred(battle_center + Vector2(350, 50), 80.0, Enemy.MovePattern.STATIC)
 		
 		TestScenario.MOVING_TARGETS:
-			_spawn_enemy(battle_center + Vector2(300, -80), 100.0, Enemy.MovePattern.HORIZONTAL, 80.0)
-			_spawn_enemy(battle_center + Vector2(300, 80), 100.0, Enemy.MovePattern.CIRCULAR, 60.0)
-			_spawn_enemy(battle_center + Vector2(400, 0), 100.0, Enemy.MovePattern.RANDOM, 100.0)
+			_spawn_enemy_deferred(battle_center + Vector2(300, -80), 100.0, Enemy.MovePattern.HORIZONTAL, 80.0)
+			_spawn_enemy_deferred(battle_center + Vector2(300, 80), 100.0, Enemy.MovePattern.CIRCULAR, 60.0)
+			_spawn_enemy_deferred(battle_center + Vector2(400, 0), 100.0, Enemy.MovePattern.RANDOM, 100.0)
 		
 		TestScenario.SURVIVAL:
-			# 持续生成敌人
-			_spawn_enemy(battle_center + Vector2(300, 0), 50.0, Enemy.MovePattern.RANDOM, 50.0)
+			# 生存模式：敌人从远处接近玩家
+			_spawn_approaching_enemy(battle_center + Vector2(500, 0), 60.0, 80.0)
+			_spawn_approaching_enemy(battle_center + Vector2(450, -100), 60.0, 70.0)
+			_spawn_approaching_enemy(battle_center + Vector2(450, 100), 60.0, 70.0)
 			# 启动生成计时器
 			_start_survival_spawner()
+		
+		TestScenario.CLOSE_RANGE:
+			# 近战场景：敌人从四周快速接近
+			_spawn_approaching_enemy(battle_center + Vector2(200, 0), 80.0, 120.0)
+			_spawn_approaching_enemy(battle_center + Vector2(-200, 0), 80.0, 120.0)
+			_spawn_approaching_enemy(battle_center + Vector2(0, 150), 80.0, 100.0)
+			_spawn_approaching_enemy(battle_center + Vector2(0, -150), 80.0, 100.0)
+			# 启动近战生成计时器
+			_start_close_range_spawner()
 
-## 生成单个敌人
-func _spawn_enemy(pos: Vector2, health: float, pattern: Enemy.MovePattern, speed: float = 0.0) -> Enemy:
+## 生成接近型敌人
+func _spawn_approaching_enemy(pos: Vector2, health: float, speed: float, zigzag: bool = false) -> void:
+	var pattern = Enemy.MovePattern.APPROACH_ZIGZAG if zigzag else Enemy.MovePattern.APPROACH
+	call_deferred("_spawn_enemy_internal", pos, health, pattern, speed)
+
+## 延迟生成敌人（避免物理查询冲突）
+func _spawn_enemy_deferred(pos: Vector2, health: float, pattern: Enemy.MovePattern, speed: float = 0.0) -> void:
+	call_deferred("_spawn_enemy_internal", pos, health, pattern, speed)
+
+## 内部生成敌人方法
+func _spawn_enemy_internal(pos: Vector2, health: float, pattern: Enemy.MovePattern, speed: float = 0.0) -> Enemy:
 	var enemy = enemy_scene.instantiate() as Enemy
 	enemy_container.add_child(enemy)
 	enemy.global_position = pos
@@ -254,6 +296,7 @@ func _spawn_enemy(pos: Vector2, health: float, pattern: Enemy.MovePattern, speed
 	enemy.current_health = health
 	enemy.move_pattern = pattern
 	enemy.move_speed = speed
+	enemy.set_target_position(player_position)
 	
 	enemy.damage_taken.connect(_on_enemy_damage_taken)
 	enemy.enemy_died.connect(_on_enemy_died)
@@ -273,19 +316,50 @@ func _on_enemy_damage_taken(amount: float) -> void:
 func _on_enemy_died(enemy: Enemy) -> void:
 	enemies_killed += 1
 	
-	# 生存模式下补充敌人
-	if is_running and current_scenario == TestScenario.SURVIVAL:
+	# 生存模式和近战模式下补充敌人
+	if is_running:
 		var battle_center = battle_area.position + battle_area.size / 2
-		var spawn_pos = battle_center + Vector2(randf_range(200, 400), randf_range(-150, 150))
-		_spawn_enemy(spawn_pos, 50.0 + enemies_killed * 5.0, Enemy.MovePattern.RANDOM, 50.0 + enemies_killed * 2.0)
+		
+		if current_scenario == TestScenario.SURVIVAL:
+			# 从远处生成接近型敌人
+			var angle = randf() * TAU
+			var distance = randf_range(400, 600)
+			var spawn_pos = battle_center + Vector2(cos(angle), sin(angle)) * distance
+			var health = 60.0 + enemies_killed * 5.0
+			var speed = 80.0 + enemies_killed * 3.0
+			var use_zigzag = randf() > 0.5
+			call_deferred("_spawn_approaching_enemy", spawn_pos, health, speed, use_zigzag)
+		
+		elif current_scenario == TestScenario.CLOSE_RANGE:
+			# 从近处生成快速接近型敌人
+			var angle = randf() * TAU
+			var distance = randf_range(150, 250)
+			var spawn_pos = battle_center + Vector2(cos(angle), sin(angle)) * distance
+			var health = 80.0 + enemies_killed * 3.0
+			var speed = 120.0 + enemies_killed * 5.0
+			call_deferred("_spawn_approaching_enemy", spawn_pos, health, speed, true)
 
 ## 启动生存模式生成器
 func _start_survival_spawner() -> void:
-	var timer = Timer.new()
-	timer.wait_time = 3.0
-	timer.timeout.connect(_on_survival_spawn_timer)
-	add_child(timer)
-	timer.start()
+	if survival_timer != null:
+		survival_timer.queue_free()
+	
+	survival_timer = Timer.new()
+	survival_timer.wait_time = 2.5
+	survival_timer.timeout.connect(_on_survival_spawn_timer)
+	add_child(survival_timer)
+	survival_timer.start()
+
+## 启动近战模式生成器
+func _start_close_range_spawner() -> void:
+	if survival_timer != null:
+		survival_timer.queue_free()
+	
+	survival_timer = Timer.new()
+	survival_timer.wait_time = 1.5  # 更快的生成速度
+	survival_timer.timeout.connect(_on_close_range_spawn_timer)
+	add_child(survival_timer)
+	survival_timer.start()
 
 ## 生存模式定时生成
 func _on_survival_spawn_timer() -> void:
@@ -293,8 +367,42 @@ func _on_survival_spawn_timer() -> void:
 		return
 	
 	var battle_center = battle_area.position + battle_area.size / 2
-	var spawn_pos = battle_center + Vector2(randf_range(200, 400), randf_range(-150, 150))
-	_spawn_enemy(spawn_pos, 50.0 + enemies_killed * 3.0, Enemy.MovePattern.RANDOM, 40.0)
+	var angle = randf() * TAU
+	var distance = randf_range(400, 600)
+	var spawn_pos = battle_center + Vector2(cos(angle), sin(angle)) * distance
+	var health = 60.0 + enemies_killed * 3.0
+	var speed = 80.0 + mini(enemies_killed * 2, 50)
+	var use_zigzag = randf() > 0.6
+	_spawn_approaching_enemy(spawn_pos, health, speed, use_zigzag)
+
+## 近战模式定时生成
+func _on_close_range_spawn_timer() -> void:
+	if not is_running or current_scenario != TestScenario.CLOSE_RANGE:
+		return
+	
+	var battle_center = battle_area.position + battle_area.size / 2
+	var angle = randf() * TAU
+	var distance = randf_range(150, 300)
+	var spawn_pos = battle_center + Vector2(cos(angle), sin(angle)) * distance
+	var health = 80.0 + enemies_killed * 2.0
+	var speed = 120.0 + mini(enemies_killed * 3, 80)
+	_spawn_approaching_enemy(spawn_pos, health, speed, true)
+
+## 更新敌人目标位置
+func _update_enemy_targets() -> void:
+	for enemy in enemy_container.get_children():
+		if enemy is Enemy:
+			enemy.set_target_position(player_position)
+
+## 检查敌人是否到达玩家
+func _check_enemy_reach_player() -> void:
+	for enemy in enemy_container.get_children():
+		if enemy is Enemy:
+			var distance = enemy.global_position.distance_to(player_position)
+			if distance < 30.0:  # 敌人到达玩家
+				# 可以在这里添加玩家受伤逻辑
+				# 目前只是让敌人消失并计入统计
+				enemy.take_damage(enemy.current_health)
 
 ## 更新统计显示
 func _update_stats_display() -> void:
@@ -317,6 +425,14 @@ func _update_stats_display() -> void:
 	stats_text += "命中数: %d\n" % caster_stats.total_hits
 	stats_text += "裂变次数: %d\n" % caster_stats.fissions_triggered
 	stats_text += "活跃子弹: %d\n" % caster_stats.active_projectiles
+	
+	# 显示当前场景信息
+	var scenario_names = ["单体目标", "群体目标", "移动目标", "生存模式", "近战场景"]
+	stats_text += "\n[u]场景: %s[/u]\n" % scenario_names[current_scenario]
+	
+	if current_scenario == TestScenario.SURVIVAL or current_scenario == TestScenario.CLOSE_RANGE:
+		var enemy_count = enemy_container.get_child_count()
+		stats_text += "当前敌人数: %d\n" % enemy_count
 	
 	stats_label.text = stats_text
 

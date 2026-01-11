@@ -14,11 +14,13 @@ signal damage_taken(amount: float)
 
 ## 移动模式
 enum MovePattern {
-	STATIC,      # 静止
-	HORIZONTAL,  # 水平移动
-	VERTICAL,    # 垂直移动
-	CIRCULAR,    # 圆周移动
-	RANDOM       # 随机移动
+	STATIC,         # 静止
+	HORIZONTAL,     # 水平移动
+	VERTICAL,       # 垂直移动
+	CIRCULAR,       # 圆周移动
+	RANDOM,         # 随机移动
+	APPROACH,       # 接近玩家（新增）
+	APPROACH_ZIGZAG # 之字形接近（新增）
 }
 
 ## 运行时状态
@@ -27,6 +29,8 @@ var status_effects: Dictionary = {}  # {status_type: {duration, value}}
 var move_time: float = 0.0
 var start_position: Vector2
 var move_direction: Vector2 = Vector2.RIGHT
+var target_position: Vector2 = Vector2.ZERO  # 目标位置（玩家位置）
+var zigzag_offset: float = 0.0  # 之字形偏移
 
 ## 视觉组件
 @onready var health_bar: ProgressBar = $HealthBar
@@ -45,6 +49,9 @@ func _ready():
 	# 设置随机移动方向
 	if move_pattern == MovePattern.RANDOM:
 		move_direction = Vector2(randf_range(-1, 1), randf_range(-1, 1)).normalized()
+	
+	# 之字形偏移随机化
+	zigzag_offset = randf() * TAU
 
 func _physics_process(delta: float) -> void:
 	# 更新移动
@@ -53,12 +60,25 @@ func _physics_process(delta: float) -> void:
 	# 更新状态效果
 	_update_status_effects(delta)
 
+## 设置目标位置（玩家位置）
+func set_target_position(pos: Vector2) -> void:
+	target_position = pos
+
 ## 更新移动
 func _update_movement(delta: float) -> void:
 	if move_speed <= 0:
 		return
 	
 	move_time += delta
+	
+	# 计算实际移动速度（考虑减速效果）
+	var actual_speed = move_speed
+	if status_effects.has(ApplyStatusActionData.StatusType.SLOWED):
+		actual_speed *= 0.5
+	
+	# 冰冻时完全停止
+	if status_effects.has(ApplyStatusActionData.StatusType.FROZEN):
+		return
 	
 	match move_pattern:
 		MovePattern.HORIZONTAL:
@@ -72,7 +92,7 @@ func _update_movement(delta: float) -> void:
 			position.y = start_position.y + sin(move_time * 1.5) * 80.0
 		
 		MovePattern.RANDOM:
-			position += move_direction * move_speed * delta
+			position += move_direction * actual_speed * delta
 			# 边界反弹
 			var viewport = get_viewport_rect()
 			if position.x < 50 or position.x > viewport.size.x - 50:
@@ -82,6 +102,20 @@ func _update_movement(delta: float) -> void:
 			# 随机改变方向
 			if randf() < 0.01:
 				move_direction = move_direction.rotated(randf_range(-0.5, 0.5))
+		
+		MovePattern.APPROACH:
+			# 直线接近目标
+			var direction = (target_position - global_position).normalized()
+			global_position += direction * actual_speed * delta
+		
+		MovePattern.APPROACH_ZIGZAG:
+			# 之字形接近目标
+			var direction = (target_position - global_position).normalized()
+			# 添加垂直于前进方向的摆动
+			var perpendicular = Vector2(-direction.y, direction.x)
+			var zigzag = sin(move_time * 3.0 + zigzag_offset) * 0.5
+			var final_direction = (direction + perpendicular * zigzag).normalized()
+			global_position += final_direction * actual_speed * delta
 
 ## 受到伤害
 func take_damage(amount: float, damage_type: int = 0) -> void:
@@ -131,11 +165,6 @@ func _update_status_effects(delta: float) -> void:
 		elif status_type == ApplyStatusActionData.StatusType.POISONED:
 			take_damage(effect.value * delta * 0.5, 0)
 		
-		# 减速效果
-		if status_type == ApplyStatusActionData.StatusType.SLOWED:
-			# 已在移动中处理
-			pass
-		
 		if effect.duration <= 0:
 			to_remove.append(status_type)
 	
@@ -176,7 +205,10 @@ func _update_health_bar() -> void:
 ## 死亡
 func _die() -> void:
 	enemy_died.emit(self)
-	queue_free()
+	# 使用 call_deferred 避免在物理查询期间修改状态
+	set_deferred("monitoring", false)
+	set_deferred("monitorable", false)
+	call_deferred("queue_free")
 
 ## 重置
 func reset() -> void:
@@ -190,3 +222,7 @@ func reset() -> void:
 ## 获取当前生命值百分比
 func get_health_percent() -> float:
 	return current_health / max_health
+
+## 获取到目标的距离
+func get_distance_to_target() -> float:
+	return global_position.distance_to(target_position)

@@ -260,7 +260,10 @@ func _check_bounds() -> void:
 ## 死亡
 func _die() -> void:
 	projectile_died.emit(self)
-	queue_free()
+	# 使用 call_deferred 避免在物理查询期间修改状态
+	set_deferred("monitoring", false)
+	set_deferred("monitorable", false)
+	call_deferred("queue_free")
 
 ## 设置追踪目标
 func set_target(new_target: Node2D) -> void:

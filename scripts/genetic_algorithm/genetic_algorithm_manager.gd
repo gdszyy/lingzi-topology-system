@@ -155,6 +155,10 @@ func _evaluate_population() -> void:
 	# 获取 EvaluationManager 引用
 	var eval_manager = get_node_or_null("/root/EvaluationManager")
 	
+	# 设置种群缓存用于多样性计算
+	if eval_manager != null and eval_manager.fitness_calculator != null:
+		eval_manager.fitness_calculator.set_population_cache(population)
+	
 	for spell in population:
 		var fitness: float
 		if eval_manager != null:
