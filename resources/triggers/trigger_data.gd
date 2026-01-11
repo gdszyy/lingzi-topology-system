@@ -5,11 +5,17 @@ extends Resource
 
 ## 触发器类型枚举
 enum TriggerType {
-	ON_CONTACT,      # 碰撞触发
-	ON_TIMER,        # 定时触发
-	ON_PROXIMITY,    # 接近触发
-	ON_DEATH,        # 死亡触发（载体消失时）
-	ON_HEALTH_THRESHOLD  # 生命值阈值触发
+	ON_CONTACT,          # 碰撞触发（敌方）
+	ON_TIMER,            # 定时触发
+	ON_PROXIMITY,        # 接近触发
+	ON_DEATH,            # 死亡触发（载体消失时）
+	ON_HEALTH_THRESHOLD, # 生命值阈值触发
+	ON_ALLY_CONTACT,     # 友方单位触发
+	ON_STATUS_APPLIED,   # 目标被施加特定状态时触发
+	ON_CHAIN_END,        # 链式传导结束时触发
+	ON_SHIELD_BREAK,     # 护盾破碎时触发
+	ON_SUMMON_DEATH,     # 召唤物死亡时触发
+	ON_REFLECT           # 反弹发生时触发
 }
 
 @export var trigger_type: TriggerType = TriggerType.ON_CONTACT
@@ -28,6 +34,18 @@ func get_type_name() -> String:
 			return "消亡触发"
 		TriggerType.ON_HEALTH_THRESHOLD:
 			return "生命阈值触发"
+		TriggerType.ON_ALLY_CONTACT:
+			return "友方触发"
+		TriggerType.ON_STATUS_APPLIED:
+			return "状态触发"
+		TriggerType.ON_CHAIN_END:
+			return "链式结束触发"
+		TriggerType.ON_SHIELD_BREAK:
+			return "护盾破碎触发"
+		TriggerType.ON_SUMMON_DEATH:
+			return "召唤物死亡触发"
+		TriggerType.ON_REFLECT:
+			return "反弹触发"
 	return "未知触发器"
 
 ## 深拷贝（子类需要重写）
@@ -55,6 +73,8 @@ static func from_dict(data: Dictionary) -> TriggerData:
 			trigger = OnTimerTrigger.from_dict(data)
 		TriggerType.ON_PROXIMITY:
 			trigger = OnProximityTrigger.from_dict(data)
+		TriggerType.ON_STATUS_APPLIED:
+			trigger = OnStatusAppliedTrigger.from_dict(data)
 		_:
 			trigger = TriggerData.new()
 			trigger.trigger_type = trigger_type_val

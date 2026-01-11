@@ -187,6 +187,37 @@ func _calculate_spell_cost_with_nesting(spell: SpellCoreData, depth: int = 0) ->
 				var zone = action as SpawnDamageZoneActionData
 				total_cost += zone.zone_damage * zone.zone_duration * 0.08
 				total_cost += zone.zone_radius * 0.05
+			
+			elif action is ShieldActionData:
+				var shield = action as ShieldActionData
+				total_cost += shield.shield_amount * 0.15
+				total_cost += shield.shield_duration * 0.5
+				total_cost += shield.shield_radius * 0.03
+			
+			elif action is ReflectActionData:
+				var reflect = action as ReflectActionData
+				total_cost += reflect.reflect_duration * 1.0
+				total_cost += reflect.max_reflects * 2.0
+				total_cost += reflect.reflect_damage_ratio * 5.0
+			
+			elif action is DisplacementActionData:
+				var disp = action as DisplacementActionData
+				total_cost += disp.displacement_force * 0.01
+				total_cost += disp.stun_after_displacement * 2.0
+				total_cost += disp.damage_on_collision * 0.2
+			
+			elif action is ChainActionData:
+				var chain = action as ChainActionData
+				total_cost += chain.chain_count * 3.0
+				total_cost += chain.chain_damage * 0.25
+				total_cost += chain.chain_range * 0.02
+			
+			elif action is SummonActionData:
+				var summon = action as SummonActionData
+				total_cost += summon.summon_count * 5.0
+				total_cost += summon.summon_duration * 0.3
+				total_cost += summon.summon_damage * 0.2
+				total_cost += summon.summon_health * 0.1
 	
 	return {
 		"total_cost": total_cost,
@@ -227,6 +258,27 @@ func _balance_spell_cost(spell: SpellCoreData, cost_info: Dictionary) -> SpellCo
 				var area = action as AreaEffectActionData
 				area.radius *= clampf(reduction_ratio, 0.6, 1.0)
 				area.damage_value *= clampf(reduction_ratio, 0.5, 1.0)
+			
+			elif action is SpawnExplosionActionData:
+				var explosion = action as SpawnExplosionActionData
+				explosion.explosion_radius *= clampf(reduction_ratio, 0.6, 1.0)
+				explosion.explosion_damage *= clampf(reduction_ratio, 0.5, 1.0)
+			
+			elif action is ShieldActionData:
+				var shield = action as ShieldActionData
+				shield.shield_amount *= clampf(reduction_ratio, 0.5, 1.0)
+				shield.shield_duration *= clampf(reduction_ratio, 0.6, 1.0)
+			
+			elif action is ChainActionData:
+				var chain = action as ChainActionData
+				chain.chain_count = maxi(2, int(chain.chain_count * reduction_ratio))
+				chain.chain_damage *= clampf(reduction_ratio, 0.5, 1.0)
+			
+			elif action is SummonActionData:
+				var summon = action as SummonActionData
+				summon.summon_count = maxi(1, int(summon.summon_count * reduction_ratio))
+				summon.summon_duration *= clampf(reduction_ratio, 0.6, 1.0)
+				summon.summon_damage *= clampf(reduction_ratio, 0.5, 1.0)
 	
 	return spell
 

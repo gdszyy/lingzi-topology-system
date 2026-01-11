@@ -46,15 +46,16 @@ func generate_spell_for_scenario(scenario: SpellScenarioConfig.SpellScenario) ->
 	var remaining_cost = cost_budget.main - used_cost
 	
 	for i in range(rule_count):
-		var rule = _generate_scenario_rule(config, i == 0, remaining_cost, target_nesting_depth, cost_budget.child)
+		var rule = _generate_scenario_rule(config, scenario, i == 0, remaining_cost, target_nesting_depth, cost_budget.child)
 		rule.rule_name = "规则_%d" % (i + 1)
 		spell.topology_rules.append(rule)
 		remaining_cost -= _calculate_rule_cost(rule)
 		if remaining_cost < 5.0:
 			break
 	
-	# 确保至少有一条接触伤害规则
-	_ensure_contact_damage(spell, config)
+	# 确保至少有一条接触伤害规则（非防御场景）
+	if scenario != SpellScenarioConfig.SpellScenario.DEFENSE:
+		_ensure_contact_damage(spell, config)
 	
 	# 计算资源消耗
 	spell.resource_cost = _calculate_resource_cost(spell)
@@ -83,6 +84,18 @@ func _decide_nesting_depth(scenario: SpellScenarioConfig.SpellScenario) -> int:
 		SpellScenarioConfig.SpellScenario.AMBUSH:
 			# 埋伏法术：中等复杂度，1-3层
 			depth_weights = [0.3, 0.35, 0.25, 0.1]
+		SpellScenarioConfig.SpellScenario.DEFENSE:
+			# 防御法术：简单，1-2层
+			depth_weights = [0.5, 0.35, 0.12, 0.03]
+		SpellScenarioConfig.SpellScenario.CONTROL:
+			# 控制法术：中等，1-3层
+			depth_weights = [0.35, 0.35, 0.22, 0.08]
+		SpellScenarioConfig.SpellScenario.SUMMON:
+			# 召唤法术：简单载体，1-2层
+			depth_weights = [0.55, 0.3, 0.12, 0.03]
+		SpellScenarioConfig.SpellScenario.CHAIN:
+			# 链式法术：中等，1-3层
+			depth_weights = [0.4, 0.35, 0.2, 0.05]
 		_:
 			depth_weights = [0.4, 0.3, 0.2, 0.1]
 	
@@ -148,6 +161,37 @@ func _calculate_action_cost(action: ActionData, depth: int = 0) -> float:
 		var zone = action as SpawnDamageZoneActionData
 		cost += zone.zone_damage * zone.zone_duration * 0.08
 		cost += zone.zone_radius * 0.05
+	
+	elif action is ShieldActionData:
+		var shield = action as ShieldActionData
+		cost += shield.shield_amount * 0.15
+		cost += shield.shield_duration * 0.5
+		cost += shield.shield_radius * 0.03
+	
+	elif action is ReflectActionData:
+		var reflect = action as ReflectActionData
+		cost += reflect.reflect_duration * 1.0
+		cost += reflect.max_reflects * 2.0
+		cost += reflect.reflect_damage_ratio * 5.0
+	
+	elif action is DisplacementActionData:
+		var disp = action as DisplacementActionData
+		cost += disp.displacement_force * 0.01
+		cost += disp.stun_after_displacement * 2.0
+		cost += disp.damage_on_collision * 0.2
+	
+	elif action is ChainActionData:
+		var chain = action as ChainActionData
+		cost += chain.chain_count * 3.0
+		cost += chain.chain_damage * 0.25
+		cost += chain.chain_range * 0.02
+	
+	elif action is SummonActionData:
+		var summon = action as SummonActionData
+		cost += summon.summon_count * 5.0
+		cost += summon.summon_duration * 0.3
+		cost += summon.summon_damage * 0.2
+		cost += summon.summon_health * 0.1
 	
 	return cost
 
@@ -224,12 +268,12 @@ func _generate_scenario_carrier(config: Dictionary, cost_budget: float) -> Carri
 	return carrier
 
 ## 生成场景专用规则
-func _generate_scenario_rule(config: Dictionary, is_first_rule: bool, remaining_cost: float, target_depth: int, child_budget: float) -> TopologyRuleData:
+func _generate_scenario_rule(config: Dictionary, scenario: SpellScenarioConfig.SpellScenario, is_first_rule: bool, remaining_cost: float, target_depth: int, child_budget: float) -> TopologyRuleData:
 	var rule = TopologyRuleData.new()
 	var rules_config = config.get("rules", {})
 	
 	# 生成触发器
-	rule.trigger = _generate_scenario_trigger(rules_config, is_first_rule)
+	rule.trigger = _generate_scenario_trigger(rules_config, is_first_rule, scenario)
 	
 	# 生成动作
 	var max_actions = rules_config.get("max_actions_per_rule", 3)
@@ -244,7 +288,7 @@ func _generate_scenario_rule(config: Dictionary, is_first_rule: bool, remaining_
 	var action_cost_used = 0.0
 	for i in range(action_count):
 		var action_budget = (remaining_cost - action_cost_used) / (action_count - i)
-		var action = _generate_scenario_action(rules_config, max_damage, target_depth, child_budget, action_budget)
+		var action = _generate_scenario_action(rules_config, scenario, max_damage, target_depth, child_budget, action_budget)
 		rule.actions.append(action)
 		action_cost_used += _calculate_action_cost(action)
 		if action_cost_used > remaining_cost * 0.9:
@@ -253,12 +297,12 @@ func _generate_scenario_rule(config: Dictionary, is_first_rule: bool, remaining_
 	return rule
 
 ## 生成场景专用触发器
-func _generate_scenario_trigger(rules_config: Dictionary, is_first_rule: bool) -> TriggerData:
+func _generate_scenario_trigger(rules_config: Dictionary, is_first_rule: bool, scenario: SpellScenarioConfig.SpellScenario) -> TriggerData:
 	var preferred_triggers = rules_config.get("preferred_triggers", [TriggerData.TriggerType.ON_CONTACT])
 	
-	# 第一条规则优先使用接触触发
+	# 第一条规则优先使用接触触发（非防御场景）
 	var trigger_type: int
-	if is_first_rule and TriggerData.TriggerType.ON_CONTACT in preferred_triggers:
+	if is_first_rule and TriggerData.TriggerType.ON_CONTACT in preferred_triggers and scenario != SpellScenarioConfig.SpellScenario.DEFENSE:
 		trigger_type = TriggerData.TriggerType.ON_CONTACT
 	else:
 		trigger_type = preferred_triggers[randi() % preferred_triggers.size()]
@@ -285,6 +329,20 @@ func _generate_scenario_trigger(rules_config: Dictionary, is_first_rule: bool) -
 			trigger = TriggerData.new()
 			trigger.trigger_type = TriggerData.TriggerType.ON_DEATH
 		
+		TriggerData.TriggerType.ON_ALLY_CONTACT:
+			trigger = TriggerData.new()
+			trigger.trigger_type = TriggerData.TriggerType.ON_ALLY_CONTACT
+		
+		TriggerData.TriggerType.ON_STATUS_APPLIED:
+			var status_trigger = OnStatusAppliedTrigger.new()
+			var preferred_status = rules_config.get("preferred_status_types", [1, 3, 4])  # FROZEN, SLOWED, STUNNED
+			status_trigger.required_status_type = preferred_status[randi() % preferred_status.size()]
+			trigger = status_trigger
+		
+		TriggerData.TriggerType.ON_CHAIN_END:
+			trigger = TriggerData.new()
+			trigger.trigger_type = TriggerData.TriggerType.ON_CHAIN_END
+		
 		_:
 			trigger = TriggerData.new()
 			trigger.trigger_type = TriggerData.TriggerType.ON_CONTACT
@@ -293,105 +351,253 @@ func _generate_scenario_trigger(rules_config: Dictionary, is_first_rule: bool) -
 	return trigger
 
 ## 生成场景专用动作
-func _generate_scenario_action(rules_config: Dictionary, max_damage: float, target_depth: int, child_budget: float, action_budget: float) -> ActionData:
+func _generate_scenario_action(rules_config: Dictionary, scenario: SpellScenarioConfig.SpellScenario, max_damage: float, target_depth: int, child_budget: float, action_budget: float) -> ActionData:
+	# 根据场景获取允许的动作类型和概率
 	var allow_fission = rules_config.get("allow_fission", true) and target_depth > 0
 	var allow_aoe = rules_config.get("allow_aoe", true)
+	var allow_shield = rules_config.get("allow_shield", false)
+	var allow_reflect = rules_config.get("allow_reflect", false)
+	var allow_displacement = rules_config.get("allow_displacement", false)
+	var allow_chain = rules_config.get("allow_chain", false)
+	var allow_summon = rules_config.get("allow_summon", false)
+	var allow_status = rules_config.get("allow_status", true)
+	
 	var fission_prob = rules_config.get("fission_probability", 0.3) if allow_fission else 0.0
 	var aoe_prob = rules_config.get("aoe_probability", 0.3) if allow_aoe else 0.0
+	var shield_prob = rules_config.get("shield_probability", 0.0) if allow_shield else 0.0
+	var reflect_prob = rules_config.get("reflect_probability", 0.0) if allow_reflect else 0.0
+	var displacement_prob = rules_config.get("displacement_probability", 0.0) if allow_displacement else 0.0
+	var chain_prob = rules_config.get("chain_probability", 0.0) if allow_chain else 0.0
+	var summon_prob = rules_config.get("summon_probability", 0.0) if allow_summon else 0.0
+	var status_prob = rules_config.get("status_probability", 0.15) if allow_status else 0.0
 	
 	# 决定动作类型
 	var roll = randf()
-	var action_type: int
+	var cumulative = 0.0
+	var action_type: int = ActionData.ActionType.DAMAGE
 	
-	if allow_fission and roll < fission_prob:
-		action_type = ActionData.ActionType.FISSION
-	elif allow_aoe and roll < fission_prob + aoe_prob:
-		action_type = ActionData.ActionType.AREA_EFFECT
-	elif roll < 0.85:
+	# 按概率选择动作类型
+	var action_probs = [
+		[ActionData.ActionType.SHIELD, shield_prob],
+		[ActionData.ActionType.REFLECT, reflect_prob],
+		[ActionData.ActionType.CHAIN, chain_prob],
+		[ActionData.ActionType.SUMMON, summon_prob],
+		[ActionData.ActionType.DISPLACEMENT, displacement_prob],
+		[ActionData.ActionType.FISSION, fission_prob],
+		[ActionData.ActionType.SPAWN_ENTITY, aoe_prob],
+		[ActionData.ActionType.APPLY_STATUS, status_prob],
+	]
+	
+	for prob_pair in action_probs:
+		cumulative += prob_pair[1]
+		if roll < cumulative:
+			action_type = prob_pair[0]
+			break
+	
+	# 如果没有选中特殊动作，默认伤害
+	if roll >= cumulative:
 		action_type = ActionData.ActionType.DAMAGE
-	else:
-		action_type = ActionData.ActionType.APPLY_STATUS
 	
 	var action: ActionData
 	
 	match action_type:
 		ActionData.ActionType.DAMAGE:
-			var damage = DamageActionData.new()
-			# 根据action_budget调整伤害
-			var budget_max_damage = minf(max_damage, action_budget / 0.3)
-			damage.damage_value = randf_range(8.0, budget_max_damage)
-			damage.damage_type = randi() % 4
-			damage.damage_multiplier = randf_range(0.8, 1.3)
-			action = damage
+			action = _generate_damage_action(max_damage, action_budget)
 		
 		ActionData.ActionType.FISSION:
-			var fission = FissionActionData.new()
-			# 根据action_budget调整裂变数量
-			var max_spawn = mini(8, int(action_budget / 2.5))
-			fission.spawn_count = randi_range(2, maxi(2, max_spawn))
-			fission.spread_angle = randf_range(30.0, 180.0)
-			fission.inherit_velocity = randf_range(0.4, 0.9)
-			
-			# 随机选择方向模式
-			var mode_roll = randf()
-			if mode_roll < 0.5:
-				fission.direction_mode = FissionActionData.DirectionMode.INHERIT_PARENT
-			elif mode_roll < 0.7:
-				fission.direction_mode = FissionActionData.DirectionMode.TOWARD_NEAREST
-			elif mode_roll < 0.9:
-				fission.direction_mode = FissionActionData.DirectionMode.FIXED_WORLD
-			else:
-				fission.direction_mode = FissionActionData.DirectionMode.RANDOM
-			
-			# 生成子法术（根据目标深度决定子法术复杂度）
-			if target_depth > 1:
-				# 多层嵌套：子法术也可能有裂变
-				var child_roll = randf()
-				if child_roll < 0.4:
-					fission.child_spell_data = _generate_nested_child_spell(child_budget, target_depth - 1)
-				elif child_roll < 0.6:
-					fission.child_spell_data = generate_advanced_child_spell("mine", child_budget * 0.8)
-				elif child_roll < 0.8:
-					fission.child_spell_data = generate_advanced_child_spell("homing", child_budget * 0.6)
-				else:
-					fission.child_spell_data = generate_advanced_child_spell("explosive", child_budget * 0.7)
-			else:
-				# 单层嵌套：简单子法术
-				var child_roll = randf()
-				if child_roll < 0.5:
-					fission.child_spell_data = _generate_simple_child_spell(child_budget * 0.6)
-				elif child_roll < 0.7:
-					fission.child_spell_data = generate_advanced_child_spell("mine", child_budget * 0.8)
-				elif child_roll < 0.85:
-					fission.child_spell_data = generate_advanced_child_spell("homing", child_budget * 0.5)
-				else:
-					fission.child_spell_data = generate_advanced_child_spell("explosive", child_budget * 0.6)
-			
-			action = fission
+			action = _generate_fission_action(rules_config, max_damage, target_depth, child_budget, action_budget)
 		
-		ActionData.ActionType.AREA_EFFECT:
-			var area = AreaEffectActionData.new()
-			# 根据action_budget调整范围和伤害
-			var budget_radius = minf(120.0, action_budget / 0.08)
-			area.radius = randf_range(40.0, budget_radius)
-			var budget_aoe_damage = minf(max_damage * 0.7, (action_budget - area.radius * 0.08) / 0.25)
-			area.damage_value = randf_range(5.0, maxf(5.0, budget_aoe_damage))
-			area.damage_falloff = randf_range(0.3, 0.7)
-			action = area
+		ActionData.ActionType.SPAWN_ENTITY:
+			action = _generate_aoe_action(max_damage, action_budget)
 		
 		ActionData.ActionType.APPLY_STATUS:
-			var status = ApplyStatusActionData.new()
-			status.status_type = randi() % 6
-			status.duration = randf_range(1.0, minf(4.0, action_budget / 0.8))
-			status.effect_value = randf_range(3.0, 12.0)
-			action = status
+			action = _generate_status_action(rules_config, action_budget)
+		
+		ActionData.ActionType.SHIELD:
+			action = _generate_shield_action(action_budget)
+		
+		ActionData.ActionType.REFLECT:
+			action = _generate_reflect_action(action_budget)
+		
+		ActionData.ActionType.DISPLACEMENT:
+			action = _generate_displacement_action(rules_config, action_budget)
+		
+		ActionData.ActionType.CHAIN:
+			action = _generate_chain_action(rules_config, max_damage, action_budget)
+		
+		ActionData.ActionType.SUMMON:
+			action = _generate_summon_action(rules_config, action_budget)
 		
 		_:
-			var damage = DamageActionData.new()
-			damage.damage_value = randf_range(8.0, max_damage)
-			action = damage
+			action = _generate_damage_action(max_damage, action_budget)
 	
 	return action
+
+## 生成伤害动作
+func _generate_damage_action(max_damage: float, action_budget: float) -> DamageActionData:
+	var damage = DamageActionData.new()
+	var budget_max_damage = minf(max_damage, action_budget / 0.3)
+	damage.damage_value = randf_range(8.0, budget_max_damage)
+	damage.damage_type = randi() % 4
+	damage.damage_multiplier = randf_range(0.8, 1.3)
+	return damage
+
+## 生成裂变动作
+func _generate_fission_action(rules_config: Dictionary, max_damage: float, target_depth: int, child_budget: float, action_budget: float) -> FissionActionData:
+	var fission = FissionActionData.new()
+	var max_spawn = mini(8, int(action_budget / 2.5))
+	fission.spawn_count = randi_range(2, maxi(2, max_spawn))
+	fission.spread_angle = randf_range(30.0, 180.0)
+	fission.inherit_velocity = randf_range(0.4, 0.9)
+	
+	# 随机选择方向模式
+	var mode_roll = randf()
+	if mode_roll < 0.5:
+		fission.direction_mode = FissionActionData.DirectionMode.INHERIT_PARENT
+	elif mode_roll < 0.7:
+		fission.direction_mode = FissionActionData.DirectionMode.TOWARD_NEAREST
+	elif mode_roll < 0.9:
+		fission.direction_mode = FissionActionData.DirectionMode.FIXED_WORLD
+	else:
+		fission.direction_mode = FissionActionData.DirectionMode.RANDOM
+	
+	# 生成子法术
+	if target_depth > 1:
+		var child_roll = randf()
+		if child_roll < 0.4:
+			fission.child_spell_data = _generate_nested_child_spell(child_budget, target_depth - 1)
+		elif child_roll < 0.6:
+			fission.child_spell_data = generate_advanced_child_spell("mine", child_budget * 0.8)
+		elif child_roll < 0.8:
+			fission.child_spell_data = generate_advanced_child_spell("homing", child_budget * 0.6)
+		else:
+			fission.child_spell_data = generate_advanced_child_spell("explosive", child_budget * 0.7)
+	else:
+		var child_roll = randf()
+		if child_roll < 0.5:
+			fission.child_spell_data = _generate_simple_child_spell(child_budget * 0.6)
+		elif child_roll < 0.7:
+			fission.child_spell_data = generate_advanced_child_spell("mine", child_budget * 0.8)
+		elif child_roll < 0.85:
+			fission.child_spell_data = generate_advanced_child_spell("homing", child_budget * 0.5)
+		else:
+			fission.child_spell_data = generate_advanced_child_spell("explosive", child_budget * 0.6)
+	
+	return fission
+
+## 生成AOE动作
+func _generate_aoe_action(max_damage: float, action_budget: float) -> SpawnExplosionActionData:
+	var explosion = SpawnExplosionActionData.new()
+	var budget_radius = minf(120.0, action_budget / 0.08)
+	explosion.explosion_radius = randf_range(40.0, budget_radius)
+	var budget_damage = minf(max_damage * 0.7, (action_budget - explosion.explosion_radius * 0.08) / 0.2)
+	explosion.explosion_damage = randf_range(10.0, maxf(10.0, budget_damage))
+	explosion.damage_falloff = randf_range(0.3, 0.7)
+	return explosion
+
+## 生成状态动作
+func _generate_status_action(rules_config: Dictionary, action_budget: float) -> ApplyStatusActionData:
+	var status = ApplyStatusActionData.new()
+	var preferred_status = rules_config.get("preferred_status_types", [])
+	if preferred_status.size() > 0:
+		status.status_type = preferred_status[randi() % preferred_status.size()]
+	else:
+		status.status_type = randi() % 6
+	status.duration = randf_range(1.0, minf(4.0, action_budget / 0.8))
+	status.effect_value = randf_range(3.0, 12.0)
+	return status
+
+## 生成护盾动作
+func _generate_shield_action(action_budget: float) -> ShieldActionData:
+	var shield = ShieldActionData.new()
+	shield.shield_type = randi() % 3
+	shield.shield_amount = randf_range(30.0, minf(80.0, action_budget / 0.15))
+	shield.shield_duration = randf_range(3.0, minf(8.0, action_budget / 0.5))
+	shield.shield_radius = randf_range(60.0, 120.0) if shield.shield_type == ShieldActionData.ShieldType.AREA else 0.0
+	shield.on_break_explode = randf() < 0.3
+	if shield.on_break_explode:
+		shield.break_explosion_damage = randf_range(20.0, 50.0)
+	return shield
+
+## 生成反弹动作
+func _generate_reflect_action(action_budget: float) -> ReflectActionData:
+	var reflect = ReflectActionData.new()
+	reflect.reflect_type = randi() % 3
+	reflect.reflect_damage_ratio = randf_range(0.3, minf(0.8, action_budget / 5.0))
+	reflect.reflect_duration = randf_range(1.5, minf(4.0, action_budget / 1.0))
+	reflect.max_reflects = randi_range(2, mini(5, int(action_budget / 2.0)))
+	reflect.reflect_radius = randf_range(50.0, 100.0)
+	return reflect
+
+## 生成位移动作
+func _generate_displacement_action(rules_config: Dictionary, action_budget: float) -> DisplacementActionData:
+	var disp = DisplacementActionData.new()
+	disp.displacement_type = randi() % 4  # KNOCKBACK, PULL, TELEPORT, LAUNCH
+	disp.displacement_force = randf_range(200.0, minf(500.0, action_budget / 0.01))
+	disp.displacement_duration = randf_range(0.2, 0.5)
+	disp.stun_after_displacement = randf_range(0.0, minf(1.0, action_budget / 2.0))
+	disp.damage_on_collision = randf_range(0.0, 20.0) if randf() < 0.3 else 0.0
+	return disp
+
+## 生成链式动作
+func _generate_chain_action(rules_config: Dictionary, max_damage: float, action_budget: float) -> ChainActionData:
+	var chain = ChainActionData.new()
+	var preferred_chain = rules_config.get("preferred_chain_types", [0, 1, 2])
+	chain.chain_type = preferred_chain[randi() % preferred_chain.size()]
+	chain.chain_count = randi_range(2, mini(5, int(action_budget / 3.0)))
+	chain.chain_damage = randf_range(15.0, minf(max_damage * 0.8, action_budget / 0.25))
+	chain.chain_damage_decay = randf_range(0.7, 0.9)
+	chain.chain_range = randf_range(150.0, 250.0)
+	chain.chain_delay = randf_range(0.05, 0.15)
+	chain.chain_can_return = randf() < 0.2
+	
+	# 链式附带状态
+	if randf() < 0.4:
+		match chain.chain_type:
+			ChainActionData.ChainType.LIGHTNING:
+				chain.apply_status_type = ApplyStatusActionData.StatusType.STUNNED
+			ChainActionData.ChainType.FIRE:
+				chain.apply_status_type = ApplyStatusActionData.StatusType.BURNING
+			ChainActionData.ChainType.ICE:
+				chain.apply_status_type = ApplyStatusActionData.StatusType.FROZEN
+			ChainActionData.ChainType.VOID:
+				chain.apply_status_type = ApplyStatusActionData.StatusType.MARKED
+		chain.apply_status_duration = randf_range(1.0, 2.5)
+	
+	return chain
+
+## 生成召唤动作
+func _generate_summon_action(rules_config: Dictionary, action_budget: float) -> SummonActionData:
+	var summon = SummonActionData.new()
+	var preferred_summon = rules_config.get("preferred_summon_types", [0, 1, 2, 5])
+	summon.summon_type = preferred_summon[randi() % preferred_summon.size()]
+	summon.summon_count = randi_range(1, mini(3, int(action_budget / 5.0)))
+	summon.summon_duration = randf_range(6.0, minf(15.0, action_budget / 0.3))
+	summon.summon_damage = randf_range(10.0, minf(25.0, action_budget / 0.2))
+	summon.summon_health = randf_range(30.0, minf(80.0, action_budget / 0.1))
+	summon.summon_attack_interval = randf_range(0.8, 1.5)
+	summon.summon_attack_range = randf_range(150.0, 250.0)
+	
+	# 根据召唤物类型设置特定属性
+	match summon.summon_type:
+		SummonActionData.SummonType.MINION:
+			summon.summon_move_speed = randf_range(80.0, 150.0)
+			summon.behavior_mode = SummonActionData.BehaviorMode.AGGRESSIVE
+		SummonActionData.SummonType.ORBITER:
+			summon.orbit_radius = randf_range(60.0, 100.0)
+			summon.orbit_speed = randf_range(1.5, 3.0)
+			summon.behavior_mode = SummonActionData.BehaviorMode.FOLLOW
+		SummonActionData.SummonType.DECOY:
+			summon.aggro_radius = randf_range(120.0, 200.0)
+			summon.behavior_mode = SummonActionData.BehaviorMode.PASSIVE
+		SummonActionData.SummonType.TOTEM:
+			summon.totem_effect_radius = randf_range(100.0, 150.0)
+			summon.totem_effect_interval = randf_range(0.8, 1.5)
+			summon.behavior_mode = SummonActionData.BehaviorMode.DEFENSIVE
+		_:
+			summon.behavior_mode = SummonActionData.BehaviorMode.DEFENSIVE
+	
+	return summon
 
 ## 生成可嵌套的子法术（支持多层嵌套）
 func _generate_nested_child_spell(cost_budget: float, remaining_depth: int) -> SpellCoreData:
@@ -514,12 +720,12 @@ func _generate_mine_child_spell(max_damage: float) -> SpellCoreData:
 	prox_trigger.trigger_once = true
 	prox_rule.trigger = prox_trigger
 	
-	# 爆炸效果
-	var area = AreaEffectActionData.new()
-	area.radius = randf_range(80.0, 150.0)
-	area.damage_value = randf_range(max_damage * 0.8, max_damage * 1.5)
-	area.damage_falloff = randf_range(0.3, 0.6)
-	prox_rule.actions.append(area)
+	# 爆炸效果（使用SpawnExplosionActionData替代AreaEffectActionData）
+	var explosion = SpawnExplosionActionData.new()
+	explosion.explosion_radius = randf_range(80.0, 150.0)
+	explosion.explosion_damage = randf_range(max_damage * 0.8, max_damage * 1.5)
+	explosion.damage_falloff = randf_range(0.3, 0.6)
+	prox_rule.actions.append(explosion)
 	
 	spell.topology_rules.append(prox_rule)
 	
@@ -530,10 +736,10 @@ func _generate_mine_child_spell(max_damage: float) -> SpellCoreData:
 		death_rule.trigger = TriggerData.new()
 		death_rule.trigger.trigger_type = TriggerData.TriggerType.ON_DEATH
 		
-		var death_area = AreaEffectActionData.new()
-		death_area.radius = area.radius * 0.7
-		death_area.damage_value = area.damage_value * 0.5
-		death_rule.actions.append(death_area)
+		var death_explosion = SpawnExplosionActionData.new()
+		death_explosion.explosion_radius = explosion.explosion_radius * 0.7
+		death_explosion.explosion_damage = explosion.explosion_damage * 0.5
+		death_rule.actions.append(death_explosion)
 		
 		spell.topology_rules.append(death_rule)
 	
@@ -593,10 +799,10 @@ func _generate_explosive_child_spell(max_damage: float) -> SpellCoreData:
 	damage.damage_value = randf_range(max_damage * 0.3, max_damage * 0.5)
 	contact_rule.actions.append(damage)
 	
-	var area = AreaEffectActionData.new()
-	area.radius = randf_range(50.0, 100.0)
-	area.damage_value = randf_range(max_damage * 0.4, max_damage * 0.7)
-	contact_rule.actions.append(area)
+	var explosion = SpawnExplosionActionData.new()
+	explosion.explosion_radius = randf_range(50.0, 100.0)
+	explosion.explosion_damage = randf_range(max_damage * 0.4, max_damage * 0.7)
+	contact_rule.actions.append(explosion)
 	
 	spell.topology_rules.append(contact_rule)
 	
@@ -606,10 +812,10 @@ func _generate_explosive_child_spell(max_damage: float) -> SpellCoreData:
 	death_rule.trigger = TriggerData.new()
 	death_rule.trigger.trigger_type = TriggerData.TriggerType.ON_DEATH
 	
-	var death_area = AreaEffectActionData.new()
-	death_area.radius = randf_range(40.0, 80.0)
-	death_area.damage_value = randf_range(max_damage * 0.3, max_damage * 0.5)
-	death_rule.actions.append(death_area)
+	var death_explosion = SpawnExplosionActionData.new()
+	death_explosion.explosion_radius = randf_range(40.0, 80.0)
+	death_explosion.explosion_damage = randf_range(max_damage * 0.3, max_damage * 0.5)
+	death_rule.actions.append(death_explosion)
 	
 	spell.topology_rules.append(death_rule)
 	
@@ -715,6 +921,14 @@ func _calculate_cooldown(scenario: SpellScenarioConfig.SpellScenario) -> float:
 			return randf_range(1.5, 3.0)  # 较长冷却
 		SpellScenarioConfig.SpellScenario.AMBUSH:
 			return randf_range(2.0, 4.0)  # 长冷却
+		SpellScenarioConfig.SpellScenario.DEFENSE:
+			return randf_range(1.5, 3.0)  # 中等冷却
+		SpellScenarioConfig.SpellScenario.CONTROL:
+			return randf_range(1.0, 2.5)  # 中等冷却
+		SpellScenarioConfig.SpellScenario.SUMMON:
+			return randf_range(3.0, 5.0)  # 长冷却
+		SpellScenarioConfig.SpellScenario.CHAIN:
+			return randf_range(1.2, 2.5)  # 中等冷却
 		_:
 			return 1.0
 
@@ -745,6 +959,22 @@ func _generate_scenario_spell_name(scenario: SpellScenarioConfig.SpellScenario) 
 			scenario_prefix = "埋伏法术-"
 			prefixes = ["伏", "潜", "隐", "陷", "诡"]
 			suffixes = ["雷", "阱", "伏", "网", "陷"]
+		SpellScenarioConfig.SpellScenario.DEFENSE:
+			scenario_prefix = "防御法术-"
+			prefixes = ["护", "盾", "壁", "障", "御"]
+			suffixes = ["盾", "壁", "障", "甲", "卫"]
+		SpellScenarioConfig.SpellScenario.CONTROL:
+			scenario_prefix = "控制法术-"
+			prefixes = ["冰", "缚", "锁", "封", "禁"]
+			suffixes = ["缚", "锁", "封", "禁", "困"]
+		SpellScenarioConfig.SpellScenario.SUMMON:
+			scenario_prefix = "召唤法术-"
+			prefixes = ["召", "唤", "灵", "魂", "影"]
+			suffixes = ["灵", "仆", "卫", "兵", "魂"]
+		SpellScenarioConfig.SpellScenario.CHAIN:
+			scenario_prefix = "链式法术-"
+			prefixes = ["连", "链", "弧", "闪", "跃"]
+			suffixes = ["链", "弧", "电", "闪", "跃"]
 		_:
 			scenario_prefix = "法术-"
 			prefixes = ["灵", "玄", "幻", "魔", "咒"]
