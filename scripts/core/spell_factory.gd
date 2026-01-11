@@ -88,6 +88,8 @@ func _generate_random_carrier() -> CarrierConfigData:
 	carrier.mass = randf_range(config.mass_range.x, config.mass_range.y)
 	carrier.piercing = randi_range(0, 3)
 	carrier.instability_cost = randf_range(0.0, 5.0)
+	# 基础伤害，确保不为0
+	carrier.base_damage = maxf(randf_range(config.damage_range.x, config.damage_range.y), 1.0)
 	return carrier
 
 ## 生成随机拓扑规则
@@ -274,8 +276,48 @@ func _calculate_resource_cost(spell: SpellCoreData) -> float:
 
 ## 生成法术名称
 func _generate_spell_name() -> String:
-	var prefixes = ["炎", "冰", "雷", "风", "暗", "光", "毒", "灵", "玄", "天"]
-	var middles = ["焰", "霜", "电", "刃", "影", "芒", "蚀", "魂", "元", "罡"]
-	var suffixes = ["弹", "箭", "球", "波", "刺", "爆", "环", "雨", "阵", "诀"]
+	return _generate_spell_name_with_scenario(-1)
+
+## 生成带场景前缀的法术名称
+func _generate_spell_name_with_scenario(scenario: int = -1) -> String:
+	var scenario_prefix: String = ""
+	var prefixes: Array
+	var middles: Array
+	var suffixes: Array
 	
-	return prefixes[randi() % prefixes.size()] + middles[randi() % middles.size()] + suffixes[randi() % suffixes.size()]
+	# 根据场景选择前缀
+	match scenario:
+		0:  # HARASS - 消耗
+			scenario_prefix = "消耗法术-"
+			prefixes = ["轻", "疾", "连", "散", "扰"]
+			middles = ["灵", "影", "风", "雷", "光"]
+			suffixes = ["刺", "箭", "弹", "针", "羽"]
+		1:  # SINGLE_TARGET - 单体
+			scenario_prefix = "单体法术-"
+			prefixes = ["穿", "贯", "狙", "精", "锐"]
+			middles = ["炎", "冰", "雷", "暗", "光"]
+			suffixes = ["矛", "枪", "射", "击", "穿"]
+		2:  # CLOSE_COMBAT - 近战
+			scenario_prefix = "近战法术-"
+			prefixes = ["烈", "猛", "暴", "狂", "怒"]
+			middles = ["炎", "雷", "风", "光", "灵"]
+			suffixes = ["斩", "击", "爆", "裂", "碎"]
+		3:  # AOE - 群伤
+			scenario_prefix = "群伤法术-"
+			prefixes = ["广", "散", "爆", "环", "域"]
+			middles = ["炎", "冰", "雷", "毒", "暗"]
+			suffixes = ["波", "雨", "环", "阵", "域"]
+		4:  # AMBUSH - 埋伏
+			scenario_prefix = "埋伏法术-"
+			prefixes = ["伏", "潜", "隐", "陷", "诡"]
+			middles = ["暗", "毒", "影", "灵", "玄"]
+			suffixes = ["雷", "阱", "伏", "网", "陷"]
+		_:  # 默认/未知场景
+			# 随机选择一个场景前缀
+			var scenario_prefixes = ["消耗法术-", "单体法术-", "近战法术-", "群伤法术-", "埋伏法术-"]
+			scenario_prefix = scenario_prefixes[randi() % scenario_prefixes.size()]
+			prefixes = ["炎", "冰", "雷", "风", "暗", "光", "毒", "灵", "玄", "天"]
+			middles = ["焐", "霜", "电", "刃", "影", "芒", "蚀", "魂", "元", "罡"]
+			suffixes = ["弹", "箭", "球", "波", "刺", "爆", "环", "雨", "阵", "诀"]
+	
+	return scenario_prefix + prefixes[randi() % prefixes.size()] + middles[randi() % middles.size()] + suffixes[randi() % suffixes.size()]

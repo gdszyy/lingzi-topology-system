@@ -14,47 +14,51 @@ var parent_editor: SpellEditor = null
 var child_editor: SpellEditor = null
 
 ## UI 引用 - 主面板
-@onready var spell_name_edit: LineEdit = $MainPanel/VBox/SpellNameEdit
-@onready var cost_spin: SpinBox = $MainPanel/VBox/CostContainer/CostSpin
-@onready var cooldown_spin: SpinBox = $MainPanel/VBox/CooldownContainer/CooldownSpin
+@onready var spell_name_edit: LineEdit = $MainPanel/ScrollContainer/VBox/SpellNameEdit
+@onready var cost_spin: SpinBox = $MainPanel/ScrollContainer/VBox/CostContainer/CostSpin
+@onready var cooldown_spin: SpinBox = $MainPanel/ScrollContainer/VBox/CooldownContainer/CooldownSpin
 
 ## UI 引用 - 载体配置
-@onready var carrier_type_option: OptionButton = $MainPanel/VBox/CarrierSection/CarrierTypeOption
-@onready var phase_option: OptionButton = $MainPanel/VBox/CarrierSection/PhaseOption
-@onready var velocity_spin: SpinBox = $MainPanel/VBox/CarrierSection/VelocitySpin
-@onready var lifetime_spin: SpinBox = $MainPanel/VBox/CarrierSection/LifetimeSpin
-@onready var mass_spin: SpinBox = $MainPanel/VBox/CarrierSection/MassSpin
-@onready var size_spin: SpinBox = $MainPanel/VBox/CarrierSection/SizeSpin
-@onready var piercing_spin: SpinBox = $MainPanel/VBox/CarrierSection/PiercingSpin
-@onready var homing_spin: SpinBox = $MainPanel/VBox/CarrierSection/HomingSpin
+@onready var carrier_type_option: OptionButton = $MainPanel/ScrollContainer/VBox/CarrierSection/CarrierTypeOption
+@onready var phase_option: OptionButton = $MainPanel/ScrollContainer/VBox/CarrierSection/PhaseOption
+@onready var velocity_spin: SpinBox = $MainPanel/ScrollContainer/VBox/CarrierSection/VelocitySpin
+@onready var lifetime_spin: SpinBox = $MainPanel/ScrollContainer/VBox/CarrierSection/LifetimeSpin
+@onready var mass_spin: SpinBox = $MainPanel/ScrollContainer/VBox/CarrierSection/MassSpin
+@onready var size_spin: SpinBox = $MainPanel/ScrollContainer/VBox/CarrierSection/SizeSpin
+@onready var piercing_spin: SpinBox = $MainPanel/ScrollContainer/VBox/CarrierSection/PiercingSpin
+@onready var homing_spin: SpinBox = $MainPanel/ScrollContainer/VBox/CarrierSection/HomingSpin
+@onready var damage_spin: SpinBox = $MainPanel/ScrollContainer/VBox/CarrierSection/DamageSpin
 
 ## UI 引用 - 规则列表
-@onready var rules_tree: Tree = $MainPanel/VBox/RulesSection/RulesTree
-@onready var add_rule_button: Button = $MainPanel/VBox/RulesSection/RuleButtons/AddRuleButton
-@onready var delete_rule_button: Button = $MainPanel/VBox/RulesSection/RuleButtons/DeleteRuleButton
-@onready var edit_rule_button: Button = $MainPanel/VBox/RulesSection/RuleButtons/EditRuleButton
+@onready var rules_tree: Tree = $MainPanel/ScrollContainer/VBox/RulesSection/RulesTree
+@onready var add_rule_button: Button = $MainPanel/ScrollContainer/VBox/RulesSection/RuleButtons/AddRuleButton
+@onready var delete_rule_button: Button = $MainPanel/ScrollContainer/VBox/RulesSection/RuleButtons/DeleteRuleButton
+@onready var edit_rule_button: Button = $MainPanel/ScrollContainer/VBox/RulesSection/RuleButtons/EditRuleButton
 
 ## UI 引用 - 规则编辑面板
 @onready var rule_edit_panel: Control = $RuleEditPanel
-@onready var rule_name_edit: LineEdit = $RuleEditPanel/VBox/RuleNameEdit
-@onready var trigger_type_option: OptionButton = $RuleEditPanel/VBox/TriggerSection/TriggerTypeOption
-@onready var trigger_once_check: CheckBox = $RuleEditPanel/VBox/TriggerSection/TriggerOnceCheck
-@onready var trigger_params_container: VBoxContainer = $RuleEditPanel/VBox/TriggerSection/TriggerParams
+@onready var rule_name_edit: LineEdit = $RuleEditPanel/ScrollContainer/VBox/RuleNameEdit
+@onready var trigger_type_option: OptionButton = $RuleEditPanel/ScrollContainer/VBox/TriggerSection/TriggerTypeOption
+@onready var trigger_once_check: CheckBox = $RuleEditPanel/ScrollContainer/VBox/TriggerSection/TriggerOnceCheck
+@onready var trigger_params_container: VBoxContainer = $RuleEditPanel/ScrollContainer/VBox/TriggerSection/TriggerParams
 
 ## UI 引用 - 动作列表
-@onready var actions_tree: Tree = $RuleEditPanel/VBox/ActionsSection/ActionsTree
-@onready var add_action_button: Button = $RuleEditPanel/VBox/ActionsSection/ActionButtons/AddActionButton
-@onready var delete_action_button: Button = $RuleEditPanel/VBox/ActionsSection/ActionButtons/DeleteActionButton
-@onready var edit_action_button: Button = $RuleEditPanel/VBox/ActionsSection/ActionButtons/EditActionButton
+@onready var actions_tree: Tree = $RuleEditPanel/ScrollContainer/VBox/ActionsSection/ActionsTree
+@onready var add_action_button: Button = $RuleEditPanel/ScrollContainer/VBox/ActionsSection/ActionButtons/AddActionButton
+@onready var delete_action_button: Button = $RuleEditPanel/ScrollContainer/VBox/ActionsSection/ActionButtons/DeleteActionButton
+@onready var edit_action_button: Button = $RuleEditPanel/ScrollContainer/VBox/ActionsSection/ActionButtons/EditActionButton
 
 ## UI 引用 - 动作编辑面板
 @onready var action_edit_panel: Control = $ActionEditPanel
-@onready var action_type_option: OptionButton = $ActionEditPanel/VBox/ActionTypeOption
-@onready var action_params_container: VBoxContainer = $ActionEditPanel/VBox/ActionParams
+@onready var action_type_option: OptionButton = $ActionEditPanel/ScrollContainer/VBox/ActionTypeOption
+@onready var action_params_container: VBoxContainer = $ActionEditPanel/ScrollContainer/VBox/ActionParams
 
 ## UI 引用 - 按钮
-@onready var save_button: Button = $MainPanel/VBox/ButtonContainer/SaveButton
-@onready var cancel_button: Button = $MainPanel/VBox/ButtonContainer/CancelButton
+@onready var save_button: Button = $MainPanel/ScrollContainer/VBox/ButtonContainer/SaveButton
+@onready var cancel_button: Button = $MainPanel/ScrollContainer/VBox/ButtonContainer/CancelButton
+
+## 基础伤害配置
+var base_damage: float = 10.0
 
 ## 当前编辑的规则和动作索引
 var current_rule_index: int = -1
@@ -152,6 +156,7 @@ func _load_spell_to_ui() -> void:
 		size_spin.value = current_spell.carrier.size
 		piercing_spin.value = current_spell.carrier.piercing
 		homing_spin.value = current_spell.carrier.homing_strength
+		damage_spin.value = current_spell.carrier.base_damage if current_spell.carrier.base_damage > 0 else 10.0
 	
 	_refresh_rules_tree()
 
@@ -207,6 +212,7 @@ func _save_ui_to_spell() -> void:
 	current_spell.carrier.size = size_spin.value
 	current_spell.carrier.piercing = int(piercing_spin.value)
 	current_spell.carrier.homing_strength = homing_spin.value
+	current_spell.carrier.base_damage = maxf(damage_spin.value, 1.0)  # 确保伤害不为0
 
 ## 保存按钮
 func _on_save_pressed() -> void:

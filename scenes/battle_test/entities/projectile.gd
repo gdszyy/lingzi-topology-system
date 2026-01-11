@@ -305,17 +305,11 @@ func _calculate_damage() -> float:
 	var mass_multiplier = 1.0 + carrier.mass * 0.1
 	total *= mass_multiplier
 	
-	# 调试输出：如果伤害为0，输出详细信息
+	# 确保伤害不为0，使用载体的base_damage作为保底
 	if total <= 0:
-		print("[警告] 伤害为0! 接触规则数=%d, 伤害动作数=%d, 规则总数=%d" % [
-			contact_rules_found, damage_actions_found, spell_data.topology_rules.size()
-		])
-		# 输出所有规则的触发器类型
-		for i in range(spell_data.topology_rules.size()):
-			var rule = spell_data.topology_rules[i]
-			print("  规则%d: 触发器=%d, 动作数=%d" % [
-				i, rule.trigger.trigger_type, rule.actions.size()
-			])
+		var base_dmg = carrier.base_damage if carrier.base_damage > 0 else 10.0
+		total = base_dmg * mass_multiplier
+		print("[保底伤害] 使用载体基础伤害: %.1f" % total)
 	
 	return total
 

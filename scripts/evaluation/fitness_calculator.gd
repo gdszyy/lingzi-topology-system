@@ -166,6 +166,9 @@ func calculate_complexity_score(spell: SpellCoreData) -> float:
 	var has_status = false
 	var has_aoe = false
 	
+	# 计算嵌套层数
+	var max_nesting_depth = _calculate_nesting_depth(spell, 0)
+	
 	for rule in spell.topology_rules:
 		if rule.trigger != null:
 			trigger_types[rule.trigger.trigger_type] = true
@@ -209,7 +212,32 @@ func calculate_complexity_score(spell: SpellCoreData) -> float:
 	if mechanism_count >= 2:
 		score += config.complexity_bonus_combo * (mechanism_count - 1)
 	
+	# 嵌套层数奖励（鼓励多层嵌套法术）
+	if max_nesting_depth > 0:
+		var nesting_bonus = 0.0
+		for depth in range(1, max_nesting_depth + 1):
+			# 每层嵌套的奖励递增
+			nesting_bonus += config.nesting_depth_bonus * pow(config.nesting_depth_multiplier, depth - 1)
+		score += nesting_bonus
+	
 	return minf(score, config.max_complexity_bonus)
+
+## 计算法术的嵌套层数
+func _calculate_nesting_depth(spell: SpellCoreData, current_depth: int) -> int:
+	if current_depth > 10:  # 防止无限递归
+		return current_depth
+	
+	var max_depth = current_depth
+	
+	for rule in spell.topology_rules:
+		for action in rule.actions:
+			if action is FissionActionData:
+				var fission = action as FissionActionData
+				if fission.child_spell_data != null and fission.child_spell_data is SpellCoreData:
+					var child_depth = _calculate_nesting_depth(fission.child_spell_data, current_depth + 1)
+					max_depth = maxi(max_depth, child_depth)
+	
+	return max_depth
 
 ## 计算多样性奖励（增强版）
 func calculate_diversity_bonus(spell: SpellCoreData) -> float:

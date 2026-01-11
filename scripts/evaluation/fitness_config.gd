@@ -57,6 +57,8 @@ enum ScenarioType {
 @export var complexity_bonus_status: float = 10.0        # 使用状态效果的奖励
 @export var complexity_bonus_combo: float = 20.0         # 组合效果奖励（如裂变+状态）
 @export var max_complexity_bonus: float = 100.0          # 复杂度奖励上限
+@export var nesting_depth_bonus: float = 12.0            # 每层嵌套的奖励（鼓励多层嵌套法术）
+@export var nesting_depth_multiplier: float = 1.5        # 嵌套层数奖励乘数（每层递增）
 
 ## 多样性保护配置（增强版）
 @export_group("多样性保护")

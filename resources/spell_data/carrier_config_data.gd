@@ -33,6 +33,7 @@ enum DamageType {
 @export var lifetime: float = 5.0                # 存活时间（秒）
 @export var size: float = 1.0                    # 碰撞体大小
 @export var piercing: int = 0                    # 穿透次数
+@export var base_damage: float = 10.0            # 基础伤害（最小为1）
 @export var homing_strength: float = 0.0         # 追踪强度 (0 = 不追踪)
 @export var homing_range: float = 300.0          # 追踪范围
 @export var homing_turn_rate: float = 5.0        # 追踪转向速率
@@ -83,6 +84,7 @@ func clone_deep() -> CarrierConfigData:
 	copy.lifetime = lifetime
 	copy.size = size
 	copy.piercing = piercing
+	copy.base_damage = base_damage
 	copy.homing_strength = homing_strength
 	copy.homing_range = homing_range
 	copy.homing_turn_rate = homing_turn_rate
@@ -100,6 +102,7 @@ func to_dict() -> Dictionary:
 		"lifetime": lifetime,
 		"size": size,
 		"piercing": piercing,
+		"base_damage": base_damage,
 		"homing_strength": homing_strength,
 		"homing_range": homing_range,
 		"homing_turn_rate": homing_turn_rate,
@@ -117,6 +120,7 @@ static func from_dict(data: Dictionary) -> CarrierConfigData:
 	config.lifetime = data.get("lifetime", 5.0)
 	config.size = data.get("size", 1.0)
 	config.piercing = data.get("piercing", 0)
+	config.base_damage = maxf(data.get("base_damage", 10.0), 1.0)  # 确保伤害不为0
 	config.homing_strength = data.get("homing_strength", 0.0)
 	config.homing_range = data.get("homing_range", 300.0)
 	config.homing_turn_rate = data.get("homing_turn_rate", 5.0)
