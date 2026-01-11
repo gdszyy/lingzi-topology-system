@@ -102,17 +102,29 @@ func _on_fission_triggered(pos: Vector2, child_spell: SpellCoreData, count: int,
 	
 	# 如果没有子法术数据，使用简化版本
 	var spell_to_use: SpellCoreData
-	if child_spell != null:
+	if child_spell != null and child_spell.carrier != null:
 		spell_to_use = child_spell
 		print("  使用子法术: %s" % child_spell.spell_name)
 	else:
 		spell_to_use = _create_simple_fission_spell()
-		print("  使用默认裂变碑片")
+		print("  使用默认裂变碑片（原子法术无效或无载体）")
+	
+	# 验证法术数据
+	if spell_to_use.carrier == null:
+		print("  [错误] 法术没有载体配置!")
+		return
+	
+	print("  子弹属性: 速度=%.1f, 生命=%.1fs, 大小=%.2f" % [
+		spell_to_use.carrier.velocity,
+		spell_to_use.carrier.lifetime,
+		spell_to_use.carrier.size
+	])
 	
 	# 生成裂变子弹
 	var angle_step = spread_angle / maxf(count - 1, 1) if count > 1 else 0.0
 	var start_angle = -spread_angle / 2.0 if spread_angle < 360.0 else 0.0
 	
+	var spawned_count = 0
 	for i in range(count):
 		var angle: float
 		if spread_angle >= 360.0:
@@ -124,17 +136,31 @@ func _on_fission_triggered(pos: Vector2, child_spell: SpellCoreData, count: int,
 		
 		var direction = Vector2(cos(angle), sin(angle))
 		
-		var projectile = projectile_scene.instantiate() as Projectile
-		get_tree().current_scene.add_child(projectile)
-		projectile.initialize(spell_to_use, direction, pos)
-		
-		projectile.hit_enemy.connect(_on_projectile_hit)
-		projectile.projectile_died.connect(_on_projectile_died)
-		projectile.fission_triggered.connect(_on_fission_triggered)
-		
-		active_projectiles.append(projectile)
+		# 使用 call_deferred 避免在物理查询期间创建节点
+		call_deferred("_spawn_fission_projectile", spell_to_use, direction, pos)
+		spawned_count += 1
 	
-	print("  生成了 %d 个裂变子弹" % count)
+	print("  请求生成 %d 个裂变子弹" % spawned_count)
+
+## 延迟生成裂变子弹
+func _spawn_fission_projectile(spell: SpellCoreData, direction: Vector2, pos: Vector2) -> void:
+	var projectile = projectile_scene.instantiate() as Projectile
+	if projectile == null:
+		print("  [错误] 无法实例化子弹场景!")
+		return
+	
+	get_tree().current_scene.add_child(projectile)
+	projectile.initialize(spell, direction, pos)
+	
+	# 连接所有信号
+	projectile.hit_enemy.connect(_on_projectile_hit)
+	projectile.projectile_died.connect(_on_projectile_died)
+	projectile.fission_triggered.connect(_on_fission_triggered)
+	projectile.explosion_requested.connect(_on_explosion_requested)
+	projectile.damage_zone_requested.connect(_on_damage_zone_requested)
+	
+	active_projectiles.append(projectile)
+	print("  [裂变] 子弹已生成于 %s, 方向 %s" % [pos, direction])
 
 ## 创建简单裂变法术
 func _create_simple_fission_spell() -> SpellCoreData:
