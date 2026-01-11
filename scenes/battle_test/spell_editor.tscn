@@ -1,0 +1,367 @@
+[gd_scene load_steps=2 format=3 uid="uid://spell_editor"]
+
+[ext_resource type="Script" path="res://scenes/battle_test/spell_editor.gd" id="1_script"]
+
+[node name="SpellEditor" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+script = ExtResource("1_script")
+
+[node name="Background" type="ColorRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+color = Color(0.05, 0.05, 0.1, 0.95)
+
+[node name="MainPanel" type="PanelContainer" parent="."]
+layout_mode = 1
+anchors_preset = -1
+anchor_left = 0.05
+anchor_top = 0.05
+anchor_right = 0.45
+anchor_bottom = 0.95
+offset_left = 0.0
+offset_top = 0.0
+offset_right = 0.0
+offset_bottom = 0.0
+
+[node name="VBox" type="VBoxContainer" parent="MainPanel"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="TitleLabel" type="Label" parent="MainPanel/VBox"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 20
+text = "法术编辑器"
+horizontal_alignment = 1
+
+[node name="HSeparator" type="HSeparator" parent="MainPanel/VBox"]
+layout_mode = 2
+
+[node name="NameLabel" type="Label" parent="MainPanel/VBox"]
+layout_mode = 2
+text = "法术名称:"
+
+[node name="SpellNameEdit" type="LineEdit" parent="MainPanel/VBox"]
+layout_mode = 2
+placeholder_text = "输入法术名称"
+
+[node name="CostContainer" type="HBoxContainer" parent="MainPanel/VBox"]
+layout_mode = 2
+
+[node name="CostLabel" type="Label" parent="MainPanel/VBox/CostContainer"]
+layout_mode = 2
+text = "资源消耗:"
+
+[node name="CostSpin" type="SpinBox" parent="MainPanel/VBox/CostContainer"]
+layout_mode = 2
+min_value = 1.0
+max_value = 500.0
+value = 10.0
+
+[node name="CooldownContainer" type="HBoxContainer" parent="MainPanel/VBox"]
+layout_mode = 2
+
+[node name="CooldownLabel" type="Label" parent="MainPanel/VBox/CooldownContainer"]
+layout_mode = 2
+text = "冷却时间:"
+
+[node name="CooldownSpin" type="SpinBox" parent="MainPanel/VBox/CooldownContainer"]
+layout_mode = 2
+min_value = 0.1
+max_value = 30.0
+step = 0.1
+value = 1.0
+suffix = "s"
+
+[node name="HSeparator2" type="HSeparator" parent="MainPanel/VBox"]
+layout_mode = 2
+
+[node name="CarrierLabel" type="Label" parent="MainPanel/VBox"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 16
+text = "载体配置"
+
+[node name="CarrierSection" type="GridContainer" parent="MainPanel/VBox"]
+layout_mode = 2
+columns = 2
+
+[node name="TypeLabel" type="Label" parent="MainPanel/VBox/CarrierSection"]
+layout_mode = 2
+text = "载体类型:"
+
+[node name="CarrierTypeOption" type="OptionButton" parent="MainPanel/VBox/CarrierSection"]
+layout_mode = 2
+
+[node name="PhaseLabel" type="Label" parent="MainPanel/VBox/CarrierSection"]
+layout_mode = 2
+text = "相态:"
+
+[node name="PhaseOption" type="OptionButton" parent="MainPanel/VBox/CarrierSection"]
+layout_mode = 2
+
+[node name="VelocityLabel" type="Label" parent="MainPanel/VBox/CarrierSection"]
+layout_mode = 2
+text = "速度:"
+
+[node name="VelocitySpin" type="SpinBox" parent="MainPanel/VBox/CarrierSection"]
+layout_mode = 2
+min_value = 0.0
+max_value = 2000.0
+value = 500.0
+
+[node name="LifetimeLabel" type="Label" parent="MainPanel/VBox/CarrierSection"]
+layout_mode = 2
+text = "存活时间:"
+
+[node name="LifetimeSpin" type="SpinBox" parent="MainPanel/VBox/CarrierSection"]
+layout_mode = 2
+min_value = 0.5
+max_value = 30.0
+step = 0.5
+value = 5.0
+suffix = "s"
+
+[node name="MassLabel" type="Label" parent="MainPanel/VBox/CarrierSection"]
+layout_mode = 2
+text = "质量:"
+
+[node name="MassSpin" type="SpinBox" parent="MainPanel/VBox/CarrierSection"]
+layout_mode = 2
+min_value = 0.1
+max_value = 10.0
+step = 0.1
+value = 1.0
+
+[node name="SizeLabel" type="Label" parent="MainPanel/VBox/CarrierSection"]
+layout_mode = 2
+text = "大小:"
+
+[node name="SizeSpin" type="SpinBox" parent="MainPanel/VBox/CarrierSection"]
+layout_mode = 2
+min_value = 0.3
+max_value = 5.0
+step = 0.1
+value = 1.0
+
+[node name="PiercingLabel" type="Label" parent="MainPanel/VBox/CarrierSection"]
+layout_mode = 2
+text = "穿透次数:"
+
+[node name="PiercingSpin" type="SpinBox" parent="MainPanel/VBox/CarrierSection"]
+layout_mode = 2
+min_value = 0.0
+max_value = 20.0
+value = 0.0
+
+[node name="HomingLabel" type="Label" parent="MainPanel/VBox/CarrierSection"]
+layout_mode = 2
+text = "追踪强度:"
+
+[node name="HomingSpin" type="SpinBox" parent="MainPanel/VBox/CarrierSection"]
+layout_mode = 2
+min_value = 0.0
+max_value = 2.0
+step = 0.1
+value = 0.0
+
+[node name="HSeparator3" type="HSeparator" parent="MainPanel/VBox"]
+layout_mode = 2
+
+[node name="RulesLabel" type="Label" parent="MainPanel/VBox"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 16
+text = "拓扑规则"
+
+[node name="RulesSection" type="VBoxContainer" parent="MainPanel/VBox"]
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="RulesTree" type="Tree" parent="MainPanel/VBox/RulesSection"]
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="RuleButtons" type="HBoxContainer" parent="MainPanel/VBox/RulesSection"]
+layout_mode = 2
+
+[node name="AddRuleButton" type="Button" parent="MainPanel/VBox/RulesSection/RuleButtons"]
+layout_mode = 2
+text = "添加规则"
+
+[node name="EditRuleButton" type="Button" parent="MainPanel/VBox/RulesSection/RuleButtons"]
+layout_mode = 2
+text = "编辑规则"
+
+[node name="DeleteRuleButton" type="Button" parent="MainPanel/VBox/RulesSection/RuleButtons"]
+layout_mode = 2
+text = "删除规则"
+
+[node name="ButtonContainer" type="HBoxContainer" parent="MainPanel/VBox"]
+layout_mode = 2
+alignment = 1
+
+[node name="SaveButton" type="Button" parent="MainPanel/VBox/ButtonContainer"]
+custom_minimum_size = Vector2(100, 40)
+layout_mode = 2
+text = "保存法术"
+
+[node name="CancelButton" type="Button" parent="MainPanel/VBox/ButtonContainer"]
+custom_minimum_size = Vector2(100, 40)
+layout_mode = 2
+text = "取消"
+
+[node name="RuleEditPanel" type="PanelContainer" parent="."]
+visible = false
+layout_mode = 1
+anchors_preset = -1
+anchor_left = 0.47
+anchor_top = 0.05
+anchor_right = 0.75
+anchor_bottom = 0.95
+
+[node name="VBox" type="VBoxContainer" parent="RuleEditPanel"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="TitleLabel" type="Label" parent="RuleEditPanel/VBox"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 18
+text = "规则编辑"
+horizontal_alignment = 1
+
+[node name="HSeparator" type="HSeparator" parent="RuleEditPanel/VBox"]
+layout_mode = 2
+
+[node name="RuleNameLabel" type="Label" parent="RuleEditPanel/VBox"]
+layout_mode = 2
+text = "规则名称:"
+
+[node name="RuleNameEdit" type="LineEdit" parent="RuleEditPanel/VBox"]
+layout_mode = 2
+placeholder_text = "输入规则名称"
+
+[node name="TriggerLabel" type="Label" parent="RuleEditPanel/VBox"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 14
+text = "触发器设置"
+
+[node name="TriggerSection" type="VBoxContainer" parent="RuleEditPanel/VBox"]
+layout_mode = 2
+
+[node name="TriggerTypeContainer" type="HBoxContainer" parent="RuleEditPanel/VBox/TriggerSection"]
+layout_mode = 2
+
+[node name="TriggerTypeLabel" type="Label" parent="RuleEditPanel/VBox/TriggerSection/TriggerTypeContainer"]
+layout_mode = 2
+text = "触发类型:"
+
+[node name="TriggerTypeOption" type="OptionButton" parent="RuleEditPanel/VBox/TriggerSection"]
+layout_mode = 2
+
+[node name="TriggerOnceCheck" type="CheckBox" parent="RuleEditPanel/VBox/TriggerSection"]
+layout_mode = 2
+button_pressed = true
+text = "仅触发一次"
+
+[node name="TriggerParams" type="VBoxContainer" parent="RuleEditPanel/VBox/TriggerSection"]
+layout_mode = 2
+
+[node name="HSeparator2" type="HSeparator" parent="RuleEditPanel/VBox"]
+layout_mode = 2
+
+[node name="ActionsLabel" type="Label" parent="RuleEditPanel/VBox"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 14
+text = "动作列表"
+
+[node name="ActionsSection" type="VBoxContainer" parent="RuleEditPanel/VBox"]
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="ActionsTree" type="Tree" parent="RuleEditPanel/VBox/ActionsSection"]
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="ActionButtons" type="HBoxContainer" parent="RuleEditPanel/VBox/ActionsSection"]
+layout_mode = 2
+
+[node name="AddActionButton" type="Button" parent="RuleEditPanel/VBox/ActionsSection/ActionButtons"]
+layout_mode = 2
+text = "添加动作"
+
+[node name="EditActionButton" type="Button" parent="RuleEditPanel/VBox/ActionsSection/ActionButtons"]
+layout_mode = 2
+text = "编辑动作"
+
+[node name="DeleteActionButton" type="Button" parent="RuleEditPanel/VBox/ActionsSection/ActionButtons"]
+layout_mode = 2
+text = "删除动作"
+
+[node name="RuleButtonContainer" type="HBoxContainer" parent="RuleEditPanel/VBox"]
+layout_mode = 2
+alignment = 1
+
+[node name="SaveRuleButton" type="Button" parent="RuleEditPanel/VBox/RuleButtonContainer"]
+custom_minimum_size = Vector2(80, 35)
+layout_mode = 2
+text = "保存规则"
+
+[node name="CloseRuleButton" type="Button" parent="RuleEditPanel/VBox/RuleButtonContainer"]
+custom_minimum_size = Vector2(80, 35)
+layout_mode = 2
+text = "关闭"
+
+[node name="ActionEditPanel" type="PanelContainer" parent="."]
+visible = false
+layout_mode = 1
+anchors_preset = -1
+anchor_left = 0.77
+anchor_top = 0.05
+anchor_right = 0.95
+anchor_bottom = 0.7
+
+[node name="VBox" type="VBoxContainer" parent="ActionEditPanel"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="TitleLabel" type="Label" parent="ActionEditPanel/VBox"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 16
+text = "动作编辑"
+horizontal_alignment = 1
+
+[node name="HSeparator" type="HSeparator" parent="ActionEditPanel/VBox"]
+layout_mode = 2
+
+[node name="ActionTypeLabel" type="Label" parent="ActionEditPanel/VBox"]
+layout_mode = 2
+text = "动作类型:"
+
+[node name="ActionTypeOption" type="OptionButton" parent="ActionEditPanel/VBox"]
+layout_mode = 2
+
+[node name="ActionParams" type="VBoxContainer" parent="ActionEditPanel/VBox"]
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="ActionButtonContainer" type="HBoxContainer" parent="ActionEditPanel/VBox"]
+layout_mode = 2
+alignment = 1
+
+[node name="SaveActionButton" type="Button" parent="ActionEditPanel/VBox/ActionButtonContainer"]
+custom_minimum_size = Vector2(80, 35)
+layout_mode = 2
+text = "保存动作"
+
+[node name="CloseActionButton" type="Button" parent="ActionEditPanel/VBox/ActionButtonContainer"]
+custom_minimum_size = Vector2(80, 35)
+layout_mode = 2
+text = "关闭"
+
+[connection signal="pressed" from="RuleEditPanel/VBox/RuleButtonContainer/SaveRuleButton" to="." method="save_rule_edit"]
+[connection signal="pressed" from="RuleEditPanel/VBox/RuleButtonContainer/CloseRuleButton" to="." method="close_rule_edit"]
+[connection signal="pressed" from="ActionEditPanel/VBox/ActionButtonContainer/SaveActionButton" to="." method="save_action_edit"]
+[connection signal="pressed" from="ActionEditPanel/VBox/ActionButtonContainer/CloseActionButton" to="." method="close_action_edit"]

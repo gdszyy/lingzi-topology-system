@@ -269,6 +269,8 @@ func _handle_enemy_collision(enemy: Node2D) -> void:
 	if piercing_remaining > 0:
 		piercing_remaining -= 1
 	else:
+		# 穿透次数耗尽，触发死亡规则后消亡
+		_trigger_death_rules()
 		_die()
 
 ## 执行接触规则
@@ -330,6 +332,8 @@ func _check_bounds() -> void:
 	var margin = 100
 	if position.x < -margin or position.x > viewport_rect.size.x + margin or \
 	   position.y < -margin or position.y > viewport_rect.size.y + margin:
+		# 出界时也触发死亡规则
+		_trigger_death_rules()
 		_die()
 
 ## 死亡

@@ -529,29 +529,36 @@ func _calculate_cooldown(scenario: SpellScenarioConfig.SpellScenario) -> float:
 
 ## 生成场景专用法术名称
 func _generate_scenario_spell_name(scenario: SpellScenarioConfig.SpellScenario) -> String:
+	var scenario_prefix: String
 	var prefixes: Array
 	var suffixes: Array
 	
 	match scenario:
 		SpellScenarioConfig.SpellScenario.HARASS:
+			scenario_prefix = "消耗法术-"
 			prefixes = ["轻", "疾", "连", "散", "扰"]
 			suffixes = ["刺", "箭", "弹", "针", "羽"]
 		SpellScenarioConfig.SpellScenario.SINGLE_TARGET:
+			scenario_prefix = "单体法术-"
 			prefixes = ["穿", "贯", "狙", "精", "锐"]
 			suffixes = ["矛", "枪", "射", "击", "穿"]
 		SpellScenarioConfig.SpellScenario.CLOSE_COMBAT:
+			scenario_prefix = "近战法术-"
 			prefixes = ["烈", "猛", "暴", "狂", "怒"]
 			suffixes = ["斩", "击", "爆", "裂", "碎"]
 		SpellScenarioConfig.SpellScenario.AOE:
+			scenario_prefix = "群伤法术-"
 			prefixes = ["广", "散", "爆", "环", "域"]
 			suffixes = ["波", "雨", "环", "阵", "域"]
 		SpellScenarioConfig.SpellScenario.AMBUSH:
+			scenario_prefix = "埋伏法术-"
 			prefixes = ["伏", "潜", "隐", "陷", "诡"]
 			suffixes = ["雷", "阱", "伏", "网", "陷"]
 		_:
+			scenario_prefix = "法术-"
 			prefixes = ["灵", "玄", "幻", "魔", "咒"]
 			suffixes = ["术", "法", "咒", "诀", "式"]
 	
 	var elements = ["炎", "冰", "雷", "风", "暗", "光", "毒", "灵"]
 	
-	return prefixes[randi() % prefixes.size()] + elements[randi() % elements.size()] + suffixes[randi() % suffixes.size()]
+	return scenario_prefix + prefixes[randi() % prefixes.size()] + elements[randi() % elements.size()] + suffixes[randi() % suffixes.size()]

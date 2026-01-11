@@ -90,6 +90,22 @@ size_flags_vertical = 3
 layout_mode = 2
 text = "从GA加载最佳法术"
 
+[node name="SpellEditButtons" type="HBoxContainer" parent="UI/LeftPanel"]
+layout_mode = 2
+theme_override_constants/separation = 5
+
+[node name="NewSpellButton" type="Button" parent="UI/LeftPanel"]
+layout_mode = 2
+text = "新建法术"
+
+[node name="EditSpellButton" type="Button" parent="UI/LeftPanel"]
+layout_mode = 2
+text = "编辑法术"
+
+[node name="DeleteSpellButton" type="Button" parent="UI/LeftPanel"]
+layout_mode = 2
+text = "删除法术"
+
 [node name="RightPanel" type="VBoxContainer" parent="UI"]
 offset_left = 1040.0
 offset_top = 60.0

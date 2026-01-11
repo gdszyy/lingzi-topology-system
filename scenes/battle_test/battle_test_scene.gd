@@ -19,6 +19,13 @@ enum TestScenario {
 @onready var spell_list: ItemList = $UI/LeftPanel/SpellList
 @onready var load_from_ga_button: Button = $UI/LeftPanel/LoadFromGAButton
 @onready var back_button: Button = $UI/TopPanel/BackButton
+@onready var new_spell_button: Button = $UI/LeftPanel/NewSpellButton
+@onready var edit_spell_button: Button = $UI/LeftPanel/EditSpellButton
+@onready var delete_spell_button: Button = $UI/LeftPanel/DeleteSpellButton
+
+## 法术编辑器
+var spell_editor_scene: PackedScene
+var spell_editor: SpellEditor = null
 
 ## 统计面板
 @onready var stats_label: RichTextLabel = $UI/RightPanel/StatsLabel
@@ -53,6 +60,7 @@ var survival_timer: Timer = null
 
 func _ready():
 	enemy_scene = preload("res://scenes/battle_test/entities/enemy.tscn")
+	spell_editor_scene = preload("res://scenes/battle_test/spell_editor.tscn")
 	
 	_setup_ui()
 	_setup_scenario_options()
@@ -82,6 +90,11 @@ func _setup_ui() -> void:
 	scenario_option.item_selected.connect(_on_scenario_selected)
 	spell_list.item_selected.connect(_on_spell_selected)
 	back_button.pressed.connect(_on_back_pressed)
+	
+	# 法术编辑按钮
+	new_spell_button.pressed.connect(_on_new_spell_pressed)
+	edit_spell_button.pressed.connect(_on_edit_spell_pressed)
+	delete_spell_button.pressed.connect(_on_delete_spell_pressed)
 	
 	stop_button.disabled = true
 
@@ -132,7 +145,8 @@ func _update_spell_list() -> void:
 	spell_list.clear()
 	for i in range(available_spells.size()):
 		var spell = available_spells[i]
-		spell_list.add_item("%d. %s" % [i + 1, spell.spell_name])
+		# 显示法术名称和cost信息
+		spell_list.add_item("%d. %s [Cost: %.1f]" % [i + 1, spell.spell_name, spell.resource_cost])
 
 ## 场景选择
 func _on_scenario_selected(index: int) -> void:
@@ -147,7 +161,8 @@ func _on_spell_selected(index: int) -> void:
 
 ## 显示法术信息
 func _display_spell_info(spell: SpellCoreData) -> void:
-	var info = "[b]%s[/b]\n\n" % spell.spell_name
+	var info = "[b]%s[/b]\n" % spell.spell_name
+	info += "[color=yellow]Cost: %.1f[/color] | CD: %.1fs\n\n" % [spell.resource_cost, spell.cooldown]
 	
 	if spell.carrier != null:
 		var phase_names = ["固态", "液态", "等离子态"]
@@ -463,3 +478,75 @@ func _input(event: InputEvent) -> void:
 		if event.button_index == MOUSE_BUTTON_LEFT and event.pressed:
 			if current_spell_index >= 0 and not spell_caster.auto_fire:
 				spell_caster.fire(event.position)
+
+
+## ==================== 法术编辑器功能 ====================
+
+## 新建法术
+func _on_new_spell_pressed() -> void:
+	_open_spell_editor(null)
+
+## 编辑法术
+func _on_edit_spell_pressed() -> void:
+	if current_spell_index < 0 or current_spell_index >= available_spells.size():
+		return
+	_open_spell_editor(available_spells[current_spell_index])
+
+## 删除法术
+func _on_delete_spell_pressed() -> void:
+	if current_spell_index < 0 or current_spell_index >= available_spells.size():
+		return
+	
+	available_spells.remove_at(current_spell_index)
+	current_spell_index = -1
+	_update_spell_list()
+	stats_label.text = "选择一个法术开始测试..."
+
+## 打开法术编辑器
+func _open_spell_editor(spell: SpellCoreData) -> void:
+	if spell_editor != null:
+		spell_editor.queue_free()
+	
+	spell_editor = spell_editor_scene.instantiate() as SpellEditor
+	spell_editor.spell_saved.connect(_on_spell_editor_saved)
+	spell_editor.editor_closed.connect(_on_spell_editor_closed)
+	
+	$UI.add_child(spell_editor)
+	spell_editor.edit_spell(spell)
+
+## 法术编辑器保存回调
+func _on_spell_editor_saved(spell: SpellCoreData) -> void:
+	# 检查是否是编辑现有法术
+	var found_index = -1
+	for i in range(available_spells.size()):
+		if available_spells[i].spell_id == spell.spell_id:
+			found_index = i
+			break
+	
+	if found_index >= 0:
+		# 更新现有法术
+		available_spells[found_index] = spell
+	else:
+		# 添加新法术
+		available_spells.append(spell)
+	
+	_update_spell_list()
+	
+	# 选中保存的法术
+	for i in range(available_spells.size()):
+		if available_spells[i].spell_id == spell.spell_id:
+			spell_list.select(i)
+			_on_spell_selected(i)
+			break
+	
+	_cleanup_spell_editor()
+
+## 法术编辑器关闭回调
+func _on_spell_editor_closed() -> void:
+	_cleanup_spell_editor()
+
+## 清理法术编辑器
+func _cleanup_spell_editor() -> void:
+	if spell_editor != null:
+		spell_editor.queue_free()
+		spell_editor = null
