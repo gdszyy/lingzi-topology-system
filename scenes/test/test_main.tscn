@@ -1,0 +1,115 @@
+[gd_scene load_steps=2 format=3 uid="uid://test_main_scene"]
+
+[ext_resource type="Script" path="res://scenes/test/test_main.gd" id="1_script"]
+
+[node name="TestMain" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_script")
+
+[node name="VBoxContainer" type="VBoxContainer" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/separation = 10
+
+[node name="Title" type="Label" parent="VBoxContainer"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 24
+text = "灵子拓扑构筑系统 - 遗传算法法术生成器"
+horizontal_alignment = 1
+
+[node name="HSeparator" type="HSeparator" parent="VBoxContainer"]
+layout_mode = 2
+
+[node name="ConfigPanel" type="HBoxContainer" parent="VBoxContainer"]
+layout_mode = 2
+theme_override_constants/separation = 20
+
+[node name="PopulationLabel" type="Label" parent="VBoxContainer/ConfigPanel"]
+layout_mode = 2
+text = "种群大小:"
+
+[node name="PopulationSpin" type="SpinBox" parent="VBoxContainer/ConfigPanel"]
+layout_mode = 2
+min_value = 10.0
+max_value = 200.0
+value = 50.0
+
+[node name="GenerationsLabel" type="Label" parent="VBoxContainer/ConfigPanel"]
+layout_mode = 2
+text = "最大代数:"
+
+[node name="GenerationsSpin" type="SpinBox" parent="VBoxContainer/ConfigPanel"]
+layout_mode = 2
+min_value = 10.0
+max_value = 500.0
+value = 100.0
+
+[node name="MutationLabel" type="Label" parent="VBoxContainer/ConfigPanel"]
+layout_mode = 2
+text = "变异率(%):"
+
+[node name="MutationSpin" type="SpinBox" parent="VBoxContainer/ConfigPanel"]
+layout_mode = 2
+min_value = 1.0
+max_value = 50.0
+value = 10.0
+
+[node name="ControlPanel" type="HBoxContainer" parent="VBoxContainer"]
+layout_mode = 2
+theme_override_constants/separation = 20
+
+[node name="StartButton" type="Button" parent="VBoxContainer/ControlPanel"]
+custom_minimum_size = Vector2(120, 40)
+layout_mode = 2
+text = "开始进化"
+
+[node name="StopButton" type="Button" parent="VBoxContainer/ControlPanel"]
+custom_minimum_size = Vector2(120, 40)
+layout_mode = 2
+text = "停止进化"
+
+[node name="StatusPanel" type="VBoxContainer" parent="VBoxContainer"]
+layout_mode = 2
+
+[node name="StatusLabel" type="Label" parent="VBoxContainer/StatusPanel"]
+layout_mode = 2
+text = "状态: 空闲"
+
+[node name="GenerationLabel" type="Label" parent="VBoxContainer/StatusPanel"]
+layout_mode = 2
+text = "当前代数: 0"
+
+[node name="BestFitnessLabel" type="Label" parent="VBoxContainer/StatusPanel"]
+layout_mode = 2
+text = "最佳适应度: 0.00"
+
+[node name="ProgressBar" type="ProgressBar" parent="VBoxContainer/StatusPanel"]
+custom_minimum_size = Vector2(0, 25)
+layout_mode = 2
+
+[node name="HSeparator2" type="HSeparator" parent="VBoxContainer"]
+layout_mode = 2
+
+[node name="ResultsPanel" type="HSplitContainer" parent="VBoxContainer"]
+layout_mode = 2
+size_flags_vertical = 3
+split_offset = 300
+
+[node name="ResultsList" type="ItemList" parent="VBoxContainer/ResultsPanel"]
+custom_minimum_size = Vector2(300, 0)
+layout_mode = 2
+
+[node name="SpellDetails" type="RichTextLabel" parent="VBoxContainer/ResultsPanel"]
+layout_mode = 2
+size_flags_horizontal = 3
+bbcode_enabled = true
+text = "选择一个法术查看详情..."
