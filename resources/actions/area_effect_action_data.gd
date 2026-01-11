@@ -22,7 +22,7 @@ enum AreaShape {
 func _init():
 	action_type = ActionType.AREA_EFFECT
 
-func duplicate_deep() -> ActionData:
+func clone_deep() -> ActionData:
 	var copy = AreaEffectActionData.new()
 	copy.action_type = action_type
 	copy.area_shape = area_shape

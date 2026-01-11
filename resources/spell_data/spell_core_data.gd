@@ -30,7 +30,7 @@ func calculate_total_instability() -> float:
 	return total
 
 ## 深拷贝
-func duplicate_deep() -> SpellCoreData:
+func clone_deep() -> SpellCoreData:
 	var copy = SpellCoreData.new()
 	copy.spell_id = spell_id
 	copy.spell_name = spell_name
@@ -41,13 +41,13 @@ func duplicate_deep() -> SpellCoreData:
 	
 	# 深拷贝载体
 	if carrier != null:
-		copy.carrier = carrier.duplicate_deep()
+		copy.carrier = carrier.clone_deep()
 	
 	# 深拷贝拓扑规则
 	copy.topology_rules = []
 	for rule in topology_rules:
 		if rule != null:
-			copy.topology_rules.append(rule.duplicate_deep())
+			copy.topology_rules.append(rule.clone_deep())
 	
 	return copy
 

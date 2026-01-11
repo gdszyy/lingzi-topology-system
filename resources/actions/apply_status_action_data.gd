@@ -22,7 +22,7 @@ enum StatusType {
 func _init():
 	action_type = ActionType.APPLY_STATUS
 
-func duplicate_deep() -> ActionData:
+func clone_deep() -> ActionData:
 	var copy = ApplyStatusActionData.new()
 	copy.action_type = action_type
 	copy.status_type = status_type

@@ -43,7 +43,7 @@ func calculate_kinetic_damage() -> float:
 	return 0.5 * mass * velocity * velocity * 0.001  # 简化的动能公式
 
 ## 深拷贝
-func duplicate_deep() -> CarrierConfigData:
+func clone_deep() -> CarrierConfigData:
 	var copy = CarrierConfigData.new()
 	copy.phase = phase
 	copy.mass = mass

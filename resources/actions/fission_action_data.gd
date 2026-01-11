@@ -14,7 +14,7 @@ extends ActionData
 func _init():
 	action_type = ActionType.FISSION
 
-func duplicate_deep() -> ActionData:
+func clone_deep() -> ActionData:
 	var copy = FissionActionData.new()
 	copy.action_type = action_type
 	copy.spawn_count = spawn_count
@@ -24,8 +24,8 @@ func duplicate_deep() -> ActionData:
 	copy.child_spell_id = child_spell_id
 	copy.max_recursion_depth = max_recursion_depth
 	# 深拷贝子法术数据
-	if child_spell_data != null and child_spell_data.has_method("duplicate_deep"):
-		copy.child_spell_data = child_spell_data.duplicate_deep()
+	if child_spell_data != null and child_spell_data.has_method("clone_deep"):
+		copy.child_spell_data = child_spell_data.clone_deep()
 	return copy
 
 func to_dict() -> Dictionary:

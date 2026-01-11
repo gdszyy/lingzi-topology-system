@@ -167,7 +167,7 @@ func _evaluate_population() -> void:
 		# 更新最佳
 		if fitness > best_fitness:
 			best_fitness = fitness
-			best_spell = spell.duplicate_deep()
+			best_spell = spell.clone_deep()
 
 ## 备用评估函数
 func _fallback_evaluate(spell: SpellCoreData) -> float:
@@ -194,7 +194,7 @@ func _evolve_one_generation() -> void:
 	# 1. 精英保留
 	var elites = selection_methods.elitism_selection(population, fitness_scores, elitism_count)
 	for elite in elites:
-		new_population.append(elite.duplicate_deep())
+		new_population.append(elite.clone_deep())
 	
 	# 2. 选择、交叉、变异生成新个体
 	while new_population.size() < population_size:
@@ -267,7 +267,7 @@ func _collect_top_spells(count: int) -> void:
 	
 	# 收集
 	for i in range(mini(count, indexed.size())):
-		top_spells.append(population[indexed[i].index].duplicate_deep())
+		top_spells.append(population[indexed[i].index].clone_deep())
 
 ## 获取当前状态
 func get_status() -> Dictionary:
@@ -336,9 +336,9 @@ func inject_spell(spell: SpellCoreData) -> void:
 			if fitness_scores[i] < worst_fitness:
 				worst_fitness = fitness_scores[i]
 				worst_idx = i
-		population[worst_idx] = spell.duplicate_deep()
+		population[worst_idx] = spell.clone_deep()
 	else:
-		population.append(spell.duplicate_deep())
+		population.append(spell.clone_deep())
 	
 	# 重新评估
 	_evaluate_population()

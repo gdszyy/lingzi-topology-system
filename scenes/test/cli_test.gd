@@ -57,7 +57,7 @@ func test_genetic_operators():
 		print("  子代 #%d: %s" % [i + 1, offspring[i].spell_name])
 	
 	# 测试变异
-	var mutated = spell_a.duplicate_deep()
+	var mutated = spell_a.clone_deep()
 	operators.mutate(mutated)
 	print("变异后法术: %s" % mutated.get_summary())
 	
@@ -123,7 +123,7 @@ func test_evolution():
 		# 精英保留
 		var elites = selection.elitism_selection(population, fitness_scores, 2)
 		for elite in elites:
-			new_population.append(elite.duplicate_deep())
+			new_population.append(elite.clone_deep())
 		
 		# 交叉变异
 		var i = 0

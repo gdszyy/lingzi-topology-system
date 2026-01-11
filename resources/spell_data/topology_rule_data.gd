@@ -9,20 +9,20 @@ extends Resource
 @export var enabled: bool = true                  # 是否启用
 
 ## 深拷贝
-func duplicate_deep() -> TopologyRuleData:
+func clone_deep() -> TopologyRuleData:
 	var copy = TopologyRuleData.new()
 	copy.rule_name = rule_name
 	copy.enabled = enabled
 	
 	# 深拷贝触发器
 	if trigger != null:
-		copy.trigger = trigger.duplicate_deep()
+		copy.trigger = trigger.clone_deep()
 	
 	# 深拷贝动作列表
 	copy.actions = []
 	for action in actions:
 		if action != null:
-			copy.actions.append(action.duplicate_deep())
+			copy.actions.append(action.clone_deep())
 	
 	return copy
 

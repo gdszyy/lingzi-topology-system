@@ -33,7 +33,7 @@ func get_type_name() -> String:
 	return "未知动作"
 
 ## 深拷贝（子类需要重写）
-func duplicate_deep() -> ActionData:
+func clone_deep() -> ActionData:
 	var copy = ActionData.new()
 	copy.action_type = action_type
 	return copy

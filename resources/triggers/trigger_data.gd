@@ -31,7 +31,7 @@ func get_type_name() -> String:
 	return "未知触发器"
 
 ## 深拷贝（子类需要重写）
-func duplicate_deep() -> TriggerData:
+func clone_deep() -> TriggerData:
 	var copy = TriggerData.new()
 	copy.trigger_type = trigger_type
 	copy.trigger_once = trigger_once

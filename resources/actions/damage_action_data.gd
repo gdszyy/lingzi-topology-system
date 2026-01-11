@@ -11,7 +11,7 @@ extends ActionData
 func _init():
 	action_type = ActionType.DAMAGE
 
-func duplicate_deep() -> ActionData:
+func clone_deep() -> ActionData:
 	var copy = DamageActionData.new()
 	copy.action_type = action_type
 	copy.damage_value = damage_value

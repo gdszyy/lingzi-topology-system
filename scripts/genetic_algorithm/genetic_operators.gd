@@ -38,10 +38,10 @@ var crossover_config = {
 func crossover(parent_a: SpellCoreData, parent_b: SpellCoreData) -> Array[SpellCoreData]:
 	# 检查是否执行交叉
 	if randf() > crossover_config.crossover_rate:
-		return [parent_a.duplicate_deep(), parent_b.duplicate_deep()]
+		return [parent_a.clone_deep(), parent_b.clone_deep()]
 	
-	var child_a = parent_a.duplicate_deep()
-	var child_b = parent_b.duplicate_deep()
+	var child_a = parent_a.clone_deep()
+	var child_b = parent_b.clone_deep()
 	
 	# 载体属性交叉
 	_crossover_carriers(child_a, child_b, parent_a, parent_b)
@@ -116,10 +116,10 @@ func _crossover_rules(child_a: SpellCoreData, child_b: SpellCoreData,
 			
 			# 从对方父代添加规则
 			for rule in parent_b.topology_rules.slice(point_b):
-				child_a.topology_rules.append(rule.duplicate_deep())
+				child_a.topology_rules.append(rule.clone_deep())
 			
 			for rule in parent_a.topology_rules.slice(point_a):
-				child_b.topology_rules.append(rule.duplicate_deep())
+				child_b.topology_rules.append(rule.clone_deep())
 
 # ==================== 变异操作 ====================
 

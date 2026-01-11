@@ -9,7 +9,7 @@ extends TriggerData
 func _init():
 	trigger_type = TriggerType.ON_TIMER
 
-func duplicate_deep() -> TriggerData:
+func clone_deep() -> TriggerData:
 	var copy = OnTimerTrigger.new()
 	copy.trigger_type = trigger_type
 	copy.trigger_once = trigger_once
