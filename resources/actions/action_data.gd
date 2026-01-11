@@ -10,7 +10,8 @@ enum ActionType {
 	APPLY_STATUS,    # 施加状态效果
 	MOVEMENT_CHANGE, # 改变运动状态
 	AREA_EFFECT,     # 范围效果
-	HEAL             # 治疗
+	HEAL,            # 治疗
+	SPAWN_ENTITY     # 生成实体（爆炸、持续伤害区域等）
 }
 
 @export var action_type: ActionType = ActionType.DAMAGE
@@ -30,6 +31,8 @@ func get_type_name() -> String:
 			return "范围效果"
 		ActionType.HEAL:
 			return "治疗"
+		ActionType.SPAWN_ENTITY:
+			return "生成实体"
 	return "未知动作"
 
 ## 深拷贝（子类需要重写）

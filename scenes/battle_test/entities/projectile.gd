@@ -6,7 +6,9 @@ class_name Projectile
 ## 信号
 signal hit_enemy(enemy: Node2D, damage: float)
 signal projectile_died(projectile: Projectile)
-signal fission_triggered(position: Vector2, spell_data: SpellCoreData, count: int)
+signal fission_triggered(position: Vector2, spell_data: SpellCoreData, count: int, spread_angle: float)
+signal explosion_requested(position: Vector2, damage: float, radius: float, falloff: float, damage_type: int)
+signal damage_zone_requested(position: Vector2, damage: float, radius: float, duration: float, interval: float, damage_type: int, slow: float)
 
 ## 法术数据
 var spell_data: SpellCoreData
@@ -17,6 +19,8 @@ var velocity: Vector2 = Vector2.ZERO
 var lifetime_remaining: float = 0.0
 var piercing_remaining: int = 0
 var target: Node2D = null  # 追踪目标
+var homing_delay_timer: float = 0.0  # 追踪延迟计时器
+var time_alive: float = 0.0  # 存活时间
 
 ## 规则执行状态
 var rule_timers: Array[float] = []  # 每条规则的计时器
@@ -90,12 +94,11 @@ func _physics_process(delta: float) -> void:
 		_die()
 		return
 	
+	# 更新存活时间
+	time_alive += delta
+	
 	# 追踪逻辑
-	if carrier.homing_strength > 0 and target != null and is_instance_valid(target):
-		var to_target = (target.global_position - global_position).normalized()
-		var current_dir = velocity.normalized()
-		var new_dir = current_dir.lerp(to_target, carrier.homing_strength * delta * 5.0)
-		velocity = new_dir * carrier.velocity
+	_update_homing(delta)
 	
 	# 移动
 	position += velocity * delta
@@ -127,7 +130,7 @@ func _update_rule_timers(delta: float) -> void:
 						rule_triggered[i] = true
 
 ## 执行规则
-func _execute_rule(rule: TopologyRuleData, rule_index: int) -> void:
+func _execute_rule(rule: TopologyRuleData, _rule_index: int) -> void:
 	for action in rule.actions:
 		_execute_action(action)
 
@@ -148,10 +151,19 @@ func _execute_action(action: ActionData) -> void:
 	elif action is ApplyStatusActionData:
 		# 状态效果在碰撞时处理
 		pass
+	
+	elif action is SpawnExplosionActionData:
+		var explosion = action as SpawnExplosionActionData
+		_execute_spawn_explosion(explosion)
+	
+	elif action is SpawnDamageZoneActionData:
+		var zone = action as SpawnDamageZoneActionData
+		_execute_spawn_damage_zone(zone)
 
 ## 执行裂变
 func _execute_fission(fission: FissionActionData) -> void:
-	fission_triggered.emit(global_position, fission.child_spell_data, fission.spawn_count)
+	print("[子弹] 执行裂变: 数量=%d, 角度=%.1f°" % [fission.spawn_count, fission.spread_angle])
+	fission_triggered.emit(global_position, fission.child_spell_data, fission.spawn_count, fission.spread_angle)
 	
 	# 如果裂变后销毁
 	if fission.destroy_parent:
@@ -268,3 +280,83 @@ func _die() -> void:
 ## 设置追踪目标
 func set_target(new_target: Node2D) -> void:
 	target = new_target
+
+## 更新追踪逻辑
+func _update_homing(delta: float) -> void:
+	# 检查是否有追踪能力
+	if carrier.homing_strength <= 0:
+		return
+	
+	# 检查追踪延迟
+	if time_alive < carrier.homing_delay:
+		return
+	
+	# 如果没有目标或目标无效，尝试寻找新目标
+	if target == null or not is_instance_valid(target):
+		target = _find_nearest_enemy()
+		if target == null:
+			return
+	
+	# 检查目标是否在追踪范围内
+	var distance_to_target = global_position.distance_to(target.global_position)
+	if distance_to_target > carrier.homing_range:
+		# 目标超出范围，尝试寻找更近的目标
+		var new_target = _find_nearest_enemy()
+		if new_target != null:
+			var new_distance = global_position.distance_to(new_target.global_position)
+			if new_distance <= carrier.homing_range:
+				target = new_target
+				distance_to_target = new_distance
+			else:
+				return  # 没有范围内的目标
+		else:
+			return
+	
+	# 计算追踪方向
+	var to_target = (target.global_position - global_position).normalized()
+	var current_dir = velocity.normalized()
+	
+	# 使用转向速率和追踪强度计算实际转向
+	var turn_amount = carrier.homing_turn_rate * carrier.homing_strength * delta
+	var new_dir = current_dir.lerp(to_target, clampf(turn_amount, 0.0, 1.0))
+	velocity = new_dir.normalized() * carrier.velocity
+
+## 寻找最近的敌人
+func _find_nearest_enemy() -> Node2D:
+	var enemies = get_tree().get_nodes_in_group("enemies")
+	var nearest: Node2D = null
+	var nearest_dist = INF
+	
+	for enemy in enemies:
+		if not is_instance_valid(enemy):
+			continue
+		var dist = global_position.distance_to(enemy.global_position)
+		if dist < nearest_dist:
+			nearest_dist = dist
+			nearest = enemy
+	
+	return nearest
+
+## 执行生成爆炸
+func _execute_spawn_explosion(explosion: SpawnExplosionActionData) -> void:
+	print("[子弹] 生成爆炸: 伤害=%.1f, 半径=%.1f" % [explosion.explosion_damage, explosion.explosion_radius])
+	explosion_requested.emit(
+		global_position,
+		explosion.explosion_damage,
+		explosion.explosion_radius,
+		explosion.damage_falloff,
+		explosion.explosion_damage_type
+	)
+
+## 执行生成持续伤害区域
+func _execute_spawn_damage_zone(zone: SpawnDamageZoneActionData) -> void:
+	print("[子弹] 生成伤害区域: 伤害=%.1f, 半径=%.1f, 持续=%.1fs" % [zone.zone_damage, zone.zone_radius, zone.zone_duration])
+	damage_zone_requested.emit(
+		global_position,
+		zone.zone_damage,
+		zone.zone_radius,
+		zone.zone_duration,
+		zone.tick_interval,
+		zone.zone_damage_type,
+		zone.slow_amount
+	)

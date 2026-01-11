@@ -108,18 +108,24 @@ func _crossover_rules(child_a: SpellCoreData, child_b: SpellCoreData,
 			var point_b = randi() % parent_b.topology_rules.size()
 			
 			# 交换从交叉点开始的规则
-			var temp_rules_a = child_a.topology_rules.slice(point_a)
-			var temp_rules_b = child_b.topology_rules.slice(point_b)
+			# 保存交叉点之前的规则
+			var rules_a_before = child_a.topology_rules.slice(0, point_a)
+			var rules_b_before = child_b.topology_rules.slice(0, point_b)
 			
-			child_a.topology_rules = child_a.topology_rules.slice(0, point_a)
-			child_b.topology_rules = child_b.topology_rules.slice(0, point_b)
-			
-			# 从对方父代添加规则
+			# 重建规则列表：前半部分 + 对方的后半部分
+			var new_rules_a: Array[TopologyRuleData] = []
+			for rule in rules_a_before:
+				new_rules_a.append(rule)
 			for rule in parent_b.topology_rules.slice(point_b):
-				child_a.topology_rules.append(rule.clone_deep())
+				new_rules_a.append(rule.clone_deep())
+			child_a.topology_rules = new_rules_a
 			
+			var new_rules_b: Array[TopologyRuleData] = []
+			for rule in rules_b_before:
+				new_rules_b.append(rule)
 			for rule in parent_a.topology_rules.slice(point_a):
-				child_b.topology_rules.append(rule.clone_deep())
+				new_rules_b.append(rule.clone_deep())
+			child_b.topology_rules = new_rules_b
 
 # ==================== 变异操作 ====================
 

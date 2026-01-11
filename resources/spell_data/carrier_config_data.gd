@@ -26,6 +26,9 @@ enum DamageType {
 @export var size: float = 1.0                    # 碰撞体大小
 @export var piercing: int = 0                    # 穿透次数
 @export var homing_strength: float = 0.0         # 追踪强度 (0 = 不追踪)
+@export var homing_range: float = 300.0          # 追踪范围
+@export var homing_turn_rate: float = 5.0        # 追踪转向速率
+@export var homing_delay: float = 0.0            # 追踪延迟（秒）
 
 ## 根据相态获取默认伤害类型
 func get_default_damage_type() -> DamageType:
@@ -53,6 +56,9 @@ func clone_deep() -> CarrierConfigData:
 	copy.size = size
 	copy.piercing = piercing
 	copy.homing_strength = homing_strength
+	copy.homing_range = homing_range
+	copy.homing_turn_rate = homing_turn_rate
+	copy.homing_delay = homing_delay
 	return copy
 
 ## 转换为字典（用于序列化）
@@ -65,7 +71,10 @@ func to_dict() -> Dictionary:
 		"lifetime": lifetime,
 		"size": size,
 		"piercing": piercing,
-		"homing_strength": homing_strength
+		"homing_strength": homing_strength,
+		"homing_range": homing_range,
+		"homing_turn_rate": homing_turn_rate,
+		"homing_delay": homing_delay
 	}
 
 ## 从字典加载
@@ -79,4 +88,7 @@ static func from_dict(data: Dictionary) -> CarrierConfigData:
 	config.size = data.get("size", 1.0)
 	config.piercing = data.get("piercing", 0)
 	config.homing_strength = data.get("homing_strength", 0.0)
+	config.homing_range = data.get("homing_range", 300.0)
+	config.homing_turn_rate = data.get("homing_turn_rate", 5.0)
+	config.homing_delay = data.get("homing_delay", 0.0)
 	return config

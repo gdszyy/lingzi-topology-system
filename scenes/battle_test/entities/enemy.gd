@@ -118,7 +118,7 @@ func _update_movement(delta: float) -> void:
 			global_position += final_direction * actual_speed * delta
 
 ## 受到伤害
-func take_damage(amount: float, damage_type: int = 0) -> void:
+func take_damage(amount: float, _damage_type: int = 0) -> void:
 	# 应用状态效果修正
 	var final_damage = amount
 	

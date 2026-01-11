@@ -313,7 +313,7 @@ func _on_enemy_damage_taken(amount: float) -> void:
 	total_damage_dealt += amount
 
 ## 敌人死亡
-func _on_enemy_died(enemy: Enemy) -> void:
+func _on_enemy_died(_enemy: Enemy) -> void:
 	enemies_killed += 1
 	
 	# 生存模式和近战模式下补充敌人

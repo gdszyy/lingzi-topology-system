@@ -1,0 +1,18 @@
+[gd_scene load_steps=3 format=3 uid="uid://explosion001"]
+
+[ext_resource type="Script" path="res://scenes/battle_test/entities/explosion.gd" id="1_explosion"]
+
+[sub_resource type="CircleShape2D" id="CircleShape2D_1"]
+radius = 100.0
+
+[node name="Explosion" type="Area2D"]
+collision_layer = 4
+collision_mask = 2
+script = ExtResource("1_explosion")
+
+[node name="Visual" type="Polygon2D" parent="."]
+color = Color(1, 0.5, 0, 0.8)
+polygon = PackedVector2Array(100, 0, 92.388, 38.268, 70.711, 70.711, 38.268, 92.388, 0, 100, -38.268, 92.388, -70.711, 70.711, -92.388, 38.268, -100, 0, -92.388, -38.268, -70.711, -70.711, -38.268, -92.388, 0, -100, 38.268, -92.388, 70.711, -70.711, 92.388, -38.268)
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="."]
+shape = SubResource("CircleShape2D_1")

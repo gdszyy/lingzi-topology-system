@@ -47,7 +47,16 @@ func _generate_random_carrier() -> CarrierConfigData:
 	carrier.lifetime = randf_range(config.lifetime_range.x, config.lifetime_range.y)
 	carrier.size = randf_range(config.size_range.x, config.size_range.y)
 	carrier.piercing = randi_range(0, 3)
-	carrier.homing_strength = randf() * 0.5 if randf() < 0.3 else 0.0  # 30%概率有追踪
+	
+	# 追踪属性 - 30%概率有追踪
+	if randf() < 0.3:
+		carrier.homing_strength = randf_range(0.2, 1.0)
+		carrier.homing_range = randf_range(150.0, 500.0)
+		carrier.homing_turn_rate = randf_range(2.0, 10.0)
+		carrier.homing_delay = randf_range(0.0, 0.5)  # 短延迟让子弹先飞一段
+	else:
+		carrier.homing_strength = 0.0
+	
 	carrier.instability_cost = randf_range(0.0, 5.0)
 	return carrier
 
@@ -93,7 +102,7 @@ func _generate_random_trigger() -> TriggerData:
 
 ## 生成随机动作
 func _generate_random_action(allow_fission: bool = true) -> ActionData:
-	var action_type = randi() % 4  # 0-3
+	var action_type = randi() % 6  # 0-5，扩展了动作类型
 	
 	# 控制裂变的生成概率
 	if action_type == ActionData.ActionType.FISSION and (not allow_fission or randf() > 0.4):
@@ -110,6 +119,10 @@ func _generate_random_action(allow_fission: bool = true) -> ActionData:
 			action = _generate_status_action()
 		ActionData.ActionType.AREA_EFFECT:
 			action = _generate_area_effect_action()
+		4:  # 生成爆炸
+			action = _generate_explosion_action()
+		5:  # 生成伤害区域
+			action = _generate_damage_zone_action()
 		_:
 			action = _generate_damage_action()
 	
@@ -183,6 +196,26 @@ func _generate_area_effect_action() -> AreaEffectActionData:
 	action.damage_falloff = randf_range(0.3, 0.8)
 	return action
 
+## 生成爆炸动作
+func _generate_explosion_action() -> SpawnExplosionActionData:
+	var action = SpawnExplosionActionData.new()
+	action.explosion_damage = randf_range(config.damage_range.x * 0.8, config.damage_range.y * 1.5)
+	action.explosion_radius = randf_range(60.0, 150.0)
+	action.damage_falloff = randf_range(0.3, 0.7)
+	action.explosion_damage_type = randi() % 4
+	return action
+
+## 生成伤害区域动作
+func _generate_damage_zone_action() -> SpawnDamageZoneActionData:
+	var action = SpawnDamageZoneActionData.new()
+	action.zone_damage = randf_range(config.damage_range.x * 0.3, config.damage_range.y * 0.5)
+	action.zone_radius = randf_range(50.0, 120.0)
+	action.zone_duration = randf_range(2.0, 6.0)
+	action.tick_interval = randf_range(0.3, 0.8)
+	action.zone_damage_type = randi() % 4
+	action.slow_amount = randf_range(0.0, 0.5) if randf() < 0.4 else 0.0  # 40%概率有减速
+	return action
+
 ## 计算资源消耗
 func _calculate_resource_cost(spell: SpellCoreData) -> float:
 	var cost = 5.0  # 基础消耗
@@ -202,6 +235,10 @@ func _calculate_resource_cost(spell: SpellCoreData) -> float:
 				cost += action.spawn_count * 3.0
 			elif action is AreaEffectActionData:
 				cost += action.radius * 0.1
+			elif action is SpawnExplosionActionData:
+				cost += action.explosion_damage * 0.15 + action.explosion_radius * 0.1
+			elif action is SpawnDamageZoneActionData:
+				cost += action.zone_damage * action.zone_duration * 0.1 + action.zone_radius * 0.05
 	
 	return cost
 

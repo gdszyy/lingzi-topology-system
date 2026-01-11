@@ -97,7 +97,7 @@ func _on_generation_completed(generation: int, best_fitness: float, avg_fitness:
 	if best_fitness_label:
 		best_fitness_label.text = "最佳适应度: %.2f (平均: %.2f)" % [best_fitness, avg_fitness]
 
-func _on_evolution_progress(generation: int, max_generations: int, best_fitness: float):
+func _on_evolution_progress(generation: int, max_generations: int, _best_fitness: float):
 	if progress_bar:
 		progress_bar.value = float(generation) / float(max_generations) * 100.0
 

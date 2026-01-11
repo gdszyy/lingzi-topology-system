@@ -87,6 +87,8 @@ func _spawn_projectile(spell: SpellCoreData, direction: Vector2) -> Projectile:
 	projectile.hit_enemy.connect(_on_projectile_hit)
 	projectile.projectile_died.connect(_on_projectile_died)
 	projectile.fission_triggered.connect(_on_fission_triggered)
+	projectile.explosion_requested.connect(_on_explosion_requested)
+	projectile.damage_zone_requested.connect(_on_damage_zone_requested)
 	
 	active_projectiles.append(projectile)
 	projectile_spawned.emit(projectile)
@@ -94,16 +96,32 @@ func _spawn_projectile(spell: SpellCoreData, direction: Vector2) -> Projectile:
 	return projectile
 
 ## 处理裂变
-func _on_fission_triggered(pos: Vector2, child_spell: SpellCoreData, count: int) -> void:
+func _on_fission_triggered(pos: Vector2, child_spell: SpellCoreData, count: int, spread_angle: float = 360.0) -> void:
 	stats.fissions_triggered += 1
+	print("[裂变触发] 位置: %s, 数量: %d, 扩散角度: %.1f°" % [pos, count, spread_angle])
 	
 	# 如果没有子法术数据，使用简化版本
-	var spell_to_use = child_spell if child_spell != null else _create_simple_fission_spell()
+	var spell_to_use: SpellCoreData
+	if child_spell != null:
+		spell_to_use = child_spell
+		print("  使用子法术: %s" % child_spell.spell_name)
+	else:
+		spell_to_use = _create_simple_fission_spell()
+		print("  使用默认裂变碑片")
 	
 	# 生成裂变子弹
-	var angle_step = 360.0 / count
+	var angle_step = spread_angle / maxf(count - 1, 1) if count > 1 else 0.0
+	var start_angle = -spread_angle / 2.0 if spread_angle < 360.0 else 0.0
+	
 	for i in range(count):
-		var angle = deg_to_rad(i * angle_step)
+		var angle: float
+		if spread_angle >= 360.0:
+			# 全周分布
+			angle = deg_to_rad(i * (360.0 / count))
+		else:
+			# 扇形分布
+			angle = deg_to_rad(start_angle + i * angle_step)
+		
 		var direction = Vector2(cos(angle), sin(angle))
 		
 		var projectile = projectile_scene.instantiate() as Projectile
@@ -115,6 +133,8 @@ func _on_fission_triggered(pos: Vector2, child_spell: SpellCoreData, count: int)
 		projectile.fission_triggered.connect(_on_fission_triggered)
 		
 		active_projectiles.append(projectile)
+	
+	print("  生成了 %d 个裂变子弹" % count)
 
 ## 创建简单裂变法术
 func _create_simple_fission_spell() -> SpellCoreData:
@@ -142,7 +162,7 @@ func _create_simple_fission_spell() -> SpellCoreData:
 	return spell
 
 ## 子弹命中
-func _on_projectile_hit(enemy: Node2D, damage: float) -> void:
+func _on_projectile_hit(_enemy: Node2D, damage: float) -> void:
 	stats.total_hits += 1
 	stats.total_damage += damage
 
@@ -192,3 +212,37 @@ func clear_projectiles() -> void:
 		if is_instance_valid(projectile):
 			projectile.queue_free()
 	active_projectiles.clear()
+
+## 处理爆炸请求
+func _on_explosion_requested(pos: Vector2, damage: float, radius: float, falloff: float, damage_type: int) -> void:
+	print("[爆炸请求] 位置: %s, 伤害: %.1f, 半径: %.1f" % [pos, damage, radius])
+	
+	var explosion_scene = preload("res://scenes/battle_test/entities/explosion.tscn")
+	var explosion = explosion_scene.instantiate() as Explosion
+	get_tree().current_scene.add_child(explosion)
+	explosion.initialize(pos, damage, radius, falloff, damage_type)
+	
+	# 连接信号统计伤害
+	explosion.explosion_hit.connect(_on_explosion_hit)
+
+## 处理伤害区域请求
+func _on_damage_zone_requested(pos: Vector2, damage: float, radius: float, duration: float, interval: float, damage_type: int, slow: float) -> void:
+	print("[伤害区域请求] 位置: %s, 伤害: %.1f, 半径: %.1f, 持续: %.1fs" % [pos, damage, radius, duration])
+	
+	var zone_scene = preload("res://scenes/battle_test/entities/damage_zone.tscn")
+	var zone = zone_scene.instantiate() as DamageZone
+	get_tree().current_scene.add_child(zone)
+	zone.initialize(pos, damage, radius, duration, interval, damage_type, slow)
+	
+	# 连接信号统计伤害
+	zone.zone_hit.connect(_on_zone_hit)
+
+## 爆炸命中
+func _on_explosion_hit(_enemy: Node2D, damage: float) -> void:
+	stats.total_hits += 1
+	stats.total_damage += damage
+
+## 伤害区域命中
+func _on_zone_hit(_enemy: Node2D, damage: float) -> void:
+	stats.total_hits += 1
+	stats.total_damage += damage
