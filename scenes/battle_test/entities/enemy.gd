@@ -89,11 +89,11 @@ func take_damage(amount: float, damage_type: int = 0) -> void:
 	var final_damage = amount
 	
 	# 燃烧增伤
-	if status_effects.has(ApplyStatusActionData.StatusType.BURN):
+	if status_effects.has(ApplyStatusActionData.StatusType.BURNING):
 		final_damage *= 1.2
 	
 	# 冰冻减伤
-	if status_effects.has(ApplyStatusActionData.StatusType.FREEZE):
+	if status_effects.has(ApplyStatusActionData.StatusType.FROZEN):
 		final_damage *= 0.8
 	
 	current_health -= final_damage
@@ -126,13 +126,13 @@ func _update_status_effects(delta: float) -> void:
 		effect.duration -= delta
 		
 		# 持续伤害效果
-		if status_type == ApplyStatusActionData.StatusType.BURN:
+		if status_type == ApplyStatusActionData.StatusType.BURNING:
 			take_damage(effect.value * delta, 0)
-		elif status_type == ApplyStatusActionData.StatusType.POISON:
+		elif status_type == ApplyStatusActionData.StatusType.POISONED:
 			take_damage(effect.value * delta * 0.5, 0)
 		
 		# 减速效果
-		if status_type == ApplyStatusActionData.StatusType.SLOW:
+		if status_type == ApplyStatusActionData.StatusType.SLOWED:
 			# 已在移动中处理
 			pass
 		
@@ -149,13 +149,13 @@ func _update_status_effects(delta: float) -> void:
 func _update_status_visual() -> void:
 	var color = NORMAL_COLOR
 	
-	if status_effects.has(ApplyStatusActionData.StatusType.BURN):
+	if status_effects.has(ApplyStatusActionData.StatusType.BURNING):
 		color = Color(1.0, 0.5, 0.0)  # 橙色
-	elif status_effects.has(ApplyStatusActionData.StatusType.FREEZE):
+	elif status_effects.has(ApplyStatusActionData.StatusType.FROZEN):
 		color = Color(0.5, 0.8, 1.0)  # 冰蓝色
-	elif status_effects.has(ApplyStatusActionData.StatusType.POISON):
+	elif status_effects.has(ApplyStatusActionData.StatusType.POISONED):
 		color = Color(0.5, 0.8, 0.2)  # 绿色
-	elif status_effects.has(ApplyStatusActionData.StatusType.SLOW):
+	elif status_effects.has(ApplyStatusActionData.StatusType.SLOWED):
 		color = Color(0.6, 0.6, 0.8)  # 灰蓝色
 	
 	if sprite:
