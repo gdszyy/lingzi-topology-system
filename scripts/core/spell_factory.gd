@@ -78,7 +78,7 @@ func _generate_random_trigger() -> TriggerData:
 		TriggerData.TriggerType.ON_TIMER:
 			var timer_trigger = OnTimerTrigger.new()
 			timer_trigger.delay = randf_range(config.timer_delay_range.x, config.timer_delay_range.y)
-			timer_trigger.repeat_interval = randf() < 0.3 ? randf_range(0.5, 2.0) : 0.0
+			timer_trigger.repeat_interval = randf_range(0.5, 2.0) if randf() < 0.3 else 0.0
 			trigger = timer_trigger
 		TriggerData.TriggerType.ON_PROXIMITY:
 			var prox_trigger = OnProximityTrigger.new()
