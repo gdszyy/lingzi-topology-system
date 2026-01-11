@@ -56,7 +56,7 @@ func fire(target_position: Vector2 = Vector2.ZERO) -> void:
 	if target_position != Vector2.ZERO:
 		direction = (target_position - global_position).normalized()
 	elif aim_at_nearest:
-		var nearest = _find_nearest_enemy()
+		var nearest = _find_nearest_enemy(global_position)
 		if nearest != null:
 			direction = (nearest.global_position - global_position).normalized()
 		else:
@@ -69,7 +69,7 @@ func fire(target_position: Vector2 = Vector2.ZERO) -> void:
 	
 	# 设置追踪目标
 	if current_spell.carrier != null and current_spell.carrier.homing_strength > 0:
-		var nearest = _find_nearest_enemy()
+		var nearest = _find_nearest_enemy(global_position)
 		if nearest != null:
 			projectile.set_target(nearest)
 	
