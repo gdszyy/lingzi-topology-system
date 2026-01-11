@@ -6,7 +6,7 @@ class_name Projectile
 ## 信号
 signal hit_enemy(enemy: Node2D, damage: float)
 signal projectile_died(projectile: Projectile)
-signal fission_triggered(position: Vector2, spell_data: SpellCoreData, count: int, spread_angle: float)
+signal fission_triggered(position: Vector2, spell_data: SpellCoreData, count: int, spread_angle: float, parent_direction: Vector2, direction_mode: int)
 signal explosion_requested(position: Vector2, damage: float, radius: float, falloff: float, damage_type: int)
 signal damage_zone_requested(position: Vector2, damage: float, radius: float, duration: float, interval: float, damage_type: int, slow: float)
 
@@ -205,8 +205,10 @@ func _execute_action(action: ActionData) -> void:
 
 ## 执行裂变
 func _execute_fission(fission: FissionActionData) -> void:
-	print("[子弹] 执行裂变: 数量=%d, 角度=%.1f°" % [fission.spawn_count, fission.spread_angle])
-	fission_triggered.emit(global_position, fission.child_spell_data, fission.spawn_count, fission.spread_angle)
+	print("[子弹] 执行裂变: 数量=%d, 角度=%.1f°, 方向模式=%d" % [fission.spawn_count, fission.spread_angle, fission.direction_mode])
+	# 传递父实体的飞行方向
+	var parent_direction = velocity.normalized() if velocity.length() > 0 else Vector2.RIGHT
+	fission_triggered.emit(global_position, fission.child_spell_data, fission.spawn_count, fission.spread_angle, parent_direction, fission.direction_mode)
 	
 	# 如果裂变后销毁
 	if fission.destroy_parent:
@@ -284,16 +286,34 @@ func _execute_contact_rule(rule: TopologyRuleData, enemy: Node2D) -> void:
 ## 计算伤害
 func _calculate_damage() -> float:
 	var total = 0.0
+	var contact_rules_found = 0
+	var damage_actions_found = 0
 	
 	for rule in spell_data.topology_rules:
 		if rule.trigger.trigger_type == TriggerData.TriggerType.ON_CONTACT:
+			contact_rules_found += 1
 			for action in rule.actions:
 				if action is DamageActionData:
+					damage_actions_found += 1
 					var dmg = action as DamageActionData
-					total += dmg.damage_value * dmg.damage_multiplier
+					var action_damage = dmg.damage_value * dmg.damage_multiplier
+					total += action_damage
 	
 	# 应用质量加成
-	total *= (1.0 + carrier.mass * 0.1)
+	var mass_multiplier = 1.0 + carrier.mass * 0.1
+	total *= mass_multiplier
+	
+	# 调试输出：如果伤害为0，输出详细信息
+	if total <= 0:
+		print("[警告] 伤害为0! 接触规则数=%d, 伤害动作数=%d, 规则总数=%d" % [
+			contact_rules_found, damage_actions_found, spell_data.topology_rules.size()
+		])
+		# 输出所有规则的触发器类型
+		for i in range(spell_data.topology_rules.size()):
+			var rule = spell_data.topology_rules[i]
+			print("  规则%d: 触发器=%d, 动作数=%d" % [
+				i, rule.trigger.trigger_type, rule.actions.size()
+			])
 	
 	return total
 

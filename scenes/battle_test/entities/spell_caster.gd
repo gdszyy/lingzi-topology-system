@@ -96,9 +96,10 @@ func _spawn_projectile(spell: SpellCoreData, direction: Vector2) -> Projectile:
 	return projectile
 
 ## 处理裂变
-func _on_fission_triggered(pos: Vector2, child_spell: SpellCoreData, count: int, spread_angle: float = 360.0) -> void:
+func _on_fission_triggered(pos: Vector2, child_spell: SpellCoreData, count: int, spread_angle: float = 360.0, parent_direction: Vector2 = Vector2.RIGHT, direction_mode: int = 0) -> void:
 	stats.fissions_triggered += 1
-	print("[裂变触发] 位置: %s, 数量: %d, 扩散角度: %.1f°" % [pos, count, spread_angle])
+	var mode_names = ["INHERIT_PARENT", "FIXED_WORLD", "TOWARD_NEAREST", "RANDOM"]
+	print("[裂变触发] 位置: %s, 数量: %d, 扩散角度: %.1f°, 方向模式: %s" % [pos, count, spread_angle, mode_names[direction_mode]])
 	
 	# 如果没有子法术数据，使用简化版本
 	var spell_to_use: SpellCoreData
@@ -120,27 +121,65 @@ func _on_fission_triggered(pos: Vector2, child_spell: SpellCoreData, count: int,
 		spell_to_use.carrier.size
 	])
 	
+	# 确定基准方向
+	var base_direction: Vector2
+	match direction_mode:
+		FissionActionData.DirectionMode.INHERIT_PARENT:
+			base_direction = parent_direction
+		FissionActionData.DirectionMode.FIXED_WORLD:
+			base_direction = Vector2.RIGHT
+		FissionActionData.DirectionMode.TOWARD_NEAREST:
+			var nearest = _find_nearest_enemy(pos)
+			if nearest != null:
+				base_direction = (nearest.global_position - pos).normalized()
+			else:
+				base_direction = parent_direction
+		FissionActionData.DirectionMode.RANDOM:
+			base_direction = Vector2.RIGHT.rotated(randf() * TAU)
+		_:
+			base_direction = parent_direction
+	
+	var base_angle = base_direction.angle()
+	
 	# 生成裂变子弹
 	var angle_step = spread_angle / maxf(count - 1, 1) if count > 1 else 0.0
 	var start_angle = -spread_angle / 2.0 if spread_angle < 360.0 else 0.0
 	
 	var spawned_count = 0
 	for i in range(count):
-		var angle: float
+		var angle_offset: float
 		if spread_angle >= 360.0:
 			# 全周分布
-			angle = deg_to_rad(i * (360.0 / count))
+			angle_offset = deg_to_rad(i * (360.0 / count))
 		else:
 			# 扇形分布
-			angle = deg_to_rad(start_angle + i * angle_step)
+			angle_offset = deg_to_rad(start_angle + i * angle_step)
 		
-		var direction = Vector2(cos(angle), sin(angle))
+		# 以基准方向为中心进行扩散
+		var final_angle = base_angle + angle_offset
+		var direction = Vector2(cos(final_angle), sin(final_angle))
 		
 		# 使用 call_deferred 避免在物理查询期间创建节点
 		call_deferred("_spawn_fission_projectile", spell_to_use, direction, pos)
 		spawned_count += 1
 	
 	print("  请求生成 %d 个裂变子弹" % spawned_count)
+
+## 查找最近的敌人
+func _find_nearest_enemy(from_pos: Vector2) -> Node2D:
+	var enemies = get_tree().get_nodes_in_group("enemies")
+	var nearest: Node2D = null
+	var nearest_dist = INF
+	
+	for enemy in enemies:
+		if not is_instance_valid(enemy):
+			continue
+		var dist = from_pos.distance_to(enemy.global_position)
+		if dist < nearest_dist:
+			nearest_dist = dist
+			nearest = enemy
+	
+	return nearest
 
 ## 延迟生成裂变子弹
 func _spawn_fission_projectile(spell: SpellCoreData, direction: Vector2, pos: Vector2) -> void:

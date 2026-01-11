@@ -322,7 +322,15 @@ func _ensure_valid_spell(spell: SpellCoreData) -> void:
 			rule.trigger = TriggerData.new()
 		if rule.actions.is_empty():
 			var damage = DamageActionData.new()
+			damage.damage_value = randf_range(10.0, 30.0)  # 确保有有效伤害值
 			rule.actions.append(damage)
+		else:
+			# 检查现有动作的有效性
+			for action in rule.actions:
+				if action is DamageActionData:
+					var dmg = action as DamageActionData
+					if dmg.damage_value <= 0:
+						dmg.damage_value = randf_range(10.0, 30.0)
 
 
 # ==================== 辅助生成函数 ====================
