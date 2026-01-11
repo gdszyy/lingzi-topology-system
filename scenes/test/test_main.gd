@@ -5,6 +5,7 @@ extends Control
 ## UI 引用
 @onready var start_button: Button = $VBoxContainer/ControlPanel/StartButton
 @onready var stop_button: Button = $VBoxContainer/ControlPanel/StopButton
+@onready var back_button: Button = $VBoxContainer/ControlPanel/BackButton
 @onready var status_label: Label = $VBoxContainer/StatusPanel/StatusLabel
 @onready var generation_label: Label = $VBoxContainer/StatusPanel/GenerationLabel
 @onready var best_fitness_label: Label = $VBoxContainer/StatusPanel/BestFitnessLabel
@@ -57,6 +58,13 @@ func _setup_ui():
 	# 连接结果列表
 	if results_list:
 		results_list.item_selected.connect(_on_result_selected)
+	
+	# 连接返回按钮
+	if back_button:
+		back_button.pressed.connect(_on_back_pressed)
+
+func _on_back_pressed():
+	get_tree().change_scene_to_file("res://scenes/main_menu/main_menu.tscn")
 
 func _on_start_pressed():
 	# 应用配置

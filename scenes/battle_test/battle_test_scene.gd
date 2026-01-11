@@ -17,6 +17,7 @@ enum TestScenario {
 @onready var reset_button: Button = $UI/TopPanel/ResetButton
 @onready var spell_list: ItemList = $UI/LeftPanel/SpellList
 @onready var load_from_ga_button: Button = $UI/LeftPanel/LoadFromGAButton
+@onready var back_button: Button = $UI/TopPanel/BackButton
 
 ## 统计面板
 @onready var stats_label: RichTextLabel = $UI/RightPanel/StatsLabel
@@ -63,8 +64,13 @@ func _setup_ui() -> void:
 	load_from_ga_button.pressed.connect(_on_load_from_ga_pressed)
 	scenario_option.item_selected.connect(_on_scenario_selected)
 	spell_list.item_selected.connect(_on_spell_selected)
+	back_button.pressed.connect(_on_back_pressed)
 	
 	stop_button.disabled = true
+
+## 返回主菜单
+func _on_back_pressed() -> void:
+	get_tree().change_scene_to_file("res://scenes/main_menu/main_menu.tscn")
 
 ## 设置场景选项
 func _setup_scenario_options() -> void:

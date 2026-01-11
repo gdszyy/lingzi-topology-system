@@ -77,6 +77,11 @@ custom_minimum_size = Vector2(120, 40)
 layout_mode = 2
 text = "停止进化"
 
+[node name="BackButton" type="Button" parent="VBoxContainer/ControlPanel"]
+custom_minimum_size = Vector2(120, 40)
+layout_mode = 2
+text = "返回主菜单"
+
 [node name="StatusPanel" type="VBoxContainer" parent="VBoxContainer"]
 layout_mode = 2
 
