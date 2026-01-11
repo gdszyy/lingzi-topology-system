@@ -10,6 +10,13 @@ enum Phase {
 	PLASMA    # 等离子态 - 高热能，高不稳定性
 }
 
+## 载体类型枚举 - 定义载体的行为模式
+enum CarrierType {
+	PROJECTILE,   # 投射物 - 正常飞行的子弹
+	MINE,         # 地雷 - 速度为0，寿命翻倍，等待触发
+	SLOW_ORB      # 慢速球 - 低速飞行，适合接近触发
+}
+
 ## 伤害类型枚举
 enum DamageType {
 	KINETIC_IMPACT,   # 动能冲击 - 物理伤害
@@ -19,8 +26,9 @@ enum DamageType {
 }
 
 @export var phase: Phase = Phase.SOLID
+@export var carrier_type: CarrierType = CarrierType.PROJECTILE  # 载体类型
 @export var mass: float = 1.0                    # 质量，影响动能伤害
-@export var velocity: float = 500.0              # 初始速度
+@export var velocity: float = 500.0              # 初始速度（地雷类型时强制为0）
 @export var instability_cost: float = 0.0        # 不稳定性成本
 @export var lifetime: float = 5.0                # 存活时间（秒）
 @export var size: float = 1.0                    # 碰撞体大小
@@ -41,14 +49,34 @@ func get_default_damage_type() -> DamageType:
 			return DamageType.ENTROPY_BURST
 	return DamageType.KINETIC_IMPACT
 
+## 获取实际速度（根据载体类型调整）
+func get_effective_velocity() -> float:
+	match carrier_type:
+		CarrierType.MINE:
+			return 0.0  # 地雷速度强制为0
+		CarrierType.SLOW_ORB:
+			return minf(velocity, 150.0)  # 慢速球最高150
+		_:
+			return velocity
+
+## 获取实际寿命（根据载体类型调整）
+func get_effective_lifetime() -> float:
+	match carrier_type:
+		CarrierType.MINE:
+			return lifetime * 2.0  # 地雷寿命翻倍
+		_:
+			return lifetime
+
 ## 计算基础动能伤害
 func calculate_kinetic_damage() -> float:
-	return 0.5 * mass * velocity * velocity * 0.001  # 简化的动能公式
+	var effective_vel = get_effective_velocity()
+	return 0.5 * mass * effective_vel * effective_vel * 0.001  # 简化的动能公式
 
 ## 深拷贝
 func clone_deep() -> CarrierConfigData:
 	var copy = CarrierConfigData.new()
 	copy.phase = phase
+	copy.carrier_type = carrier_type
 	copy.mass = mass
 	copy.velocity = velocity
 	copy.instability_cost = instability_cost
@@ -65,6 +93,7 @@ func clone_deep() -> CarrierConfigData:
 func to_dict() -> Dictionary:
 	return {
 		"phase": phase,
+		"carrier_type": carrier_type,
 		"mass": mass,
 		"velocity": velocity,
 		"instability_cost": instability_cost,
@@ -81,6 +110,7 @@ func to_dict() -> Dictionary:
 static func from_dict(data: Dictionary) -> CarrierConfigData:
 	var config = CarrierConfigData.new()
 	config.phase = data.get("phase", Phase.SOLID)
+	config.carrier_type = data.get("carrier_type", CarrierType.PROJECTILE)
 	config.mass = data.get("mass", 1.0)
 	config.velocity = data.get("velocity", 500.0)
 	config.instability_cost = data.get("instability_cost", 0.0)

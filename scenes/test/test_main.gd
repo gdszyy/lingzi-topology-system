@@ -150,11 +150,13 @@ func _format_spell_details(spell: SpellCoreData) -> String:
 	# 载体信息
 	if spell.carrier != null:
 		var phase_names = ["固态", "液态", "等离子态"]
+		var type_names = ["投射物", "地雷", "慢速球"]
 		text += "[b]【载体配置】[/b]\n"
+		text += "类型: %s\n" % type_names[spell.carrier.carrier_type]
 		text += "相态: %s\n" % phase_names[spell.carrier.phase]
 		text += "质量: %.2f\n" % spell.carrier.mass
-		text += "速度: %.2f\n" % spell.carrier.velocity
-		text += "存活时间: %.2fs\n" % spell.carrier.lifetime
+		text += "速度: %.2f (实际: %.2f)\n" % [spell.carrier.velocity, spell.carrier.get_effective_velocity()]
+		text += "存活时间: %.2fs (实际: %.2fs)\n" % [spell.carrier.lifetime, spell.carrier.get_effective_lifetime()]
 		text += "穿透: %d\n" % spell.carrier.piercing
 		text += "追踪强度: %.2f\n" % spell.carrier.homing_strength
 		text += "不稳定性: %.2f\n\n" % spell.carrier.instability_cost

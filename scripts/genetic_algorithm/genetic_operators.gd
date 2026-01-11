@@ -155,15 +155,39 @@ func _mutate_carrier(spell: SpellCoreData) -> void:
 	if randf() < mutation_config.categorical_mutation_rate:
 		carrier.phase = randi() % 3
 	
+	# 载体类型变异（类别）- 较低概率
+	if randf() < mutation_config.categorical_mutation_rate * 0.5:
+		var old_type = carrier.carrier_type
+		carrier.carrier_type = randi() % 3  # PROJECTILE, MINE, SLOW_ORB
+		# 根据新类型调整相关参数
+		if carrier.carrier_type == CarrierConfigData.CarrierType.MINE:
+			carrier.velocity = 0.0
+			carrier.homing_strength = 0.0
+			if carrier.lifetime < 5.0:
+				carrier.lifetime = randf_range(5.0, 15.0)
+		elif carrier.carrier_type == CarrierConfigData.CarrierType.SLOW_ORB:
+			if carrier.velocity > 150.0 or carrier.velocity == 0.0:
+				carrier.velocity = randf_range(30.0, 150.0)
+		elif old_type == CarrierConfigData.CarrierType.MINE:
+			# 从地雷变为投射物，需要给予速度
+			carrier.velocity = randf_range(200.0, 600.0)
+	
 	# 数值参数变异
 	if randf() < mutation_config.numeric_mutation_rate:
 		carrier.mass = _mutate_numeric(carrier.mass, 0.3, 10.0)
 	
+	# 速度变异（根据载体类型调整范围）
 	if randf() < mutation_config.numeric_mutation_rate:
-		carrier.velocity = _mutate_numeric(carrier.velocity, 100.0, 1000.0)
+		match carrier.carrier_type:
+			CarrierConfigData.CarrierType.MINE:
+				pass  # 地雷速度始终为0
+			CarrierConfigData.CarrierType.SLOW_ORB:
+				carrier.velocity = _mutate_numeric(carrier.velocity, 20.0, 150.0)
+			_:
+				carrier.velocity = _mutate_numeric(carrier.velocity, 50.0, 1000.0)  # 扩展范围
 	
 	if randf() < mutation_config.numeric_mutation_rate:
-		carrier.lifetime = _mutate_numeric(carrier.lifetime, 0.5, 10.0)
+		carrier.lifetime = _mutate_numeric(carrier.lifetime, 0.5, 15.0)  # 扩展寿命范围
 	
 	if randf() < mutation_config.numeric_mutation_rate:
 		carrier.size = _mutate_numeric(carrier.size, 0.2, 3.0)
@@ -171,7 +195,8 @@ func _mutate_carrier(spell: SpellCoreData) -> void:
 	if randf() < mutation_config.numeric_mutation_rate:
 		carrier.piercing = clampi(carrier.piercing + randi_range(-1, 1), 0, 5)
 	
-	if randf() < mutation_config.numeric_mutation_rate:
+	# 追踪变异（地雷不能追踪）
+	if randf() < mutation_config.numeric_mutation_rate and carrier.carrier_type != CarrierConfigData.CarrierType.MINE:
 		carrier.homing_strength = _mutate_numeric(carrier.homing_strength, 0.0, 1.0)
 	
 	if randf() < mutation_config.numeric_mutation_rate:

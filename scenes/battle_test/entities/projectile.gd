@@ -52,12 +52,17 @@ func initialize(data: SpellCoreData, direction: Vector2, start_pos: Vector2) -> 
 	# 设置位置
 	global_position = start_pos
 	
-	# 设置速度
-	velocity = direction.normalized() * carrier.velocity
+	# 设置速度（使用有效速度，支持地雷/慢速球类型）
+	var effective_velocity = carrier.get_effective_velocity()
+	velocity = direction.normalized() * effective_velocity
 	
-	# 设置生命周期
-	lifetime_remaining = carrier.lifetime
+	# 设置生命周期（使用有效寿命，地雷类型寿命翻倍）
+	lifetime_remaining = carrier.get_effective_lifetime()
 	piercing_remaining = carrier.piercing
+	
+	# 输出载体类型信息
+	var type_names = ["Projectile", "Mine", "SlowOrb"]
+	print("[子弹] 类型=%s, 速度=%.1f, 寿命=%.1fs" % [type_names[carrier.carrier_type], effective_velocity, lifetime_remaining])
 	
 	# 初始化规则状态
 	rule_timers.clear()

@@ -5,15 +5,20 @@ extends Node
 ## 生成配置
 var config = {
 	"mass_range": Vector2(0.5, 5.0),
-	"velocity_range": Vector2(200.0, 800.0),
+	"velocity_range": Vector2(50.0, 800.0),       # 扩展速度范围，支持慢速子弹
+	"slow_velocity_range": Vector2(30.0, 150.0),  # 慢速球专用速度范围
 	"lifetime_range": Vector2(1.0, 8.0),
+	"mine_lifetime_range": Vector2(5.0, 15.0),    # 地雷基础寿命（实际会翻倍）
 	"size_range": Vector2(0.5, 2.0),
+	"mine_size_range": Vector2(1.0, 2.5),         # 地雷较大以便观察
 	"damage_range": Vector2(5.0, 50.0),
 	"timer_delay_range": Vector2(0.2, 3.0),
 	"radius_range": Vector2(30.0, 150.0),
 	"spawn_count_range": Vector2i(2, 8),
 	"max_rules": 4,
-	"max_actions_per_rule": 3
+	"max_actions_per_rule": 3,
+	"mine_probability": 0.15,                     # 生成地雷的概率
+	"slow_orb_probability": 0.20                  # 生成慢速球的概率
 }
 
 ## 生成随机法术
@@ -42,21 +47,46 @@ func generate_random_spell() -> SpellCoreData:
 func _generate_random_carrier() -> CarrierConfigData:
 	var carrier = CarrierConfigData.new()
 	carrier.phase = randi() % 3  # 随机相态
-	carrier.mass = randf_range(config.mass_range.x, config.mass_range.y)
-	carrier.velocity = randf_range(config.velocity_range.x, config.velocity_range.y)
-	carrier.lifetime = randf_range(config.lifetime_range.x, config.lifetime_range.y)
-	carrier.size = randf_range(config.size_range.x, config.size_range.y)
-	carrier.piercing = randi_range(0, 3)
 	
-	# 追踪属性 - 30%概率有追踪
-	if randf() < 0.3:
-		carrier.homing_strength = randf_range(0.2, 1.0)
-		carrier.homing_range = randf_range(150.0, 500.0)
-		carrier.homing_turn_rate = randf_range(2.0, 10.0)
-		carrier.homing_delay = randf_range(0.0, 0.5)  # 短延迟让子弹先飞一段
+	# 随机选择载体类型
+	var type_roll = randf()
+	if type_roll < config.mine_probability:
+		# 生成地雷类型
+		carrier.carrier_type = CarrierConfigData.CarrierType.MINE
+		carrier.velocity = 0.0  # 地雷速度为0
+		carrier.lifetime = randf_range(config.mine_lifetime_range.x, config.mine_lifetime_range.y)
+		carrier.size = randf_range(config.mine_size_range.x, config.mine_size_range.y)
+		carrier.homing_strength = 0.0  # 地雷不追踪
+	elif type_roll < config.mine_probability + config.slow_orb_probability:
+		# 生成慢速球类型
+		carrier.carrier_type = CarrierConfigData.CarrierType.SLOW_ORB
+		carrier.velocity = randf_range(config.slow_velocity_range.x, config.slow_velocity_range.y)
+		carrier.lifetime = randf_range(config.lifetime_range.x, config.lifetime_range.y * 1.5)  # 稍长寿命
+		carrier.size = randf_range(config.size_range.x, config.size_range.y)
+		# 慢速球可以有追踪
+		if randf() < 0.4:
+			carrier.homing_strength = randf_range(0.3, 0.8)
+			carrier.homing_range = randf_range(200.0, 400.0)
+			carrier.homing_turn_rate = randf_range(3.0, 8.0)
+		else:
+			carrier.homing_strength = 0.0
 	else:
-		carrier.homing_strength = 0.0
+		# 生成普通投射物
+		carrier.carrier_type = CarrierConfigData.CarrierType.PROJECTILE
+		carrier.velocity = randf_range(config.velocity_range.x, config.velocity_range.y)
+		carrier.lifetime = randf_range(config.lifetime_range.x, config.lifetime_range.y)
+		carrier.size = randf_range(config.size_range.x, config.size_range.y)
+		# 追踪属性 - 30%概率有追踪
+		if randf() < 0.3:
+			carrier.homing_strength = randf_range(0.2, 1.0)
+			carrier.homing_range = randf_range(150.0, 500.0)
+			carrier.homing_turn_rate = randf_range(2.0, 10.0)
+			carrier.homing_delay = randf_range(0.0, 0.5)
+		else:
+			carrier.homing_strength = 0.0
 	
+	carrier.mass = randf_range(config.mass_range.x, config.mass_range.y)
+	carrier.piercing = randi_range(0, 3)
 	carrier.instability_cost = randf_range(0.0, 5.0)
 	return carrier
 
