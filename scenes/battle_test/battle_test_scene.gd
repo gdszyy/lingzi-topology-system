@@ -360,8 +360,8 @@ func _spawn_enemy_internal(pos: Vector2, health: float, pattern: Enemy.MovePatte
 	var enemy = enemy_scene.instantiate() as Enemy
 	enemy_container.add_child(enemy)
 	enemy.global_position = pos
-	enemy.max_health = health
-	enemy.current_health = health
+	# 使用新的能量系统设置敌人属性
+	enemy.set_max_energy_cap(health)
 	enemy.move_pattern = pattern
 	enemy.move_speed = speed
 	enemy.set_target_position(player_position)

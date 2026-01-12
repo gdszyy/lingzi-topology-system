@@ -1,6 +1,10 @@
 class_name PlayerController extends CharacterBody2D
 
-signal health_changed(current: float, max_health: float)
+## 玩家控制器
+## 集成了新的能量系统，替代传统的血量系统
+
+signal energy_cap_changed(current_cap: float, max_cap: float)  # 替代 health_changed
+signal current_energy_changed(current: float, cap: float)
 signal weapon_changed(weapon: WeaponData)
 signal state_changed(state_name: String)
 signal attack_started(attack: AttackData)
@@ -24,6 +28,9 @@ signal weapon_settled  ## 武器物理系统稳定信号
 
 @export var movement_config: MovementConfig
 
+## 能量系统（替代传统血量系统）
+@export var energy_system: EnergySystemData
+
 var is_flying: bool = false
 var was_flying: bool = false
 var is_attacking: bool = false
@@ -35,9 +42,7 @@ var current_weapon: WeaponData = null
 
 var current_spell: SpellCoreData = null
 
-var max_health: float = 100.0
-var current_health: float = 100.0
-
+## 护盾系统（保留，与能量系统协同）
 var current_shield: float = 0.0
 var shield_duration: float = 0.0
 
@@ -52,12 +57,23 @@ var stats = {
 	"total_damage_dealt": 0.0,
 	"total_hits": 0,
 	"spells_cast": 0,
-	"engravings_triggered": 0
+	"engravings_triggered": 0,
+	"energy_absorbed": 0.0,
+	"energy_cap_recovered": 0.0
 }
 
 func _ready() -> void:
 	if movement_config == null:
 		movement_config = MovementConfig.create_default()
+
+	# 初始化能量系统
+	if energy_system == null:
+		energy_system = EnergySystemData.create_default()
+	
+	# 连接能量系统信号
+	energy_system.energy_cap_changed.connect(_on_energy_cap_changed)
+	energy_system.current_energy_changed.connect(_on_current_energy_changed)
+	energy_system.depleted.connect(_on_depleted)
 
 	if state_machine != null:
 		state_machine.initialize(self)
@@ -97,6 +113,9 @@ func _process(delta: float) -> void:
 	_update_target_angle()
 
 	_update_shield(delta)
+	
+	# 能量系统更新（被动吸收和自动修复）
+	_update_energy_system(delta)
 
 	if state_machine != null:
 		state_machine.frame_update(delta)
@@ -142,6 +161,20 @@ func _update_shield(delta: float) -> void:
 		shield_duration -= delta
 		if shield_duration <= 0:
 			current_shield = 0
+
+## 更新能量系统
+func _update_energy_system(delta: float) -> void:
+	if energy_system == null:
+		return
+	
+	# 被动吸收环境能量
+	var absorbed = energy_system.absorb_from_environment(delta)
+	stats.energy_absorbed += absorbed
+	
+	# 自动修复能量上限（如果启用）
+	if energy_system.auto_cultivation:
+		var recovered = energy_system.cultivate(delta, 0.5)
+		stats.energy_cap_recovered += recovered
 
 func _apply_movement(delta: float) -> void:
 	if not can_move:
@@ -236,36 +269,55 @@ func set_weapon(weapon: WeaponData) -> void:
 func set_spell(spell: SpellCoreData) -> void:
 	current_spell = spell
 
+## 承受伤害（新能量系统）
 func take_damage(damage: float, source: Node2D = null) -> void:
 	var actual_damage = damage
 
+	# 护盾优先吸收伤害
 	if current_shield > 0:
 		var shield_absorb = min(current_shield, actual_damage)
 		current_shield -= shield_absorb
 		actual_damage -= shield_absorb
 
-	if actual_damage > 0:
-		current_health = max(0, current_health - actual_damage)
+	# 剩余伤害由能量系统处理
+	if actual_damage > 0 and energy_system != null:
+		energy_system.take_damage(actual_damage)
 
-	health_changed.emit(current_health, max_health)
 	took_damage.emit(damage, source)
 
-	if current_health <= 0:
-		_on_death()
-
+## 治疗/恢复能量上限
 func heal(amount: float) -> float:
-	var old_health = current_health
-	current_health = min(max_health, current_health + amount)
-	var healed = current_health - old_health
+	if energy_system == null:
+		return 0.0
+	return energy_system.restore_energy_cap(amount)
 
-	if healed > 0:
-		health_changed.emit(current_health, max_health)
+## 恢复当前能量
+func restore_energy(amount: float) -> float:
+	if energy_system == null:
+		return 0.0
+	return energy_system.restore_energy(amount)
 
-	return healed
+## 消耗能量（用于施法）
+func consume_energy(amount: float) -> bool:
+	if energy_system == null:
+		return false
+	return energy_system.consume_energy(amount)
+
+## 主动修炼（恢复能量上限）
+func cultivate(delta: float, intensity: float = 1.0) -> float:
+	if energy_system == null:
+		return 0.0
+	var recovered = energy_system.cultivate(delta, intensity)
+	stats.energy_cap_recovered += recovered
+	return recovered
 
 func apply_shield(amount: float, duration: float) -> void:
 	current_shield = max(current_shield, amount)
 	shield_duration = max(shield_duration, duration)
+
+## 能量上限耗尽（死亡）
+func _on_depleted() -> void:
+	_on_death()
 
 func _on_death() -> void:
 	pass
@@ -276,6 +328,14 @@ func _on_state_changed(_old_state: State, new_state: State) -> void:
 func _on_engraving_triggered(trigger_type: int, spell: SpellCoreData, source: String) -> void:
 	stats.engravings_triggered += 1
 	print("[刻录触发] 类型: %d, 法术: %s, 来源: %s" % [trigger_type, spell.spell_name, source])
+
+## 能量上限变化回调
+func _on_energy_cap_changed(current_cap: float, max_cap: float) -> void:
+	energy_cap_changed.emit(current_cap, max_cap)
+
+## 当前能量变化回调
+func _on_current_energy_changed(current: float, cap: float) -> void:
+	current_energy_changed.emit(current, cap)
 
 func get_engraving_manager() -> EngravingManager:
 	return engraving_manager
@@ -303,3 +363,27 @@ func reset_stats() -> void:
 	stats.total_hits = 0
 	stats.spells_cast = 0
 	stats.engravings_triggered = 0
+	stats.energy_absorbed = 0.0
+	stats.energy_cap_recovered = 0.0
+
+## 获取能量系统
+func get_energy_system() -> EnergySystemData:
+	return energy_system
+
+## 获取当前能量上限（兼容旧代码）
+func get_current_health() -> float:
+	if energy_system:
+		return energy_system.current_energy_cap
+	return 0.0
+
+## 获取最大能量上限（兼容旧代码）
+func get_max_health() -> float:
+	if energy_system:
+		return energy_system.max_energy_cap
+	return 0.0
+
+## 获取能量上限百分比
+func get_health_percent() -> float:
+	if energy_system:
+		return energy_system.get_cap_percent()
+	return 0.0

@@ -1,7 +1,12 @@
 class_name ActionExecutor extends Node
 
+## 动作执行器
+## 负责执行各种战斗动作，支持新的能量系统
+
 signal damage_dealt(target: Node2D, damage: float, source: String)
 signal heal_applied(target: Node2D, amount: float)
+signal energy_restored(target: Node2D, amount: float)
+signal cap_restored(target: Node2D, amount: float)
 signal status_applied(target: Node2D, status: String, duration: float)
 signal projectile_spawned(projectile: Node2D)
 signal area_effect_created(area: Node2D)
@@ -56,6 +61,10 @@ func execute_action(action: ActionData, context: Dictionary) -> void:
 		_execute_area_effect_action(action as AreaEffectActionData, context)
 	elif action is SummonActionData:
 		_execute_summon_action(action as SummonActionData, context)
+	elif action is EnergyRestoreActionData:
+		_execute_energy_restore_action(action as EnergyRestoreActionData, context)
+	elif action is CultivationActionData:
+		_execute_cultivation_action(action as CultivationActionData, context)
 	else:
 		_execute_generic_action(action, context)
 
@@ -76,6 +85,7 @@ func _apply_damage_to_target(target: Node2D, damage: float, action: DamageAction
 
 	var final_damage = damage
 
+	# 伤害类型修正（可以根据目标的能量系统状态进行调整）
 	match action.damage_type:
 		CarrierConfigData.DamageType.ENTROPY_BURST:
 			final_damage *= 1.0
@@ -319,6 +329,92 @@ func _execute_summon_action(action: SummonActionData, context: Dictionary) -> vo
 		VFXFactory.spawn_at(summon_vfx, position, get_tree().current_scene)
 	
 	# TODO: 实际召唤物生成逻辑
+
+## 执行能量恢复动作
+func _execute_energy_restore_action(action: EnergyRestoreActionData, context: Dictionary) -> void:
+	var targets: Array[Node2D] = []
+	var position = context.get("position", Vector2.ZERO)
+	
+	# 确定目标
+	if action.apply_to_self and player != null:
+		targets.append(player)
+	
+	if action.apply_to_allies:
+		targets.append_array(_get_nearby_allies(position, action.effect_radius))
+	
+	var restore_value = action.restore_value * effect_multiplier
+	
+	for target in targets:
+		if not target.has_method("get_energy_system"):
+			continue
+		
+		var energy_system = target.get_energy_system()
+		if energy_system == null:
+			continue
+		
+		var restored: float = 0.0
+		
+		match action.restore_type:
+			EnergyRestoreActionData.RestoreType.INSTANT:
+				restored = energy_system.restore_energy(restore_value)
+			EnergyRestoreActionData.RestoreType.PERCENTAGE:
+				var amount = energy_system.current_energy_cap * action.percentage
+				restored = energy_system.restore_energy(amount)
+			EnergyRestoreActionData.RestoreType.OVER_TIME:
+				# 持续恢复需要通过状态效果系统实现
+				# 这里先实现瞬间恢复作为简化
+				restored = energy_system.restore_energy(restore_value)
+		
+		if restored > 0:
+			energy_restored.emit(target, restored)
+
+## 执行修炼动作（恢复能量上限）
+func _execute_cultivation_action(action: CultivationActionData, context: Dictionary) -> void:
+	var targets: Array[Node2D] = []
+	var position = context.get("position", Vector2.ZERO)
+	
+	# 确定目标
+	if action.apply_to_self and player != null:
+		targets.append(player)
+	
+	if action.apply_to_allies:
+		targets.append_array(_get_nearby_allies(position, action.effect_radius))
+	
+	var cap_restore = action.cap_restore_value * effect_multiplier
+	var energy_cost = action.get_energy_cost() * effect_multiplier
+	
+	for target in targets:
+		if not target.has_method("get_energy_system"):
+			continue
+		
+		var energy_system = target.get_energy_system()
+		if energy_system == null:
+			continue
+		
+		# 检查能量是否足够
+		if energy_system.current_energy < energy_cost:
+			continue
+		
+		var restored: float = 0.0
+		
+		match action.cultivation_type:
+			CultivationActionData.CultivationType.INSTANT:
+				# 消耗能量，恢复能量上限
+				if energy_system.consume_energy(energy_cost):
+					restored = energy_system.restore_energy_cap(cap_restore)
+			CultivationActionData.CultivationType.OVER_TIME:
+				# 持续修复需要通过状态效果系统实现
+				# 这里先实现瞬间修复作为简化
+				if energy_system.consume_energy(energy_cost):
+					restored = energy_system.restore_energy_cap(cap_restore)
+			CultivationActionData.CultivationType.BOOST:
+				# 临时提升修炼效率（需要状态效果系统支持）
+				# 暂时跳过
+				pass
+		
+		if restored > 0:
+			cap_restored.emit(target, restored)
+			heal_applied.emit(target, restored)  # 兼容旧信号
 
 func _execute_generic_action(action: ActionData, _context: Dictionary) -> void:
 	print("执行通用动作: %s" % action.get_type_name())
