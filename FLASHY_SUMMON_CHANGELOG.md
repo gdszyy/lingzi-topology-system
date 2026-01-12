@@ -1,4 +1,4 @@
-# 华丽张力效果奖励机制与召唤实体类型支持
+# 华丽张力效果奖励机制、召唤实体类型支持与专有命名系统
 
 ## 概述
 
@@ -145,3 +145,115 @@ print("召唤分数: ", details.summon_score)
 feat: 添加华丽张力效果奖励机制和召唤实体类型支持
 Commit: 73cf802
 ```
+
+
+---
+
+## 专有命名系统
+
+### 召唤法术命名 (`_generate_summon_spell_name`)
+
+根据召唤实体类型生成专有名称，前缀为"召唤法术-"：
+
+| 召唤类型 | 命名风格示例 | 说明 |
+|----------|--------------|------|
+| **TURRET (炮塔)** | 守灵塔、镇光台、封炎垒 | 固定防御风格 |
+| **MINION (仆从)** | 唤灵仆、召魂侍、降影兵 | 召唤使役风格 |
+| **ORBITER (环绕体)** | 旋灵球、环光环、绕焰轮 | 旋转环绕风格 |
+| **DECOY (诱饵)** | 幻灵分身、影影残影、残魂幻象 | 幻影分身风格 |
+| **BARRIER (屏障)** | 护灵障、守光盾、征晶壁 | 防护屏障风格 |
+| **TOTEM (图腾)** | 圣灵图腾、神魂柱、灵光碑 | 神圣图腾风格 |
+
+### 华丽法术命名 (`_generate_flashy_spell_name`)
+
+根据华丽效果类型生成专有名称，前缀为"华丽法术-"：
+
+| 华丽类型 | 命名风格示例 | 触发条件 |
+|----------|--------------|----------|
+| **chain (链式)** | 电光链、雷焰索、闪霜弧 | 包含 ChainActionData |
+| **fission (裂变)** | 爆灵爆、裂光裂、散焰雨 | 裂变数量 ≥ 4 |
+| **explosion (爆炸)** | 爆炎爆、烈焰灭、血光天 | 爆炸半径 ≥ 80 |
+| **plasma (等离子)** | 灵灵焰、天光光、圣焰耀 | 载体为等离子相态 |
+| **combo (组合)** | 天灵天罡、神光神威、圣焰圣裁 | 多种华丽效果组合 |
+
+### 自动命名逻辑 (`_generate_spell_name_by_content`)
+
+```gdscript
+# 自动检测法术内容并选择合适的命名
+func _generate_spell_name_by_content(spell: SpellCoreData) -> String:
+    # 1. 优先检测召唤法术
+    var summon_type = _detect_summon_type(spell)
+    if summon_type >= 0:
+        return _generate_summon_spell_name(summon_type)
+    
+    # 2. 其次检测华丽法术
+    var flashy_type = _detect_flashy_type(spell)
+    if flashy_type != "":
+        return _generate_flashy_spell_name(flashy_type)
+    
+    # 3. 默认使用场景命名
+    return _generate_spell_name_with_scenario(-1)
+```
+
+---
+
+## 场景权重调整系统
+
+### 设计目的
+
+当遗传算法生成特定类型法术时，应该降低其他类型法术的场景权重，以确保生成的法术更符合目标类型。
+
+### 新增配置参数
+
+```gdscript
+@export_group("法术类型场景权重调整")
+@export var summon_scenario_weight_multiplier: float = 0.3  # 生成其他法术时召唤场景权重
+@export var flashy_scenario_weight_multiplier: float = 0.4  # 生成其他法术时华丽场景权重
+@export var other_scenario_weight_for_summon: float = 0.5   # 召唤法术时其他场景权重
+@export var other_scenario_weight_for_flashy: float = 0.6   # 华丽法术时其他场景权重
+```
+
+### 法术类型枚举
+
+```gdscript
+enum SpellType {
+    GENERAL,      # 通用法术
+    SUMMON,       # 召唤法术
+    FLASHY,       # 华丽法术
+    COMBAT        # 纯战斗法术
+}
+```
+
+### 配置工厂方法
+
+| 方法 | 用途 | 关键调整 |
+|------|------|----------|
+| `create_summon_focused()` | 专门生成召唤法术 | 召唤奖励增强，其他场景权重降低 |
+| `create_non_summon_focused()` | 避免生成召唤法术 | 召唤场景权重 ×0.2，召唤奖励降低 |
+| `create_non_flashy_focused()` | 避免生成华丽法术 | 华丽场景权重 ×0.25，华丽奖励降低 |
+| `create_combat_focused()` | 纯战斗法术 | 同时降低召唤和华丽权重 |
+
+### 使用示例
+
+```gdscript
+# 生成纯战斗法术（降低召唤和华丽权重）
+var combat_config = FitnessConfig.create_combat_focused()
+var calculator = FitnessCalculator.new(combat_config)
+
+# 专门生成召唤法术
+var summon_config = FitnessConfig.create_summon_focused()
+var summon_calculator = FitnessCalculator.new(summon_config)
+
+# 获取法术类型信息
+var details = calculator.get_evaluation_details(spell)
+print("法术类型: ", details.spell_type_name)  # "召唤法术"、"华丽法术"、"通用法术"
+```
+
+---
+
+## 提交记录
+
+| 提交 ID | 说明 |
+|---------|------|
+| `73cf802` | 添加华丽张力效果奖励机制和召唤实体类型支持 |
+| `0903925` | 添加召唤法术和华丽法术专有命名系统，调整场景权重 |
