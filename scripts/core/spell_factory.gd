@@ -114,7 +114,7 @@ func _generate_random_trigger() -> TriggerData:
 	return trigger
 
 func _generate_random_action(allow_fission: bool = true) -> ActionData:
-	var action_type = randi() % 6
+	var action_type = randi() % 8  # 扩展为8种动作类型
 
 	if action_type == ActionData.ActionType.FISSION and (not allow_fission or randf() > 0.4):
 		action_type = ActionData.ActionType.DAMAGE
@@ -134,6 +134,10 @@ func _generate_random_action(allow_fission: bool = true) -> ActionData:
 			action = _generate_explosion_action()
 		5:
 			action = _generate_damage_zone_action()
+		6:  # 召唤动作 - 支持所有召唤实体类型
+			action = _generate_summon_action()
+		7:  # 链式动作 - 华丽视觉效果
+			action = _generate_chain_action()
 		_:
 			action = _generate_damage_action()
 
@@ -215,6 +219,68 @@ func _generate_damage_zone_action() -> SpawnDamageZoneActionData:
 	action.tick_interval = randf_range(0.3, 0.8)
 	action.zone_damage_type = randi() % 4
 	action.slow_amount = randf_range(0.0, 0.5) if randf() < 0.4 else 0.0
+	return action
+
+## 生成召唤动作 - 支持所有召唤实体类型
+func _generate_summon_action() -> SummonActionData:
+	var action = SummonActionData.new()
+	# 随机选择召唤类型（包括所有最新类型）
+	action.summon_type = randi() % 6  # TURRET, MINION, ORBITER, DECOY, BARRIER, TOTEM
+	action.behavior_mode = randi() % 4  # AGGRESSIVE, DEFENSIVE, PASSIVE, FOLLOW
+	action.summon_count = randi_range(1, 3)
+	action.summon_duration = randf_range(5.0, 15.0)
+	action.summon_health = randf_range(30.0, 100.0)
+	action.summon_damage = randf_range(10.0, 30.0)
+	action.summon_attack_interval = randf_range(0.5, 2.0)
+	action.summon_attack_range = randf_range(100.0, 300.0)
+	
+	# 根据召唤类型调整特定参数
+	match action.summon_type:
+		SummonActionData.SummonType.TURRET:
+			action.summon_move_speed = 0.0
+			action.summon_attack_range = randf_range(200.0, 400.0)
+		SummonActionData.SummonType.MINION:
+			action.summon_move_speed = randf_range(80.0, 150.0)
+			action.aggro_radius = randf_range(100.0, 200.0)
+		SummonActionData.SummonType.ORBITER:
+			action.orbit_radius = randf_range(50.0, 120.0)
+			action.orbit_speed = randf_range(1.5, 4.0)
+			action.summon_count = randi_range(2, 5)  # 环绕体通常多个
+		SummonActionData.SummonType.DECOY:
+			action.summon_health = randf_range(50.0, 150.0)
+			action.summon_damage = 0.0
+			action.aggro_radius = randf_range(150.0, 300.0)
+		SummonActionData.SummonType.BARRIER:
+			action.summon_health = randf_range(100.0, 200.0)
+			action.summon_move_speed = 0.0
+		SummonActionData.SummonType.TOTEM:
+			action.totem_effect_radius = randf_range(80.0, 180.0)
+			action.totem_effect_interval = randf_range(0.5, 1.5)
+			action.summon_move_speed = 0.0
+	
+	# 小概率继承法术
+	action.inherit_spell = randf() < 0.15
+	
+	return action
+
+## 生成链式动作 - 视觉华丽效果
+func _generate_chain_action() -> ChainActionData:
+	var action = ChainActionData.new()
+	action.chain_type = randi() % 4  # LIGHTNING, FIRE, ICE, VOID
+	action.chain_count = randi_range(2, 6)
+	action.chain_range = randf_range(150.0, 300.0)
+	action.chain_damage = randf_range(15.0, 40.0)
+	action.chain_damage_decay = randf_range(0.6, 0.9)
+	action.chain_delay = randf_range(0.05, 0.2)
+	action.chain_can_return = randf() < 0.2
+	action.target_selection = randi() % 4  # NEAREST, RANDOM, LOWEST_HEALTH, HIGHEST_HEALTH
+	action.chain_visual_width = randf_range(2.0, 5.0)
+	
+	# 小概率分叉（更加华丽）
+	if randf() < 0.25:
+		action.fork_chance = randf_range(0.2, 0.5)
+		action.fork_count = randi_range(1, 2)
+	
 	return action
 
 func _calculate_resource_cost(spell: SpellCoreData) -> float:

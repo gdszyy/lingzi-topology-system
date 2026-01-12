@@ -28,6 +28,14 @@ func calculate_scenario_fitness(data: SimulationDataCollector, spell: SpellCoreD
 
 	var complexity_score = calculate_complexity_score(spell)
 	var norm_complexity = _normalize(complexity_score, 0.0, config.max_complexity_bonus)
+	
+	# 计算华丽张力效果分数
+	var flashy_score = calculate_flashy_score(spell)
+	var norm_flashy = _normalize(flashy_score, 0.0, config.max_flashy_bonus)
+	
+	# 计算召唤系统奖励（纳入复杂度评估）
+	var summon_score = calculate_summon_score(spell)
+	norm_complexity += _normalize(summon_score, 0.0, 50.0) * 0.3
 
 	var kill_bonus = report.kill_rate * 0.15
 
@@ -39,6 +47,7 @@ func calculate_scenario_fitness(data: SimulationDataCollector, spell: SpellCoreD
 		config.weight_overkill * norm_overkill +
 		config.weight_instability * norm_instability +
 		config.weight_complexity * norm_complexity +
+		config.weight_flashy * norm_flashy +  # 添加华丽效果权重
 		kill_bonus
 	)
 
@@ -96,14 +105,25 @@ func calculate_spell_cost(spell: SpellCoreData) -> Dictionary:
 					total_cost += child_cost.total_cost * 0.5
 					fission_depth = maxi(fission_depth, child_cost.get("fission_depth", 0) + 1)
 
-			elif action is ApplyStatusActionData:
+				elif action is ApplyStatusActionData:
 				var status = action as ApplyStatusActionData
 				total_cost += status.duration * config.cost_per_status
 
-			elif action is AreaEffectActionData:
+				elif action is AreaEffectActionData:
 				var area = action as AreaEffectActionData
 				total_cost += area.radius * config.cost_per_aoe_radius
 				total_cost += area.damage_value * config.cost_per_damage * 0.5
+				
+				elif action is SummonActionData:
+				var summon = action as SummonActionData
+				total_cost += summon.summon_count * config.cost_per_summon
+				total_cost += summon.summon_duration * 0.2
+				total_cost += summon.summon_damage * config.cost_per_damage * 0.3
+				
+				elif action is ChainActionData:
+				var chain = action as ChainActionData
+				total_cost += chain.chain_count * 1.5
+				total_cost += chain.chain_damage * config.cost_per_damage * 0.4
 
 	if fission_depth > config.max_fission_depth:
 		violations.append("裂变深度 %d 超过上限 %d" % [fission_depth, config.max_fission_depth])
@@ -129,6 +149,134 @@ func calculate_spell_cost(spell: SpellCoreData) -> Dictionary:
 		"fitness_penalty": fitness_penalty,
 		"fission_depth": fission_depth
 	}
+
+## 计算华丽张力效果分数
+func calculate_flashy_score(spell: SpellCoreData) -> float:
+	var score = 0.0
+	var flashy_types_count = 0  # 用于组合奖励
+	
+	# 检查载体相态 - 等离子相态视觉最华丽
+	if spell.carrier != null:
+		if spell.carrier.phase == CarrierConfigData.Phase.PLASMA:
+			score += config.flashy_plasma_phase_bonus
+			flashy_types_count += 1
+		# 追踪效果奖励
+		if spell.carrier.homing_strength > 0.3:
+			score += config.flashy_homing_visual_bonus * spell.carrier.homing_strength
+			flashy_types_count += 1
+	
+	# 检查所有规则中的动作
+	var fission_depth = 0
+	var has_chain = false
+	var has_summon = false
+	var has_explosion = false
+	var max_aoe_radius = 0.0
+	
+	for rule in spell.topology_rules:
+		for action in rule.actions:
+			# 链式效果 - 视觉冲击力强
+			if action is ChainActionData:
+				var chain = action as ChainActionData
+				score += config.flashy_chain_bonus
+				# 链式分叉更加华丽
+				if chain.fork_chance > 0:
+					score += config.flashy_chain_fork_bonus * chain.fork_chance * chain.fork_count
+				# 链式数量奖励
+				score += chain.chain_count * 1.5
+				if not has_chain:
+					has_chain = true
+					flashy_types_count += 1
+			
+			# 召唤效果 - 场面丰富
+			elif action is SummonActionData:
+				var summon = action as SummonActionData
+				score += config.flashy_summon_bonus
+				# 环绕体视觉效果最佳
+				if summon.summon_type == SummonActionData.SummonType.ORBITER:
+					score += config.flashy_orbiter_bonus
+				# 多个召唤物增加场面感
+				score += (summon.summon_count - 1) * 2.0
+				if not has_summon:
+					has_summon = true
+					flashy_types_count += 1
+			
+			# 裂变效果 - 弹幕张力
+			elif action is FissionActionData:
+				var fission = action as FissionActionData
+				# 多弹射出的视觉效果
+				score += fission.spawn_count * 1.0
+				# 检查嵌套裂变深度
+				if fission.child_spell_data != null and fission.child_spell_data is SpellCoreData:
+					var child_flashy = calculate_flashy_score(fission.child_spell_data)
+					score += child_flashy * 0.5 + config.flashy_multi_fission_bonus
+					fission_depth += 1
+			
+			# 爆炸效果 - 视觉冲击
+			elif action is SpawnExplosionActionData:
+				var explosion = action as SpawnExplosionActionData
+				score += config.flashy_explosion_bonus
+				# 大爆炸更加壮观
+				score += explosion.explosion_radius * 0.03
+				if not has_explosion:
+					has_explosion = true
+					flashy_types_count += 1
+			
+			# 范围效果 - 大范围更壮观
+			elif action is AreaEffectActionData:
+				var area = action as AreaEffectActionData
+				max_aoe_radius = maxf(max_aoe_radius, area.radius)
+	
+	# 大范围AOE奖励
+	if max_aoe_radius > 80.0:
+		score += (max_aoe_radius - 80.0) * config.flashy_aoe_scale_bonus
+		flashy_types_count += 1
+	
+	# 多重裂变层次奖励
+	if fission_depth > 0:
+		score += fission_depth * config.flashy_multi_fission_bonus
+		flashy_types_count += 1
+	
+	# 多种华丽效果组合奖励 - 多样化的视觉效果更加吸引人
+	if flashy_types_count >= 2:
+		score *= 1.0 + (flashy_types_count - 1) * (config.flashy_combo_multiplier - 1.0) * 0.5
+	
+	return minf(score, config.max_flashy_bonus)
+
+## 计算召唤系统奖励分数
+func calculate_summon_score(spell: SpellCoreData) -> float:
+	var score = 0.0
+	
+	for rule in spell.topology_rules:
+		for action in rule.actions:
+			if action is SummonActionData:
+				var summon = action as SummonActionData
+				# 基础召唤奖励
+				score += config.summon_base_bonus
+				
+				# 根据召唤类型给予不同奖励
+				match summon.summon_type:
+					SummonActionData.SummonType.TURRET:
+						score += config.summon_turret_bonus
+					SummonActionData.SummonType.MINION:
+						score += config.summon_minion_bonus
+					SummonActionData.SummonType.ORBITER:
+						score += config.summon_orbiter_bonus
+					SummonActionData.SummonType.DECOY:
+						score += config.summon_decoy_bonus
+					SummonActionData.SummonType.BARRIER:
+						score += config.summon_barrier_bonus
+					SummonActionData.SummonType.TOTEM:
+						score += config.summon_totem_bonus
+				
+				# 多个召唤物奖励
+				if summon.summon_count > 1:
+					score += (summon.summon_count - 1) * config.summon_count_bonus
+				
+				# 继承法术奖励 - 更复杂的召唤物
+				if summon.inherit_spell or summon.custom_spell_data != null:
+					score += config.summon_inherit_spell_bonus
+	
+	return score
 
 func calculate_complexity_score(spell: SpellCoreData) -> float:
 	var score = 0.0
@@ -472,6 +620,14 @@ func quick_evaluate(spell: SpellCoreData) -> float:
 
 	var complexity = calculate_complexity_score(spell)
 	score += complexity * 0.3
+	
+	# 添加华丽张力效果奖励
+	var flashy = calculate_flashy_score(spell)
+	score += flashy * 0.4
+	
+	# 添加召唤系统奖励
+	var summon = calculate_summon_score(spell)
+	score += summon * 0.35
 
 	score -= spell.calculate_total_instability() * 1.5
 
@@ -498,6 +654,8 @@ func compare_spells(spell_a: SpellCoreData, spell_b: SpellCoreData) -> int:
 func get_evaluation_details(spell: SpellCoreData) -> Dictionary:
 	var cost_result = calculate_spell_cost(spell)
 	var complexity = calculate_complexity_score(spell)
+	var flashy = calculate_flashy_score(spell)
+	var summon = calculate_summon_score(spell)
 
 	var details = {
 		"quick_score": quick_evaluate(spell),
@@ -507,11 +665,15 @@ func get_evaluation_details(spell: SpellCoreData) -> Dictionary:
 		"has_fission": false,
 		"has_aoe": false,
 		"has_status": false,
+		"has_chain": false,
+		"has_summon": false,
 		"estimated_damage": 0.0,
 		"total_cost": cost_result.total_cost,
 		"cost_over_limit": cost_result.over_limit,
 		"cost_violations": cost_result.violations,
 		"complexity_score": complexity,
+		"flashy_score": flashy,
+		"summon_score": summon,
 		"efficiency_multiplier": cost_result.efficiency_multiplier
 	}
 
@@ -525,6 +687,10 @@ func get_evaluation_details(spell: SpellCoreData) -> Dictionary:
 				details.estimated_damage += (action as AreaEffectActionData).damage_value
 			elif action is ApplyStatusActionData:
 				details.has_status = true
+			elif action is ChainActionData:
+				details.has_chain = true
+			elif action is SummonActionData:
+				details.has_summon = true
 			elif action is DamageActionData:
 				var dmg = action as DamageActionData
 				details.estimated_damage += dmg.damage_value * dmg.damage_multiplier

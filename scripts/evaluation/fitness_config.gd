@@ -60,6 +60,32 @@ enum ScenarioType {
 @export var nesting_depth_bonus: float = 15.0
 @export var nesting_depth_multiplier: float = 1.3
 
+@export_group("华丽张力效果奖励")
+@export var weight_flashy: float = 0.08  # 华丽效果权重
+@export var flashy_chain_bonus: float = 12.0  # 链式效果奖励
+@export var flashy_chain_fork_bonus: float = 8.0  # 链式分叉额外奖励
+@export var flashy_summon_bonus: float = 10.0  # 召唤效果奖励
+@export var flashy_orbiter_bonus: float = 15.0  # 环绕体召唤额外奖励（视觉华丽）
+@export var flashy_multi_fission_bonus: float = 5.0  # 多重裂变奖励（每层）
+@export var flashy_explosion_bonus: float = 8.0  # 爆炸效果奖励
+@export var flashy_aoe_scale_bonus: float = 0.05  # 大范围AOE奖励（按半径）
+@export var flashy_plasma_phase_bonus: float = 6.0  # 等离子相态奖励（视觉最华丽）
+@export var flashy_homing_visual_bonus: float = 4.0  # 追踪效果奖励
+@export var flashy_combo_multiplier: float = 1.5  # 多种华丽效果组合乘数
+@export var max_flashy_bonus: float = 80.0  # 华丽效果奖励上限
+
+@export_group("召唤系统奖励")
+@export var summon_base_bonus: float = 8.0  # 召唤基础奖励
+@export var summon_turret_bonus: float = 6.0  # 炮塔召唤奖励
+@export var summon_minion_bonus: float = 8.0  # 仆从召唤奖励
+@export var summon_orbiter_bonus: float = 12.0  # 环绕体召唤奖励
+@export var summon_decoy_bonus: float = 5.0  # 诱饵召唤奖励
+@export var summon_barrier_bonus: float = 7.0  # 屏障召唤奖励
+@export var summon_totem_bonus: float = 10.0  # 图腾召唤奖励
+@export var summon_count_bonus: float = 3.0  # 每个额外召唤物奖励
+@export var summon_inherit_spell_bonus: float = 15.0  # 继承法术奖励
+@export var cost_per_summon: float = 3.0  # 每个召唤物的cost
+
 @export_group("多样性保护")
 @export var diversity_weight: float = 0.25
 @export var similarity_penalty: float = 0.35
@@ -99,7 +125,8 @@ func get_metric_weights() -> Dictionary:
 		"resource_efficiency": weight_resource_efficiency,
 		"overkill": weight_overkill,
 		"instability": weight_instability,
-		"complexity": weight_complexity
+		"complexity": weight_complexity,
+		"flashy": weight_flashy
 	}
 
 func get_scenario_weights() -> Dictionary:
@@ -135,10 +162,21 @@ static func create_single_target_focused() -> FitnessConfig:
 
 static func create_flashy_focused() -> FitnessConfig:
 	var config = FitnessConfig.new()
-	config.weight_damage = 0.15
-	config.weight_complexity = 0.25
+	config.weight_damage = 0.12
+	config.weight_complexity = 0.20
+	config.weight_flashy = 0.15  # 增强华丽效果权重
 	config.complexity_bonus_fission = 25.0
 	config.complexity_bonus_combo = 30.0
+	# 华丽效果奖励增强
+	config.flashy_chain_bonus = 18.0
+	config.flashy_chain_fork_bonus = 12.0
+	config.flashy_summon_bonus = 15.0
+	config.flashy_orbiter_bonus = 20.0
+	config.flashy_multi_fission_bonus = 8.0
+	config.flashy_explosion_bonus = 12.0
+	config.flashy_plasma_phase_bonus = 10.0
+	config.flashy_combo_multiplier = 2.0
+	config.max_flashy_bonus = 120.0
 	return config
 
 static func create_close_range_focused() -> FitnessConfig:

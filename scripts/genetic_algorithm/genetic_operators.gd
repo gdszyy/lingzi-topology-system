@@ -243,6 +243,57 @@ func _mutate_action(action: ActionData) -> void:
 			area.radius = _mutate_numeric(area.radius, 20.0, 200.0)
 		if randf() < mutation_config.numeric_mutation_rate:
 			area.damage_value = _mutate_numeric(area.damage_value, 1.0, 80.0)
+	
+	# 召唤动作变异 - 支持所有召唤实体类型
+	elif action is SummonActionData:
+		var summon = action as SummonActionData
+		if randf() < mutation_config.categorical_mutation_rate:
+			summon.summon_type = randi() % 6  # TURRET, MINION, ORBITER, DECOY, BARRIER, TOTEM
+		if randf() < mutation_config.categorical_mutation_rate:
+			summon.behavior_mode = randi() % 4
+		if randf() < mutation_config.numeric_mutation_rate:
+			summon.summon_count = clampi(summon.summon_count + randi_range(-1, 1), 1, 5)
+		if randf() < mutation_config.numeric_mutation_rate:
+			summon.summon_duration = _mutate_numeric(summon.summon_duration, 3.0, 20.0)
+		if randf() < mutation_config.numeric_mutation_rate:
+			summon.summon_health = _mutate_numeric(summon.summon_health, 20.0, 150.0)
+		if randf() < mutation_config.numeric_mutation_rate:
+			summon.summon_damage = _mutate_numeric(summon.summon_damage, 5.0, 50.0)
+		# 环绕体特殊参数变异
+		if summon.summon_type == SummonActionData.SummonType.ORBITER:
+			if randf() < mutation_config.numeric_mutation_rate:
+				summon.orbit_radius = _mutate_numeric(summon.orbit_radius, 30.0, 150.0)
+			if randf() < mutation_config.numeric_mutation_rate:
+				summon.orbit_speed = _mutate_numeric(summon.orbit_speed, 1.0, 5.0)
+		# 图腾特殊参数变异
+		if summon.summon_type == SummonActionData.SummonType.TOTEM:
+			if randf() < mutation_config.numeric_mutation_rate:
+				summon.totem_effect_radius = _mutate_numeric(summon.totem_effect_radius, 50.0, 200.0)
+			if randf() < mutation_config.numeric_mutation_rate:
+				summon.totem_effect_interval = _mutate_numeric(summon.totem_effect_interval, 0.3, 2.0)
+	
+	# 链式动作变异 - 华丽视觉效果
+	elif action is ChainActionData:
+		var chain = action as ChainActionData
+		if randf() < mutation_config.categorical_mutation_rate:
+			chain.chain_type = randi() % 4  # LIGHTNING, FIRE, ICE, VOID
+		if randf() < mutation_config.categorical_mutation_rate:
+			chain.target_selection = randi() % 4
+		if randf() < mutation_config.numeric_mutation_rate:
+			chain.chain_count = clampi(chain.chain_count + randi_range(-1, 2), 2, 8)
+		if randf() < mutation_config.numeric_mutation_rate:
+			chain.chain_range = _mutate_numeric(chain.chain_range, 100.0, 400.0)
+		if randf() < mutation_config.numeric_mutation_rate:
+			chain.chain_damage = _mutate_numeric(chain.chain_damage, 10.0, 60.0)
+		if randf() < mutation_config.numeric_mutation_rate:
+			chain.chain_damage_decay = _mutate_numeric(chain.chain_damage_decay, 0.5, 0.95)
+		# 分叉变异（增加华丽度）
+		if randf() < mutation_config.numeric_mutation_rate * 0.5:
+			if chain.fork_chance == 0 and randf() < 0.3:
+				chain.fork_chance = randf_range(0.15, 0.4)
+				chain.fork_count = randi_range(1, 2)
+			elif chain.fork_chance > 0:
+				chain.fork_chance = _mutate_numeric(chain.fork_chance, 0.0, 0.6)
 
 func _mutate_numeric(value: float, min_val: float, max_val: float) -> float:
 	var mutation_amount = value * mutation_config.numeric_mutation_strength * randf_range(-1.0, 1.0)
@@ -314,7 +365,7 @@ func _generate_random_trigger() -> TriggerData:
 	return trigger
 
 func _generate_random_action(allow_fission: bool = true) -> ActionData:
-	var action_type = randi() % 4
+	var action_type = randi() % 6  # 扩展为6种动作类型
 
 	if action_type == ActionData.ActionType.FISSION and (not allow_fission or randf() > 0.4):
 		action_type = ActionData.ActionType.DAMAGE
@@ -348,6 +399,34 @@ func _generate_random_action(allow_fission: bool = true) -> ActionData:
 			area.damage_value = randf_range(5.0, 30.0)
 			area.duration = randf_range(0.0, 2.0)
 			return area
+		
+		4:  # 召唤动作 - 支持所有召唤实体类型
+			var summon = SummonActionData.new()
+			summon.summon_type = randi() % 6  # TURRET, MINION, ORBITER, DECOY, BARRIER, TOTEM
+			summon.behavior_mode = randi() % 4
+			summon.summon_count = randi_range(1, 3)
+			summon.summon_duration = randf_range(5.0, 12.0)
+			summon.summon_health = randf_range(30.0, 80.0)
+			summon.summon_damage = randf_range(10.0, 25.0)
+			# 环绕体特殊处理
+			if summon.summon_type == SummonActionData.SummonType.ORBITER:
+				summon.orbit_radius = randf_range(50.0, 100.0)
+				summon.orbit_speed = randf_range(1.5, 3.5)
+				summon.summon_count = randi_range(2, 4)
+			return summon
+		
+		5:  # 链式动作 - 华丽视觉效果
+			var chain = ChainActionData.new()
+			chain.chain_type = randi() % 4  # LIGHTNING, FIRE, ICE, VOID
+			chain.chain_count = randi_range(2, 5)
+			chain.chain_range = randf_range(150.0, 250.0)
+			chain.chain_damage = randf_range(15.0, 35.0)
+			chain.chain_damage_decay = randf_range(0.65, 0.85)
+			# 小概率分叉
+			if randf() < 0.2:
+				chain.fork_chance = randf_range(0.2, 0.4)
+				chain.fork_count = randi_range(1, 2)
+			return chain
 
 		_:
 			var damage = DamageActionData.new()
