@@ -114,7 +114,7 @@ func damage_shield(target: Node, damage: float) -> float:
 	
 	return remaining_damage
 
-## 尝试反弹投射物
+## 尝试反弹投射物（使用PROJECTILE类型护盾）
 func try_reflect_projectile(target: Node, projectile: Node) -> bool:
 	var target_id = target.get_instance_id()
 	
@@ -123,8 +123,8 @@ func try_reflect_projectile(target: Node, projectile: Node) -> bool:
 	
 	var instance: ShieldInstance = active_shields[target_id]
 	
-	# 检查是否是反射护盾
-	if instance.data.shield_type != ShieldActionData.ShieldType.REFLECTIVE:
+	# 检查是否是弹幕护盾（PROJECTILE类型可以反弹投射物）
+	if instance.data.shield_type != ShieldActionData.ShieldType.PROJECTILE:
 		return false
 	
 	# 检查反射次数限制
@@ -223,8 +223,8 @@ func _create_shield_visual(target: Node, shield_data: ShieldActionData) -> Node2
 			shield_color = Color(0.2, 0.6, 1.0, 0.4)  # 蓝色
 		ShieldActionData.ShieldType.AREA:
 			shield_color = Color(0.2, 1.0, 0.6, 0.3)  # 绿色
-		ShieldActionData.ShieldType.REFLECTIVE:
-			shield_color = Color(1.0, 0.8, 0.2, 0.4)  # 金色
+		ShieldActionData.ShieldType.PROJECTILE:
+			shield_color = Color(1.0, 0.8, 0.2, 0.4)  # 金色（弹幕护盾）
 	
 	shield_shape.color = shield_color
 	

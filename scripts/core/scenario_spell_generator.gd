@@ -554,14 +554,14 @@ func _generate_chain_action(rules_config: Dictionary, max_damage: float, action_
 	# 链式附带状态
 	if randf() < 0.4:
 		match chain.chain_type:
-			ChainActionData.ChainType.LIGHTNING:
-				chain.apply_status_type = ApplyStatusActionData.StatusType.STUNNED
-			ChainActionData.ChainType.FIRE:
-				chain.apply_status_type = ApplyStatusActionData.StatusType.BURNING
-			ChainActionData.ChainType.ICE:
-				chain.apply_status_type = ApplyStatusActionData.StatusType.FROZEN
-			ChainActionData.ChainType.VOID:
-				chain.apply_status_type = ApplyStatusActionData.StatusType.MARKED
+				ChainActionData.ChainType.LIGHTNING:
+					chain.apply_status_type = ApplyStatusActionData.StatusType.CRYO_CRYSTAL  # 冷脆化代替眩晕
+				ChainActionData.ChainType.FIRE:
+					chain.apply_status_type = ApplyStatusActionData.StatusType.ENTROPY_BURN  # 熵燃代替燃烧
+				ChainActionData.ChainType.ICE:
+					chain.apply_status_type = ApplyStatusActionData.StatusType.CRYO_CRYSTAL  # 冷脆化代替冰冻
+				ChainActionData.ChainType.VOID:
+					chain.apply_status_type = ApplyStatusActionData.StatusType.RESONANCE_MARK  # 共振标记代替标记
 		chain.apply_status_duration = randf_range(1.0, 2.5)
 	
 	return chain

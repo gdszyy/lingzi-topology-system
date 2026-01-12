@@ -116,9 +116,9 @@ func _deal_tick_damage() -> void:
 			enemy.take_damage(damage_per_tick, damage_type)
 			zone_hit.emit(enemy, damage_per_tick)
 		
-		# 应用减速效果
+		# 应用减速效果（使用结构锁代替减速）
 		if slow_amount > 0 and enemy.has_method("apply_status"):
-			enemy.apply_status(ApplyStatusActionData.StatusType.SLOWED, tick_interval + 0.1, slow_amount)
+			enemy.apply_status(ApplyStatusActionData.StatusType.STRUCTURE_LOCK, tick_interval + 0.1, slow_amount)
 
 ## 进入区域
 func _on_body_entered(body: Node2D) -> void:

@@ -22,9 +22,9 @@ static func create_lightning_chain_on_hit() -> SpellCoreData:
 	# 创建链式动作
 	var chain_action = ChainActionData.new()
 	chain_action.chain_damage = 15.0
-	chain_action.max_chains = 3
+	chain_action.chain_count = 3
 	chain_action.chain_range = 150.0
-	chain_action.damage_decay = 0.8
+	chain_action.chain_damage_decay = 0.8
 	
 	# 创建规则
 	var rule = TopologyRuleData.new()
@@ -56,7 +56,7 @@ static func create_fire_enchant_on_attack() -> SpellCoreData:
 	
 	var damage_action = DamageActionData.new()
 	damage_action.damage_value = 10.0
-	damage_action.damage_type = DamageActionData.DamageType.FIRE
+	damage_action.damage_type = CarrierConfigData.DamageType.ENTROPY_BURST  # 使用熵能爆发代替火焰
 	
 	var rule = TopologyRuleData.new()
 	rule.rule_name = "火焰附魔"
@@ -87,7 +87,7 @@ static func create_shield_on_damage() -> SpellCoreData:
 	
 	var shield_action = ShieldActionData.new()
 	shield_action.shield_amount = 20.0
-	shield_action.duration = 3.0
+	shield_action.shield_duration = 3.0
 	
 	var rule = TopologyRuleData.new()
 	rule.rule_name = "反伤护盾"
@@ -117,10 +117,9 @@ static func create_heal_while_flying() -> SpellCoreData:
 	trigger.trigger_once = false
 	
 	var status_action = ApplyStatusActionData.new()
-	status_action.status_type = ApplyStatusActionData.StatusType.REGENERATION
+	status_action.status_type = ApplyStatusActionData.StatusType.SPIRITON_SURGE  # 使用灵潮代替恢复
 	status_action.duration = 0.5
-	status_action.strength = 2.0
-	status_action.apply_to_self = true
+	status_action.effect_value = 2.0
 	
 	var rule = TopologyRuleData.new()
 	rule.rule_name = "风之祝福"
@@ -183,10 +182,9 @@ static func create_berserk_on_low_health() -> SpellCoreData:
 	trigger.trigger_once = false
 	
 	var status_action = ApplyStatusActionData.new()
-	status_action.status_type = ApplyStatusActionData.StatusType.BERSERK
+	status_action.status_type = ApplyStatusActionData.StatusType.SPIRITON_SURGE  # 使用灵潮代替狂暴
 	status_action.duration = 5.0
-	status_action.strength = 1.5  # 50%伤害提升
-	status_action.apply_to_self = true
+	status_action.effect_value = 1.5  # 50%伤害提升
 	
 	var rule = TopologyRuleData.new()
 	rule.rule_name = "狂暴本能"

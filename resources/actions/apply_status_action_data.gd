@@ -67,6 +67,7 @@ enum StatusCategory {
 @export var spread_on_death: bool = false   # 目标死亡时是否传播给附近敌人
 @export var spread_radius: float = 100.0    # 传播范围
 @export var cleansable: bool = true         # 是否可被净化
+@export var apply_to_self: bool = false      # 是否应用于自身
 
 ## 相态克制关系
 # 等离子 -> 固态（熔化）
@@ -206,6 +207,7 @@ func clone_deep() -> ActionData:
 	copy.spread_on_death = spread_on_death
 	copy.spread_radius = spread_radius
 	copy.cleansable = cleansable
+	copy.apply_to_self = apply_to_self
 	copy.phase_counter_bonus = phase_counter_bonus
 	return copy
 
@@ -221,6 +223,7 @@ func to_dict() -> Dictionary:
 	base["spread_on_death"] = spread_on_death
 	base["spread_radius"] = spread_radius
 	base["cleansable"] = cleansable
+	base["apply_to_self"] = apply_to_self
 	base["phase_counter_bonus"] = phase_counter_bonus
 	return base
 
@@ -236,6 +239,7 @@ static func from_dict(data: Dictionary) -> ApplyStatusActionData:
 	action.spread_on_death = data.get("spread_on_death", false)
 	action.spread_radius = data.get("spread_radius", 100.0)
 	action.cleansable = data.get("cleansable", true)
+	action.apply_to_self = data.get("apply_to_self", false)
 	action.phase_counter_bonus = data.get("phase_counter_bonus", 1.5)
 	return action
 

@@ -93,9 +93,9 @@ func try_reflect_projectile(target: Node, projectile: Node) -> bool:
 	
 	var instance: ReflectInstance = active_reflects[target_id]
 	
-	# 检查反弹类型
+	# 检查反弹类型（PROJECTILE 或 BOTH 可以反弹投射物）
 	if instance.data.reflect_type != ReflectActionData.ReflectType.PROJECTILE and \
-	   instance.data.reflect_type != ReflectActionData.ReflectType.AREA:
+	   instance.data.reflect_type != ReflectActionData.ReflectType.BOTH:
 		return false
 	
 	# 检查剩余反弹次数
@@ -126,9 +126,9 @@ func try_reflect_damage(target: Node, source: Node, damage: float) -> float:
 	
 	var instance: ReflectInstance = active_reflects[target_id]
 	
-	# 检查反弹类型
+	# 检查反弹类型（DAMAGE 或 BOTH 可以反弹伤害）
 	if instance.data.reflect_type != ReflectActionData.ReflectType.DAMAGE and \
-	   instance.data.reflect_type != ReflectActionData.ReflectType.AREA:
+	   instance.data.reflect_type != ReflectActionData.ReflectType.BOTH:
 		return 0.0
 	
 	# 检查剩余反弹次数
@@ -244,7 +244,7 @@ func _create_reflect_visual(target: Node, reflect_data: ReflectActionData) -> No
 			ring_color = Color(1.0, 0.8, 0.2, 0.5)  # 金色
 		ReflectActionData.ReflectType.DAMAGE:
 			ring_color = Color(1.0, 0.3, 0.3, 0.5)  # 红色
-		ReflectActionData.ReflectType.AREA:
+		ReflectActionData.ReflectType.BOTH:
 			ring_color = Color(0.8, 0.2, 1.0, 0.5)  # 紫色
 	
 	reflect_ring.color = ring_color

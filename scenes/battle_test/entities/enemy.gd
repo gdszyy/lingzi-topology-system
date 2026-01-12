@@ -71,13 +71,13 @@ func _update_movement(delta: float) -> void:
 	
 	move_time += delta
 	
-	# 计算实际移动速度（考虑减速效果）
+	# 计算实际移动速度（考虑减速效果 - 使用结构锁代替减速）
 	var actual_speed = move_speed
-	if status_effects.has(ApplyStatusActionData.StatusType.SLOWED):
+	if status_effects.has(ApplyStatusActionData.StatusType.STRUCTURE_LOCK):
 		actual_speed *= 0.5
 	
-	# 冰冻时完全停止
-	if status_effects.has(ApplyStatusActionData.StatusType.FROZEN):
+	# 冷脆化时完全停止（代替冰冻）
+	if status_effects.has(ApplyStatusActionData.StatusType.CRYO_CRYSTAL):
 		return
 	
 	match move_pattern:
@@ -122,12 +122,12 @@ func take_damage(amount: float, _damage_type: int = 0) -> void:
 	# 应用状态效果修正
 	var final_damage = amount
 	
-	# 燃烧增伤
-	if status_effects.has(ApplyStatusActionData.StatusType.BURNING):
+	# 熵燃增伤（代替燃烧）
+	if status_effects.has(ApplyStatusActionData.StatusType.ENTROPY_BURN):
 		final_damage *= 1.2
 	
-	# 冰冻减伤
-	if status_effects.has(ApplyStatusActionData.StatusType.FROZEN):
+	# 冷脆化减伤（代替冰冻）
+	if status_effects.has(ApplyStatusActionData.StatusType.CRYO_CRYSTAL):
 		final_damage *= 0.8
 	
 	current_health -= final_damage
@@ -160,9 +160,9 @@ func _update_status_effects(delta: float) -> void:
 		effect.duration -= delta
 		
 		# 持续伤害效果
-		if status_type == ApplyStatusActionData.StatusType.BURNING:
+		if status_type == ApplyStatusActionData.StatusType.ENTROPY_BURN:  # 熵燃（代替燃烧）
 			take_damage(effect.value * delta, 0)
-		elif status_type == ApplyStatusActionData.StatusType.POISONED:
+		elif status_type == ApplyStatusActionData.StatusType.SPIRITON_EROSION:  # 灵蚀（代替中毒）
 			take_damage(effect.value * delta * 0.5, 0)
 		
 		if effect.duration <= 0:
@@ -178,13 +178,13 @@ func _update_status_effects(delta: float) -> void:
 func _update_status_visual() -> void:
 	var color = NORMAL_COLOR
 	
-	if status_effects.has(ApplyStatusActionData.StatusType.BURNING):
+	if status_effects.has(ApplyStatusActionData.StatusType.ENTROPY_BURN):  # 熵燃
 		color = Color(1.0, 0.5, 0.0)  # 橙色
-	elif status_effects.has(ApplyStatusActionData.StatusType.FROZEN):
+	elif status_effects.has(ApplyStatusActionData.StatusType.CRYO_CRYSTAL):  # 冷脆化
 		color = Color(0.5, 0.8, 1.0)  # 冰蓝色
-	elif status_effects.has(ApplyStatusActionData.StatusType.POISONED):
+	elif status_effects.has(ApplyStatusActionData.StatusType.SPIRITON_EROSION):  # 灵蚀
 		color = Color(0.5, 0.8, 0.2)  # 绿色
-	elif status_effects.has(ApplyStatusActionData.StatusType.SLOWED):
+	elif status_effects.has(ApplyStatusActionData.StatusType.STRUCTURE_LOCK):  # 结构锁
 		color = Color(0.6, 0.6, 0.8)  # 灰蓝色
 	
 	if sprite:

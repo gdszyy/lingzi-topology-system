@@ -85,13 +85,15 @@ func _apply_damage_to_target(target: Node2D, damage: float, action: DamageAction
 	# 计算最终伤害
 	var final_damage = damage
 	
-	# 应用伤害类型修正
+	# 应用伤害类型修正（使用CarrierConfigData.DamageType）
 	match action.damage_type:
-		DamageActionData.DamageType.FIRE:
+		CarrierConfigData.DamageType.ENTROPY_BURST:
 			final_damage *= 1.0  # 可以添加元素克制
-		DamageActionData.DamageType.ICE:
+		CarrierConfigData.DamageType.CRYO_SHATTER:
 			final_damage *= 1.0
-		DamageActionData.DamageType.LIGHTNING:
+		CarrierConfigData.DamageType.VOID_EROSION:
+			final_damage *= 1.0
+		CarrierConfigData.DamageType.KINETIC_IMPACT:
 			final_damage *= 1.0
 	
 	# 应用伤害
@@ -113,7 +115,7 @@ func _execute_status_action(action: ApplyStatusActionData, context: Dictionary) 
 	
 	# 应用状态
 	if target.has_method("apply_status"):
-		target.apply_status(action.status_type, duration, action.strength)
+		target.apply_status(action.status_type, duration, action.effect_value)
 		status_applied.emit(target, action.get_status_name(), duration)
 
 ## 执行位移动作
@@ -138,8 +140,8 @@ func _execute_shield_action(action: ShieldActionData, context: Dictionary) -> vo
 		return
 	
 	var shield_value = action.shield_amount * effect_multiplier
-	var duration = action.duration
-	
+	var duration = action.shield_duration
+
 	# 应用护盾
 	if player.has_method("apply_shield"):
 		player.apply_shield(shield_value, duration)
@@ -206,7 +208,7 @@ func _execute_chain_action(action: ChainActionData, context: Dictionary) -> void
 	var chain_damage = action.chain_damage * effect_multiplier
 	
 	# 链式传播
-	for i in range(action.max_chains):
+	for i in range(action.chain_count):
 		var next_target = _find_chain_target(current_target, chain_targets, action.chain_range)
 		if next_target == null:
 			break
@@ -215,7 +217,7 @@ func _execute_chain_action(action: ChainActionData, context: Dictionary) -> void
 		
 		# 对目标造成伤害
 		if next_target.has_method("take_damage"):
-			var damage = chain_damage * pow(action.damage_decay, i)
+			var damage = chain_damage * pow(action.chain_damage_decay, i)
 			next_target.take_damage(damage)
 			damage_dealt.emit(next_target, damage, "chain")
 		
