@@ -1,0 +1,123 @@
+[gd_scene load_steps=5 format=3 uid="uid://b8k3m2n4p5q6r"]
+
+[ext_resource type="PackedScene" uid="uid://dqw8r5k2m1xvh" path="res://scenes/player/player.tscn" id="1_player"]
+[ext_resource type="Script" path="res://scenes/player/combat_test_scene.gd" id="2_scene"]
+[ext_resource type="PackedScene" uid="uid://dummy_enemy" path="res://scenes/battle_test/entities/dummy_enemy.tscn" id="3_dummy"]
+
+[node name="CombatTestScene" type="Node2D"]
+script = ExtResource("2_scene")
+
+[node name="Background" type="ColorRect" parent="."]
+offset_right = 1280.0
+offset_bottom = 720.0
+color = Color(0.15, 0.15, 0.2, 1)
+
+[node name="BattleArea" type="ColorRect" parent="."]
+offset_left = 100.0
+offset_top = 100.0
+offset_right = 900.0
+offset_bottom = 620.0
+color = Color(0.2, 0.2, 0.25, 1)
+
+[node name="Player" parent="." instance=ExtResource("1_player")]
+position = Vector2(500, 360)
+
+[node name="EnemyContainer" type="Node2D" parent="."]
+
+[node name="UI" type="CanvasLayer" parent="."]
+
+[node name="TopPanel" type="HBoxContainer" parent="UI"]
+offset_left = 10.0
+offset_top = 10.0
+offset_right = 1270.0
+offset_bottom = 50.0
+
+[node name="StateLabel" type="Label" parent="UI/TopPanel"]
+layout_mode = 2
+text = "状态: Idle"
+
+[node name="HSeparator" type="HSeparator" parent="UI/TopPanel"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="WeaponLabel" type="Label" parent="UI/TopPanel"]
+layout_mode = 2
+text = "武器: 徒手"
+
+[node name="HSeparator2" type="HSeparator" parent="UI/TopPanel"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="SpawnEnemyButton" type="Button" parent="UI/TopPanel"]
+layout_mode = 2
+text = "生成敌人"
+
+[node name="ClearEnemiesButton" type="Button" parent="UI/TopPanel"]
+layout_mode = 2
+text = "清除敌人"
+
+[node name="BackButton" type="Button" parent="UI/TopPanel"]
+layout_mode = 2
+text = "返回"
+
+[node name="LeftPanel" type="VBoxContainer" parent="UI"]
+offset_left = 920.0
+offset_top = 100.0
+offset_right = 1270.0
+offset_bottom = 620.0
+
+[node name="WeaponListLabel" type="Label" parent="UI/LeftPanel"]
+layout_mode = 2
+text = "武器列表"
+
+[node name="WeaponList" type="ItemList" parent="UI/LeftPanel"]
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="SpellListLabel" type="Label" parent="UI/LeftPanel"]
+layout_mode = 2
+text = "法术列表"
+
+[node name="SpellList" type="ItemList" parent="UI/LeftPanel"]
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="BottomPanel" type="HBoxContainer" parent="UI"]
+anchors_preset = 7
+anchor_left = 0.5
+anchor_top = 1.0
+anchor_right = 0.5
+anchor_bottom = 1.0
+offset_left = -300.0
+offset_top = -80.0
+offset_right = 300.0
+offset_bottom = -10.0
+grow_horizontal = 2
+grow_vertical = 0
+
+[node name="ControlsLabel" type="RichTextLabel" parent="UI/BottomPanel"]
+layout_mode = 2
+size_flags_horizontal = 3
+bbcode_enabled = true
+text = "[center][b]操作说明[/b]
+WASD - 移动 | 空格 - 飞行 | 鼠标 - 瞄准
+左键 - 主攻击 | 右键 - 副攻击 | Q - 施法
+1-6 - 切换武器[/center]"
+
+[node name="StatsPanel" type="VBoxContainer" parent="UI"]
+offset_left = 10.0
+offset_top = 100.0
+offset_right = 90.0
+offset_bottom = 200.0
+
+[node name="HealthLabel" type="Label" parent="UI/StatsPanel"]
+layout_mode = 2
+text = "HP: 100/100"
+
+[node name="DamageLabel" type="Label" parent="UI/StatsPanel"]
+layout_mode = 2
+text = "伤害: 0"
+
+[node name="HitsLabel" type="Label" parent="UI/StatsPanel"]
+layout_mode = 2
+text = "命中: 0"
