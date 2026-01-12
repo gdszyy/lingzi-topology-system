@@ -145,7 +145,9 @@ func _process_periodic_triggers(delta: float) -> void:
 	current_context = {
 		"delta": delta,
 		"player": player,
-		"position": player.global_position if player != null else Vector2.ZERO
+		"position": player.global_position if player != null else Vector2.ZERO,
+		"is_attacking": player.is_attacking if player != null else false,
+		"is_moving": player.velocity.length_squared() > 100 if player != null else false
 	}
 
 	distribute_trigger(TriggerData.TriggerType.ON_TICK, current_context)
@@ -308,196 +310,91 @@ func _on_slot_spell_triggered(spell: SpellCoreData, trigger_type: int, slot: Eng
 		slot.spell_triggered.disconnect(_on_slot_spell_triggered)
 
 func _execute_rule_actions(rule: TopologyRuleData, context: Dictionary, slot: EngravingSlot) -> void:
-	if rule == null or not rule.enabled:
-		return
-
-	var full_context = context.duplicate()
-	full_context["slot"] = slot
-	full_context["slot_level"] = slot.slot_level
-	full_context["is_engraved"] = true
+	var modified_context = context.duplicate()
 	
-	# 应用肢体效率修正到效果
-	var part_efficiency = context.get("part_efficiency", 1.0)
-	full_context["effect_multiplier"] = part_efficiency
-	
-	# 应用武器特质效果修正
-	var weapon_trait_modifier = context.get("weapon_trait_modifier", null) as WeaponTraitModifier
-	var chain_bonus = context.get("chain_bonus", 0.0)
-	var consecutive_count = context.get("consecutive_count", 0)
-
-	for action in rule.actions:
-		if action != null:
-			# 计算武器特质对该动作的效果修正
-			var weapon_effect_modifier = 1.0
-			if weapon_trait_modifier != null:
-				weapon_effect_modifier = weapon_trait_modifier.get_effect_for_action(action.action_type)
-				
-				# 应用连续触发加成或首次触发加成
-				if consecutive_count == 0:
-					weapon_effect_modifier *= (1.0 + weapon_trait_modifier.first_cast_bonus)
-				else:
-					weapon_effect_modifier *= (1.0 + chain_bonus)
+	# 应用武器特质对效果强度的修正
+	if slot.weapon_modifier != null:
+		for action in rule.actions:
+			var effect_multiplier = slot.calculate_modified_effect(action.action_type)
+			modified_context["effect_multiplier"] = effect_multiplier
 			
-			full_context["weapon_effect_modifier"] = weapon_effect_modifier
-			full_context["total_effect_modifier"] = part_efficiency * weapon_effect_modifier
+			# 应用连续触发加成
+			var chain_bonus = slot.get_chain_bonus()
+			modified_context["effect_multiplier"] += chain_bonus
 			
-			action_executor.execute_action(action, full_context)
-			action_executed.emit(action, full_context)
+			action_executor.execute_action(action, modified_context)
+			action_executed.emit(action, modified_context)
+	else:
+		# 肢体篆刻，应用肢体效率
+		var efficiency = context.get("part_efficiency", 1.0)
+		modified_context["effect_multiplier"] = efficiency
+		
+		for action in rule.actions:
+			action_executor.execute_action(action, modified_context)
+			action_executed.emit(action, modified_context)
 
-## 对特定肢体造成伤害（二维体素战斗系统核心方法）
-## 返回传递到核心的伤害值
-func damage_body_part(part_type: BodyPartData.PartType, damage: float) -> float:
-	var part = get_body_part(part_type)
-	if part == null:
-		return damage  # 如果找不到肢体，全部伤害传递到核心
-	
-	var actual_damage = part.take_damage(damage)
-	var core_damage = actual_damage * part.core_damage_ratio
-	
-	# 记录统计
-	var part_key = BodyPartData.PartType.keys()[part_type]
-	if not body_part_stats.damage_by_part.has(part_key):
-		body_part_stats.damage_by_part[part_key] = 0.0
-	body_part_stats.damage_by_part[part_key] += actual_damage
-	
-	return core_damage
-
-## 治疗特定肢体
-func heal_body_part(part_type: BodyPartData.PartType, amount: float) -> float:
-	var part = get_body_part(part_type)
-	if part == null:
-		return 0.0
-	
-	return part.heal(amount)
-
-## 完全修复所有肢体
-func restore_all_body_parts() -> void:
+func get_body_part(type: int) -> BodyPartData:
 	for part in body_parts:
-		part.fully_restore()
-	
-	# 重新注册所有槽位
-	_register_all_slots()
-
-## 肢体受伤回调
-func _on_body_part_damage_taken(damage: float, remaining_health: float, part: BodyPartData) -> void:
-	body_part_damaged.emit(part, damage, remaining_health)
-
-## 肢体被摧毁回调
-func _on_body_part_destroyed(part: BodyPartData) -> void:
-	body_part_stats.total_parts_destroyed += 1
-	
-	# 统计失效的法术数量
-	var disabled_spell_count = 0
-	for slot in part.engraving_slots:
-		if slot.engraved_spell != null:
-			disabled_spell_count += 1
-	
-	body_part_stats.total_spells_disabled += disabled_spell_count
-	
-	# 重新注册槽位（排除已摧毁肢体的槽位）
-	_register_all_slots()
-	
-	body_part_destroyed.emit(part)
-	spells_disabled.emit(part, disabled_spell_count)
-	
-	print("[二维体素] %s 被摧毁，%d 个法术失效" % [part.part_name, disabled_spell_count])
-
-## 肢体恢复回调
-func _on_body_part_restored(part: BodyPartData) -> void:
-	body_part_stats.total_parts_restored += 1
-	
-	# 统计恢复的法术数量
-	var enabled_spell_count = 0
-	for slot in part.engraving_slots:
-		if slot.engraved_spell != null:
-			enabled_spell_count += 1
-	
-	# 重新注册槽位
-	_register_all_slots()
-	
-	body_part_restored.emit(part)
-	spells_enabled.emit(part, enabled_spell_count)
-	
-	print("[二维体素] %s 已恢复，%d 个法术重新生效" % [part.part_name, enabled_spell_count])
-
-## 肢体生命值变化回调
-func _on_body_part_health_changed(current: float, maximum: float, part: BodyPartData) -> void:
-	# 可以在这里添加UI更新逻辑
-	pass
-
-func engrave_to_body_part(part_type: int, slot_index: int, spell: SpellCoreData) -> bool:
-	var part = _get_body_part(part_type)
-	if part == null:
-		push_warning("未找到肢体部件: %d" % part_type)
-		return false
-	
-	# 检查肢体是否功能正常
-	if not part.is_functional:
-		push_warning("肢体 %s 已被摧毁，无法篆刻法术" % part.part_name)
-		return false
-
-	if slot_index < 0 or slot_index >= part.engraving_slots.size():
-		push_warning("槽位索引无效: %d" % slot_index)
-		return false
-
-	return part.engraving_slots[slot_index].engrave_spell(spell)
-
-func engrave_to_weapon(slot_index: int, spell: SpellCoreData) -> bool:
-	if player == null or player.current_weapon == null:
-		push_warning("没有装备武器")
-		return false
-
-	return player.current_weapon.engrave_spell_to_slot(slot_index, spell)
-
-func remove_from_body_part(part_type: int, slot_index: int) -> SpellCoreData:
-	var part = _get_body_part(part_type)
-	if part == null:
-		return null
-
-	if slot_index < 0 or slot_index >= part.engraving_slots.size():
-		return null
-
-	return part.engraving_slots[slot_index].remove_spell()
-
-func remove_from_weapon(slot_index: int) -> SpellCoreData:
-	if player == null or player.current_weapon == null:
-		return null
-
-	return player.current_weapon.remove_spell_from_slot(slot_index)
-
-func _get_body_part(part_type: int) -> BodyPartData:
-	for part in body_parts:
-		if part.part_type == part_type:
+		if part.part_type == type:
 			return part
 	return null
 
-func get_body_parts() -> Array[BodyPartData]:
-	return body_parts
-
-func get_body_part(part_type: int) -> BodyPartData:
-	return _get_body_part(part_type)
-
-## 获取所有功能正常的肢体
 func get_functional_body_parts() -> Array[BodyPartData]:
-	var functional_parts: Array[BodyPartData] = []
+	var functional: Array[BodyPartData] = []
 	for part in body_parts:
 		if part.is_functional:
-			functional_parts.append(part)
-	return functional_parts
+			functional.append(part)
+	return functional
 
-## 获取所有已摧毁的肢体
-func get_destroyed_body_parts() -> Array[BodyPartData]:
-	var destroyed_parts: Array[BodyPartData] = []
-	for part in body_parts:
-		if not part.is_functional:
-			destroyed_parts.append(part)
-	return destroyed_parts
+func damage_body_part(type: int, damage: float) -> float:
+	var part = get_body_part(type)
+	if part != null:
+		return part.take_damage(damage)
+	return damage # 如果找不到肢体，伤害直接传递给核心
+
+func _on_body_part_damage_taken(damage: float, part: BodyPartData) -> void:
+	body_part_damaged.emit(part, damage, part.current_health)
+	
+	var part_name = BodyPartData.PartType.keys()[part.part_type]
+	if not body_part_stats.damage_by_part.has(part_name):
+		body_part_stats.damage_by_part[part_name] = 0.0
+	body_part_stats.damage_by_part[part_name] += damage
+
+func _on_body_part_destroyed(part: BodyPartData) -> void:
+	body_part_destroyed.emit(part)
+	body_part_stats.total_parts_destroyed += 1
+	
+	# 禁用该肢体上的所有篆刻
+	var disabled_count = part.engraving_slots.size()
+	body_part_stats.total_spells_disabled += disabled_count
+	spells_disabled.emit(part, disabled_count)
+	
+	# 重新注册可用槽位
+	_register_all_slots()
+	
+	print("[肢体摧毁] %s 已损坏，其上的 %d 个篆刻法术失效！" % [part.part_name, disabled_count])
+
+func _on_body_part_restored(part: BodyPartData) -> void:
+	body_part_restored.emit(part)
+	body_part_stats.total_parts_restored += 1
+	
+	# 重新启用该肢体上的篆刻
+	var enabled_count = part.engraving_slots.size()
+	spells_enabled.emit(part, enabled_count)
+	
+	# 重新注册可用槽位
+	_register_all_slots()
+	
+	print("[肢体修复] %s 已修复，其上的 %d 个篆刻法术重新激活！" % [part.part_name, enabled_count])
+
+func _on_body_part_health_changed(current: float, _max_val: float, part: BodyPartData) -> void:
+	# 可以在这里处理肢体效率随血量下降的逻辑
+	pass
 
 func get_all_engraved_spells() -> Array[SpellCoreData]:
 	var spells: Array[SpellCoreData] = []
 
 	for part in body_parts:
-		# 只返回功能正常的肢体上的法术
 		if part.is_functional:
 			spells.append_array(part.get_engraved_spells())
 
@@ -569,7 +466,9 @@ func _on_attack_started(attack: AttackData) -> void:
 	current_context = {
 		"attack": attack,
 		"player": player,
-		"position": player.global_position
+		"position": player.global_position,
+		"is_attacking": true,
+		"is_moving": player.velocity.length_squared() > 100 if player != null else false
 	}
 	distribute_trigger(TriggerData.TriggerType.ON_ATTACK_START, current_context)
 
@@ -579,7 +478,9 @@ func _on_attack_hit(target: Node2D, damage: float) -> void:
 		"damage": damage,
 		"player": player,
 		"position": player.global_position,
-		"target_position": target.global_position if target != null else Vector2.ZERO
+		"target_position": target.global_position if target != null else Vector2.ZERO,
+		"is_attacking": true,
+		"is_moving": player.velocity.length_squared() > 100 if player != null else false
 	}
 
 	distribute_trigger(TriggerData.TriggerType.ON_WEAPON_HIT, current_context)
@@ -596,7 +497,9 @@ func _on_attack_ended(attack: AttackData) -> void:
 	current_context = {
 		"attack": attack,
 		"player": player,
-		"position": player.global_position
+		"position": player.global_position,
+		"is_attacking": false,
+		"is_moving": player.velocity.length_squared() > 100 if player != null else false
 	}
 	distribute_trigger(TriggerData.TriggerType.ON_ATTACK_END, current_context)
 
@@ -604,7 +507,9 @@ func _on_state_changed(state_name: String) -> void:
 	current_context = {
 		"state_name": state_name,
 		"player": player,
-		"position": player.global_position
+		"position": player.global_position,
+		"is_attacking": player.is_attacking if player != null else false,
+		"is_moving": state_name == "Move" or state_name == "Fly"
 	}
 
 	distribute_trigger(TriggerData.TriggerType.ON_STATE_ENTER, current_context)
@@ -624,7 +529,9 @@ func _on_took_damage(damage: float, source: Node2D) -> void:
 		"damage": damage,
 		"source": source,
 		"player": player,
-		"position": player.global_position
+		"position": player.global_position,
+		"is_attacking": player.is_attacking if player != null else false,
+		"is_moving": player.velocity.length_squared() > 100 if player != null else false
 	}
 	distribute_trigger(TriggerData.TriggerType.ON_TAKE_DAMAGE, current_context)
 
@@ -636,7 +543,9 @@ func _on_health_changed(current: float, maximum: float) -> void:
 		"max_health": maximum,
 		"health_ratio": ratio,
 		"player": player,
-		"position": player.global_position
+		"position": player.global_position,
+		"is_attacking": player.is_attacking if player != null else false,
+		"is_moving": player.velocity.length_squared() > 100 if player != null else false
 	}
 
 	if ratio < 0.3:
@@ -646,7 +555,9 @@ func _on_spell_cast(spell: SpellCoreData) -> void:
 	current_context = {
 		"spell": spell,
 		"player": player,
-		"position": player.global_position
+		"position": player.global_position,
+		"is_attacking": player.is_attacking if player != null else false,
+		"is_moving": player.velocity.length_squared() > 100 if player != null else false
 	}
 	distribute_trigger(TriggerData.TriggerType.ON_SPELL_CAST, current_context)
 
@@ -655,7 +566,9 @@ func _on_spell_hit(target: Node2D, damage: float) -> void:
 		"target": target,
 		"damage": damage,
 		"player": player,
-		"position": player.global_position
+		"position": player.global_position,
+		"is_attacking": player.is_attacking if player != null else false,
+		"is_moving": player.velocity.length_squared() > 100 if player != null else false
 	}
 
 	if player.current_spell != null:

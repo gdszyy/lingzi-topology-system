@@ -209,7 +209,7 @@ func start_trigger(trigger_type: int, context: Dictionary = {}, proficiency: flo
 	if not has_matching_rule:
 		return false
 
-	var windup_time = calculate_engraved_windup(proficiency)
+	var windup_time = calculate_modified_windup(proficiency, trigger_type)
 
 	if windup_time < 0.05:
 		return _execute_trigger(trigger_type, context)
@@ -243,7 +243,7 @@ func _execute_trigger_internal(trigger_type: int, _context: Dictionary) -> Array
 
 	if triggered_rules.size() > 0:
 		trigger_count += 1
-		cooldown_timer = cooldown
+		cooldown_timer = calculate_modified_cooldown(trigger_type)
 		spell_triggered.emit(engraved_spell, trigger_type)
 
 	return triggered_rules
@@ -275,7 +275,7 @@ func get_windup_progress() -> float:
 	if not is_winding_up or engraved_spell == null:
 		return 1.0
 
-	var total_windup = calculate_engraved_windup()
+	var total_windup = calculate_modified_windup()
 	if total_windup <= 0:
 		return 1.0
 
