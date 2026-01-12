@@ -130,22 +130,22 @@ func calculate_spell_cost(spell: SpellCoreData) -> Dictionary:
 					total_cost += child_cost.total_cost * 0.5
 					fission_depth = maxi(fission_depth, child_cost.get("fission_depth", 0) + 1)
 
-				elif action is ApplyStatusActionData:
+			elif action is ApplyStatusActionData:
 				var status = action as ApplyStatusActionData
 				total_cost += status.duration * config.cost_per_status
 
-				elif action is AreaEffectActionData:
+			elif action is AreaEffectActionData:
 				var area = action as AreaEffectActionData
 				total_cost += area.radius * config.cost_per_aoe_radius
 				total_cost += area.damage_value * config.cost_per_damage * 0.5
-				
-				elif action is SummonActionData:
+
+			elif action is SummonActionData:
 				var summon = action as SummonActionData
 				total_cost += summon.summon_count * config.cost_per_summon
 				total_cost += summon.summon_duration * 0.2
 				total_cost += summon.summon_damage * config.cost_per_damage * 0.3
-				
-				elif action is ChainActionData:
+
+			elif action is ChainActionData:
 				var chain = action as ChainActionData
 				total_cost += chain.chain_count * 1.5
 				total_cost += chain.chain_damage * config.cost_per_damage * 0.4
