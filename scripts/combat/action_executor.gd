@@ -245,38 +245,34 @@ func _execute_explosion_action(action: SpawnExplosionActionData, context: Dictio
 			var dir = (enemy.global_position - position).normalized()
 			enemy.apply_knockback(dir * action.knockback_force * falloff)
 
+## 执行链式动作（委托给 ChainSystem 统一处理）
 func _execute_chain_action(action: ChainActionData, context: Dictionary) -> void:
 	var start_target = context.get("target", null) as Node2D
 	if start_target == null:
 		return
-
-	var chain_targets: Array[Node2D] = [start_target]
-	var current_target = start_target
-	var chain_damage = action.chain_damage * effect_multiplier
-
-	for i in range(action.chain_count):
-		var next_target = _find_chain_target(current_target, chain_targets, action.chain_range)
-		if next_target == null:
-			break
-
-		chain_targets.append(next_target)
-
-		if next_target.has_method("take_damage"):
-			var damage = chain_damage * pow(action.chain_damage_decay, i)
-			next_target.take_damage(damage)
-			damage_dealt.emit(next_target, damage, "chain")
-
-		current_target = next_target
 	
-	# 播放链式特效
-	if chain_targets.size() >= 2:
-		_spawn_chain_vfx(action.chain_type, chain_targets, chain_damage)
-
-## 生成链式特效
-func _spawn_chain_vfx(chain_type: ChainActionData.ChainType, targets: Array[Node2D], damage: float) -> void:
-	var chain_vfx = VFXFactory.create_chain_vfx(chain_type, targets, damage, 0.1)
-	if chain_vfx:
-		get_tree().current_scene.add_child(chain_vfx)
+	var source_position = context.get("position", Vector2.ZERO)
+	
+	# 如果有效果倍率，创建修改后的链式数据
+	var chain_data = action
+	if effect_multiplier != 1.0:
+		chain_data = action.clone_deep() as ChainActionData
+		chain_data.chain_damage *= effect_multiplier
+	
+	# 获取 RuntimeSystemsManager 中的 ChainSystem
+	var runtime_manager = get_tree().get_first_node_in_group("runtime_systems_manager")
+	if runtime_manager != null and runtime_manager.has_method("start_chain"):
+		runtime_manager.start_chain(start_target, chain_data, source_position)
+		# 发出伤害信号（第一个目标的伤害由 ChainSystem 处理）
+		damage_dealt.emit(start_target, chain_data.chain_damage, "chain")
+	else:
+		# 回退方案：直接调用 ChainSystem（如果存在）
+		var chain_system = get_tree().get_first_node_in_group("chain_system")
+		if chain_system != null:
+			chain_system.start_chain(start_target, chain_data, source_position)
+			damage_dealt.emit(start_target, chain_data.chain_damage, "chain")
+		else:
+			push_warning("[ActionExecutor] 无法找到 ChainSystem，链式效果未执行")
 
 func _execute_fission_action(action: FissionActionData, context: Dictionary) -> void:
 	if projectile_scene == null or action.child_spell_data == null:
@@ -446,20 +442,3 @@ func _get_nearby_allies(position: Vector2, radius: float) -> Array[Node2D]:
 
 	return allies
 
-func _find_chain_target(from: Node2D, exclude: Array[Node2D], max_range: float) -> Node2D:
-	var enemies = get_tree().get_nodes_in_group("enemies")
-	var nearest: Node2D = null
-	var nearest_dist = max_range
-
-	for enemy in enemies:
-		if not is_instance_valid(enemy):
-			continue
-		if enemy in exclude:
-			continue
-
-		var dist = from.global_position.distance_to(enemy.global_position)
-		if dist < nearest_dist:
-			nearest_dist = dist
-			nearest = enemy
-
-	return nearest

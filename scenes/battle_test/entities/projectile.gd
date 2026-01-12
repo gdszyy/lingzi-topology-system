@@ -310,50 +310,21 @@ func _execute_contact_rule(rule: TopologyRuleData, enemy: Node2D) -> void:
 			var chain = action as ChainActionData
 			_execute_chain_effect(chain, enemy)
 
-## 执行链接效果
+## 执行链接效果（委托给 ChainSystem 统一处理）
 func _execute_chain_effect(chain: ChainActionData, initial_target: Node2D) -> void:
 	print("[子弹] 执行链接效果: 类型=%s, 链接数=%d" % [chain.get_type_name(), chain.chain_count])
 	
-	# 收集可链接的目标
-	var targets: Array[Node2D] = []
-	targets.append(initial_target)
-	
-	var enemies = get_tree().get_nodes_in_group("enemies")
-	var current_pos = initial_target.global_position
-	var visited = [initial_target]
-	
-	for i in range(chain.chain_count - 1):
-		var nearest: Node2D = null
-		var nearest_dist = chain.chain_range
-		
-		for enemy in enemies:
-			if not is_instance_valid(enemy) or enemy in visited:
-				continue
-			var dist = current_pos.distance_to(enemy.global_position)
-			if dist < nearest_dist:
-				nearest_dist = dist
-				nearest = enemy
-		
-		if nearest:
-			targets.append(nearest)
-			visited.append(nearest)
-			current_pos = nearest.global_position
+	# 获取 RuntimeSystemsManager 中的 ChainSystem
+	var runtime_manager = get_tree().get_first_node_in_group("runtime_systems_manager")
+	if runtime_manager != null and runtime_manager.has_method("start_chain"):
+		runtime_manager.start_chain(initial_target, chain, global_position)
+	else:
+		# 回退方案：直接调用 ChainSystem（如果存在）
+		var chain_system = get_tree().get_first_node_in_group("chain_system")
+		if chain_system != null:
+			chain_system.start_chain(initial_target, chain, global_position)
 		else:
-			break
-	
-	# 创建链接特效
-	if targets.size() > 1:
-		var chain_vfx = VFXFactory.create_chain_vfx(chain.chain_type, targets, chain.chain_damage, chain.chain_delay)
-		if chain_vfx:
-			get_tree().current_scene.add_child(chain_vfx)
-	
-	# 对链接目标造成伤害
-	var current_damage = chain.chain_damage
-	for i in range(1, targets.size()):
-		var target_enemy = targets[i]
-		if target_enemy.has_method("take_damage"):
-			target_enemy.take_damage(current_damage, 0)
-		current_damage *= chain.chain_damage_decay
+			push_warning("[Projectile] 无法找到 ChainSystem，链式效果未执行")
 
 ## 生成状态效果特效
 func _spawn_status_vfx(target: Node2D, status: ApplyStatusActionData) -> void:

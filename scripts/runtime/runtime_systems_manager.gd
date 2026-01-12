@@ -37,6 +37,7 @@ func _initialize_systems() -> void:
 	chain_system = ChainSystem.new()
 	chain_system.name = "ChainSystem"
 	add_child(chain_system)
+	chain_system.add_to_group("chain_system")
 
 	summon_system = SummonSystem.new()
 	summon_system.name = "SummonSystem"
