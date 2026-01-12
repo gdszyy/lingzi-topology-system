@@ -1,4 +1,4 @@
-[gd_scene load_steps=17 format=3 uid="uid://dqw8r5k2m1xvh"]
+[gd_scene load_steps=18 format=3 uid="uid://dqw8r5k2m1xvh"]
 
 [ext_resource type="Script" path="res://scripts/combat/player_controller.gd" id="1_player"]
 [ext_resource type="Script" path="res://scripts/combat/state_machine/state_machine.gd" id="2_statemachine"]
@@ -14,6 +14,7 @@
 [ext_resource type="Script" path="res://scripts/combat/weapon_manager.gd" id="12_weaponmanager"]
 [ext_resource type="Script" path="res://scripts/combat/engraving_manager.gd" id="13_engravingmanager"]
 [ext_resource type="Script" path="res://scripts/combat/player_visuals.gd" id="14_visuals"]
+[ext_resource type="Script" path="res://scripts/combat/weapon_physics.gd" id="15_weaponphysics"]
 
 [sub_resource type="CircleShape2D" id="CircleShape2D_collision"]
 radius = 16.0
@@ -50,12 +51,25 @@ scale = Vector2(0.6, 0.6)
 
 [node name="WeaponRig" type="Node2D" parent="Visuals/TorsoPivot"]
 
-[node name="MainHandWeapon" type="Sprite2D" parent="Visuals/TorsoPivot/WeaponRig"]
+[node name="WeaponPhysics" type="Node2D" parent="Visuals/TorsoPivot/WeaponRig"]
 position = Vector2(20, 0)
+script = ExtResource("15_weaponphysics")
+position_stiffness = 200.0
+position_damping = 25.0
+rotation_stiffness = 150.0
+rotation_damping = 20.0
+position_settle_threshold = 2.0
+velocity_settle_threshold = 5.0
+rotation_settle_threshold = 0.05
+angular_velocity_settle_threshold = 0.1
+max_displacement = 100.0
+max_velocity = 1000.0
+
+[node name="MainHandWeapon" type="Sprite2D" parent="Visuals/TorsoPivot/WeaponRig/WeaponPhysics"]
 modulate = Color(0.7, 0.7, 0.7, 1)
 
-[node name="OffHandWeapon" type="Sprite2D" parent="Visuals/TorsoPivot/WeaponRig"]
-position = Vector2(-15, 5)
+[node name="OffHandWeapon" type="Sprite2D" parent="Visuals/TorsoPivot/WeaponRig/WeaponPhysics"]
+position = Vector2(-35, 5)
 visible = false
 modulate = Color(0.7, 0.7, 0.7, 1)
 

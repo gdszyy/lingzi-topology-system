@@ -9,6 +9,7 @@ signal attack_hit(target: Node2D, damage: float)
 signal took_damage(damage: float, source: Node2D)
 signal spell_cast(spell: SpellCoreData)
 signal spell_hit(target: Node2D, damage: float)
+signal weapon_settled  ## 武器物理系统稳定信号
 
 @onready var state_machine: StateMachine = $StateMachine
 @onready var input_buffer: InputBuffer = $InputBuffer

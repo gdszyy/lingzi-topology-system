@@ -6,8 +6,9 @@ class_name PlayerVisuals extends Node2D
 @onready var torso_sprite: Sprite2D = $TorsoPivot/TorsoSprite
 @onready var head_sprite: Sprite2D = $TorsoPivot/HeadSprite
 @onready var weapon_rig: Node2D = $TorsoPivot/WeaponRig
-@onready var main_hand_weapon: Sprite2D = $TorsoPivot/WeaponRig/MainHandWeapon
-@onready var off_hand_weapon: Sprite2D = $TorsoPivot/WeaponRig/OffHandWeapon
+@onready var weapon_physics: WeaponPhysics = $TorsoPivot/WeaponRig/WeaponPhysics
+@onready var main_hand_weapon: Sprite2D = $TorsoPivot/WeaponRig/WeaponPhysics/MainHandWeapon
+@onready var off_hand_weapon: Sprite2D = $TorsoPivot/WeaponRig/WeaponPhysics/OffHandWeapon
 
 var player: PlayerController = null
 
@@ -15,17 +16,25 @@ var is_walking: bool = false
 var walk_cycle: float = 0.0
 var walk_speed: float = 10.0
 
+## 武器挥舞状态（现在由 WeaponPhysics 驱动）
 var is_swinging: bool = false
 var swing_progress: float = 0.0
 var swing_start_angle: float = 0.0
 var swing_end_angle: float = 0.0
 var swing_duration: float = 0.0
+var swing_curve: Curve = null
 
 func _ready() -> void:
 	player = get_parent() as PlayerController
 	_setup_default_visuals()
 	_connect_player_signals()
 	_initialize_weapon_appearance()
+	_setup_weapon_physics()
+
+func _setup_weapon_physics() -> void:
+	if weapon_physics != null:
+		weapon_physics.weapon_settled.connect(_on_weapon_settled)
+		weapon_physics.weapon_position_changed.connect(_on_weapon_position_changed)
 
 func _connect_player_signals() -> void:
 	if player != null:
@@ -37,10 +46,21 @@ func _initialize_weapon_appearance() -> void:
 
 func _on_weapon_changed(weapon: WeaponData) -> void:
 	update_weapon_appearance(weapon)
+	if weapon_physics != null:
+		weapon_physics.update_physics_from_weapon(weapon)
+
+func _on_weapon_settled() -> void:
+	## 武器稳定后的回调，可用于通知状态机
+	if player != null and player.has_signal("weapon_settled"):
+		player.emit_signal("weapon_settled")
+
+func _on_weapon_position_changed(_pos: Vector2, _rot: float) -> void:
+	## 武器位置变化时的回调，可用于更新特效等
+	pass
 
 func _process(delta: float) -> void:
 	_update_walk_animation(delta)
-	_update_weapon_swing(delta)
+	_update_weapon_swing_physics(delta)
 
 func _setup_default_visuals() -> void:
 	_create_placeholder_sprites()
@@ -118,8 +138,9 @@ func _update_walk_animation(delta: float) -> void:
 		torso_pivot.position.y = lerp(torso_pivot.position.y, 0.0, delta * 10)
 		legs_pivot.scale.y = lerp(legs_pivot.scale.y, 1.0, delta * 10)
 
-func _update_weapon_swing(delta: float) -> void:
-	if not is_swinging:
+## 使用物理系统驱动武器挥舞
+func _update_weapon_swing_physics(delta: float) -> void:
+	if not is_swinging or weapon_physics == null:
 		return
 
 	swing_progress += delta / swing_duration
@@ -127,20 +148,61 @@ func _update_weapon_swing(delta: float) -> void:
 	if swing_progress >= 1.0:
 		is_swinging = false
 		swing_progress = 1.0
+		## 挥舞结束，让武器回到休息位置
+		weapon_physics.set_to_rest()
+		return
 
-	var current_angle = lerp(swing_start_angle, swing_end_angle, swing_progress)
-	weapon_rig.rotation = deg_to_rad(current_angle)
+	## 计算当前目标角度
+	var curve_value = swing_progress
+	if swing_curve != null:
+		curve_value = swing_curve.sample(swing_progress)
+	
+	var target_angle = lerp(swing_start_angle, swing_end_angle, curve_value)
+	
+	## 设置武器物理系统的目标旋转
+	weapon_physics.set_target(weapon_physics.rest_position, deg_to_rad(target_angle))
 
-func start_weapon_swing(start_angle: float, end_angle: float, duration: float) -> void:
+## 开始武器挥舞（使用物理系统）
+func start_weapon_swing(start_angle: float, end_angle: float, duration: float, curve: Curve = null) -> void:
 	is_swinging = true
 	swing_progress = 0.0
 	swing_start_angle = start_angle
 	swing_end_angle = end_angle
-	swing_duration = duration
+	swing_duration = max(0.01, duration)
+	swing_curve = curve
+	
+	## 设置初始目标角度
+	if weapon_physics != null:
+		weapon_physics.set_target(weapon_physics.rest_position, deg_to_rad(start_angle))
 
+## 开始攻击动作的武器回正阶段
+func start_weapon_repositioning(target_position: Vector2, target_rotation: float) -> void:
+	if weapon_physics != null:
+		weapon_physics.set_target(target_position, target_rotation)
+
+## 检查武器是否已经回正到位
+func is_weapon_settled() -> bool:
+	if weapon_physics != null:
+		return weapon_physics.get_is_settled()
+	return true
+
+## 获取武器回正的预估时间
+func get_weapon_settle_time() -> float:
+	if weapon_physics != null:
+		return weapon_physics.estimate_settle_time()
+	return 0.0
+
+## 重置武器位置（立即跳转）
 func reset_weapon_position() -> void:
 	is_swinging = false
-	weapon_rig.rotation = 0
+	if weapon_physics != null:
+		weapon_physics.snap_to_rest()
+	else:
+		weapon_rig.rotation = 0
+
+## 获取武器物理节点
+func get_weapon_physics() -> WeaponPhysics:
+	return weapon_physics
 
 func update_weapon_appearance(weapon: WeaponData) -> void:
 	if weapon == null:
@@ -159,6 +221,10 @@ func update_weapon_appearance(weapon: WeaponData) -> void:
 	main_hand_weapon.visible = weapon.weapon_type != WeaponData.WeaponType.UNARMED
 
 	off_hand_weapon.visible = weapon.is_dual_wield()
+	
+	## 更新武器物理参数
+	if weapon_physics != null:
+		weapon_physics.update_physics_from_weapon(weapon)
 
 func _create_weapon_texture_for_type(weapon_type: int) -> ImageTexture:
 	match weapon_type:
@@ -187,5 +253,16 @@ func play_attack_effect(attack: AttackData) -> void:
 	start_weapon_swing(
 		attack.swing_start_angle,
 		attack.swing_end_angle,
-		attack.windup_time + attack.active_time
+		attack.windup_time + attack.active_time,
+		attack.swing_curve
 	)
+
+## 施加武器冲量（用于攻击时的物理效果）
+func apply_weapon_impulse(impulse: Vector2) -> void:
+	if weapon_physics != null:
+		weapon_physics.apply_impulse(impulse)
+
+## 施加武器角冲量
+func apply_weapon_angular_impulse(angular_impulse: float) -> void:
+	if weapon_physics != null:
+		weapon_physics.apply_angular_impulse(angular_impulse)
