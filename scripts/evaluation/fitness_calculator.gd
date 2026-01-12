@@ -57,7 +57,10 @@ func calculate_scenario_fitness(data: SimulationDataCollector, spell: SpellCoreD
 
 func calculate_total_fitness(scenario_results: Dictionary, spell: SpellCoreData) -> float:
 	var total = 0.0
-	var scenario_weights = config.get_scenario_weights()
+	
+	# 检测法术类型并获取调整后的场景权重
+	var spell_type = _detect_spell_type(spell)
+	var scenario_weights = config.get_adjusted_scenario_weights(spell_type)
 
 	for scenario_type in scenario_results:
 		var data = scenario_results[scenario_type]
@@ -70,6 +73,28 @@ func calculate_total_fitness(scenario_results: Dictionary, spell: SpellCoreData)
 		total = total * (1.0 - config.diversity_weight) + diversity_bonus * config.diversity_weight
 
 	return total
+
+## 检测法术类型
+func _detect_spell_type(spell: SpellCoreData) -> FitnessConfig.SpellType:
+	var has_summon = false
+	var flashy_score = calculate_flashy_score(spell)
+	
+	# 检查是否有召唤动作
+	for rule in spell.topology_rules:
+		for action in rule.actions:
+			if action is SummonActionData:
+				has_summon = true
+				break
+		if has_summon:
+			break
+	
+	# 根据特征判断法术类型
+	if has_summon:
+		return FitnessConfig.SpellType.SUMMON
+	elif flashy_score > config.max_flashy_bonus * 0.3:  # 华丽分数超过上限的30%
+		return FitnessConfig.SpellType.FLASHY
+	else:
+		return FitnessConfig.SpellType.GENERAL
 
 func calculate_spell_cost(spell: SpellCoreData) -> Dictionary:
 	var total_cost = 0.0
@@ -656,6 +681,17 @@ func get_evaluation_details(spell: SpellCoreData) -> Dictionary:
 	var complexity = calculate_complexity_score(spell)
 	var flashy = calculate_flashy_score(spell)
 	var summon = calculate_summon_score(spell)
+	var spell_type = _detect_spell_type(spell)
+	
+	# 获取法术类型名称
+	var spell_type_name = "通用法术"
+	match spell_type:
+		FitnessConfig.SpellType.SUMMON:
+			spell_type_name = "召唤法术"
+		FitnessConfig.SpellType.FLASHY:
+			spell_type_name = "华丽法术"
+		FitnessConfig.SpellType.COMBAT:
+			spell_type_name = "战斗法术"
 
 	var details = {
 		"quick_score": quick_evaluate(spell),
@@ -674,6 +710,8 @@ func get_evaluation_details(spell: SpellCoreData) -> Dictionary:
 		"complexity_score": complexity,
 		"flashy_score": flashy,
 		"summon_score": summon,
+		"spell_type": spell_type,
+		"spell_type_name": spell_type_name,
 		"efficiency_multiplier": cost_result.efficiency_multiplier
 	}
 

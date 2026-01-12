@@ -21,7 +21,6 @@ var config = {
 func generate_random_spell() -> SpellCoreData:
 	var spell = SpellCoreData.new()
 	spell.generate_id()
-	spell.spell_name = _generate_spell_name()
 
 	spell.carrier = _generate_random_carrier()
 
@@ -33,6 +32,9 @@ func generate_random_spell() -> SpellCoreData:
 
 	spell.resource_cost = _calculate_resource_cost(spell)
 	spell.cooldown = randf_range(0.5, 3.0)
+	
+	# 根据法术内容自动选择合适的命名
+	spell.spell_name = _generate_spell_name_by_content(spell)
 
 	return spell
 
@@ -311,6 +313,146 @@ func _calculate_resource_cost(spell: SpellCoreData) -> float:
 func _generate_spell_name() -> String:
 	return _generate_spell_name_with_scenario(-1)
 
+## 生成召唤法术专有名称
+func _generate_summon_spell_name(summon_type: int = -1) -> String:
+	var prefixes: Array
+	var middles: Array
+	var suffixes: Array
+	
+	# 根据召唤类型选择不同的命名风格
+	match summon_type:
+		SummonActionData.SummonType.TURRET:
+			prefixes = ["守", "镇", "封", "征", "战"]
+			middles = ["灵", "光", "炎", "雷", "玄"]
+			suffixes = ["塔", "台", "垒", "城", "阵"]
+		SummonActionData.SummonType.MINION:
+			prefixes = ["唤", "召", "降", "彻", "引"]
+			middles = ["灵", "魂", "影", "幽", "魔"]
+			suffixes = ["仆", "侍", "兵", "徒", "将"]
+		SummonActionData.SummonType.ORBITER:
+			prefixes = ["旋", "环", "绕", "星", "轮"]
+			middles = ["灵", "光", "焰", "影", "晶"]
+			suffixes = ["球", "环", "轮", "星", "光"]
+		SummonActionData.SummonType.DECOY:
+			prefixes = ["幻", "影", "残", "迷", "诱"]
+			middles = ["灵", "影", "魂", "梦", "幻"]
+			suffixes = ["分身", "残影", "幻象", "像", "影"]
+		SummonActionData.SummonType.BARRIER:
+			prefixes = ["护", "守", "征", "圣", "灵"]
+			middles = ["灵", "光", "晶", "圣", "天"]
+			suffixes = ["障", "盾", "壁", "罩", "护"]
+		SummonActionData.SummonType.TOTEM:
+			prefixes = ["圣", "神", "灵", "天", "古"]
+			middles = ["灵", "魂", "光", "木", "石"]
+			suffixes = ["图腾", "柱", "碑", "台", "坐"]
+		_:
+			prefixes = ["唤", "召", "降", "灵", "神"]
+			middles = ["灵", "魂", "影", "光", "玄"]
+			suffixes = ["体", "灵", "影", "象", "使"]
+	
+	return "召唤法术-" + prefixes[randi() % prefixes.size()] + middles[randi() % middles.size()] + suffixes[randi() % suffixes.size()]
+
+## 生成华丽法术专有名称
+func _generate_flashy_spell_name(flashy_type: String = "") -> String:
+	var prefixes: Array
+	var middles: Array
+	var suffixes: Array
+	
+	# 根据华丽效果类型选择不同的命名风格
+	match flashy_type:
+		"chain":  # 链式效果
+			prefixes = ["电", "雷", "闪", "弧", "绝"]
+			middles = ["光", "焰", "霜", "影", "灵"]
+			suffixes = ["链", "索", "弧", "网", "纪"]
+		"fission":  # 裂变效果
+			prefixes = ["爆", "裂", "散", "分", "绽"]
+			middles = ["灵", "光", "焰", "星", "影"]
+			suffixes = ["爆", "裂", "雨", "花", "散"]
+		"explosion":  # 爆炸效果
+			prefixes = ["爆", "烈", "血", "天", "灭"]
+			middles = ["炎", "焰", "光", "雷", "灵"]
+			suffixes = ["爆", "灭", "天", "毁", "崩"]
+		"plasma":  # 等离子相态
+			prefixes = ["灵", "天", "圣", "神", "元"]
+			middles = ["灵", "光", "焰", "电", "元"]
+			suffixes = ["焰", "光", "耀", "辉", "华"]
+		"combo":  # 组合华丽效果
+			prefixes = ["天", "神", "圣", "绝", "灭"]
+			middles = ["灵", "光", "焰", "雷", "影"]
+			suffixes = ["天罡", "神威", "圣裁", "绝律", "灭世"]
+		_:  # 默认华丽效果
+			prefixes = ["绚", "耀", "瑰", "玄", "妙"]
+			middles = ["灵", "光", "影", "焰", "晶"]
+			suffixes = ["舞", "耀", "彩", "华", "光"]
+	
+	return "华丽法术-" + prefixes[randi() % prefixes.size()] + middles[randi() % middles.size()] + suffixes[randi() % suffixes.size()]
+
+## 根据法术内容自动选择合适的命名
+func _generate_spell_name_by_content(spell: SpellCoreData) -> String:
+	# 检查是否为召唤法术
+	var summon_type = _detect_summon_type(spell)
+	if summon_type >= 0:
+		return _generate_summon_spell_name(summon_type)
+	
+	# 检查是否为华丽法术
+	var flashy_type = _detect_flashy_type(spell)
+	if flashy_type != "":
+		return _generate_flashy_spell_name(flashy_type)
+	
+	# 默认命名
+	return _generate_spell_name_with_scenario(-1)
+
+## 检测法术的召唤类型
+func _detect_summon_type(spell: SpellCoreData) -> int:
+	for rule in spell.topology_rules:
+		for action in rule.actions:
+			if action is SummonActionData:
+				return (action as SummonActionData).summon_type
+	return -1
+
+## 检测法术的华丽效果类型
+func _detect_flashy_type(spell: SpellCoreData) -> String:
+	var has_chain = false
+	var has_fission = false
+	var has_explosion = false
+	var has_plasma = spell.carrier != null and spell.carrier.phase == CarrierConfigData.Phase.PLASMA
+	var flashy_count = 0
+	
+	for rule in spell.topology_rules:
+		for action in rule.actions:
+			if action is ChainActionData:
+				has_chain = true
+				flashy_count += 1
+			elif action is FissionActionData:
+				var fission = action as FissionActionData
+				if fission.spawn_count >= 4:
+					has_fission = true
+					flashy_count += 1
+			elif action is SpawnExplosionActionData:
+				var explosion = action as SpawnExplosionActionData
+				if explosion.explosion_radius >= 80:
+					has_explosion = true
+					flashy_count += 1
+	
+	if has_plasma:
+		flashy_count += 1
+	
+	# 多种华丽效果组合
+	if flashy_count >= 2:
+		return "combo"
+	
+	# 单一华丽效果
+	if has_chain:
+		return "chain"
+	if has_fission:
+		return "fission"
+	if has_explosion:
+		return "explosion"
+	if has_plasma:
+		return "plasma"
+	
+	return ""
+
 func _generate_spell_name_with_scenario(scenario: int = -1) -> String:
 	var scenario_prefix: String = ""
 	var prefixes: Array
@@ -343,6 +485,10 @@ func _generate_spell_name_with_scenario(scenario: int = -1) -> String:
 			prefixes = ["伏", "潜", "隐", "陷", "诡"]
 			middles = ["暗", "毒", "影", "灵", "玄"]
 			suffixes = ["雷", "阱", "伏", "网", "陷"]
+		7:  # 召唤法术场景
+			return _generate_summon_spell_name(-1)
+		8:  # 链式/华丽法术场景
+			return _generate_flashy_spell_name("chain")
 		_:
 			var scenario_prefixes = ["消耗法术-", "单体法术-", "近战法术-", "群伤法术-", "埋伏法术-"]
 			scenario_prefix = scenario_prefixes[randi() % scenario_prefixes.size()]

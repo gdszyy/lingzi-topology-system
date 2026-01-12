@@ -97,6 +97,14 @@ enum ScenarioType {
 @export var simulation_duration: float = 30.0
 @export var cast_interval: float = 1.0
 
+@export_group("法术类型场景权重调整")
+## 当生成其他类型法术时，召唤/华丽法术的场景权重乘数
+@export var summon_scenario_weight_multiplier: float = 0.3  # 召唤法术场景权重乘数
+@export var flashy_scenario_weight_multiplier: float = 0.4  # 华丽法术场景权重乘数
+## 当专门生成召唤/华丽法术时，其他场景的权重乘数
+@export var other_scenario_weight_for_summon: float = 0.5  # 召唤法术时其他场景权重
+@export var other_scenario_weight_for_flashy: float = 0.6  # 华丽法术时其他场景权重
+
 func get_layer_budget(nesting_depth: int) -> float:
 	match nesting_depth:
 		1: return layer_1_budget
@@ -137,6 +145,53 @@ func get_scenario_weights() -> Dictionary:
 		ScenarioType.SURVIVAL: weight_survival,
 		ScenarioType.CLOSE_RANGE: weight_close_range
 	}
+
+## 根据法术类型获取调整后的场景权重
+enum SpellType {
+	GENERAL,      # 通用法术
+	SUMMON,       # 召唤法术
+	FLASHY,       # 华丽法术
+	COMBAT        # 纯战斗法术
+}
+
+func get_adjusted_scenario_weights(spell_type: SpellType) -> Dictionary:
+	var base_weights = get_scenario_weights()
+	var adjusted_weights = base_weights.duplicate()
+	
+	match spell_type:
+		SpellType.SUMMON:
+			# 召唤法术：降低其他场景权重
+			for key in adjusted_weights:
+				adjusted_weights[key] *= other_scenario_weight_for_summon
+		SpellType.FLASHY:
+			# 华丽法术：降低其他场景权重
+			for key in adjusted_weights:
+				adjusted_weights[key] *= other_scenario_weight_for_flashy
+		SpellType.COMBAT:
+			# 纯战斗法术：保持原权重
+			pass
+		SpellType.GENERAL:
+			# 通用法术：保持原权重
+			pass
+	
+	# 归一化权重
+	var total = 0.0
+	for key in adjusted_weights:
+		total += adjusted_weights[key]
+	if total > 0:
+		for key in adjusted_weights:
+			adjusted_weights[key] /= total
+	
+	return adjusted_weights
+
+## 获取召唤/华丽法术的场景权重乘数
+func get_special_spell_weight_multiplier(is_summon: bool, is_flashy: bool) -> float:
+	if is_summon:
+		return summon_scenario_weight_multiplier
+	elif is_flashy:
+		return flashy_scenario_weight_multiplier
+	else:
+		return 1.0
 
 static func create_default() -> FitnessConfig:
 	var config = FitnessConfig.new()
@@ -204,4 +259,70 @@ static func create_deep_nesting_focused() -> FitnessConfig:
 	config.cost_per_damage = 0.25
 	config.cost_per_fission = 2.0
 	config.child_cost_decay = 0.35
+	return config
+
+## 创建召唤法术专用配置
+static func create_summon_focused() -> FitnessConfig:
+	var config = FitnessConfig.new()
+	# 降低伤害权重，提高复杂度和召唤权重
+	config.weight_damage = 0.12
+	config.weight_ttk = 0.10
+	config.weight_complexity = 0.22
+	config.weight_flashy = 0.10
+	# 召唤系统奖励增强
+	config.summon_base_bonus = 15.0
+	config.summon_turret_bonus = 10.0
+	config.summon_minion_bonus = 12.0
+	config.summon_orbiter_bonus = 18.0
+	config.summon_decoy_bonus = 8.0
+	config.summon_barrier_bonus = 10.0
+	config.summon_totem_bonus = 15.0
+	config.summon_count_bonus = 5.0
+	config.summon_inherit_spell_bonus = 20.0
+	# 场景权重调整
+	config.summon_scenario_weight_multiplier = 1.0  # 召唤场景保持原权重
+	config.other_scenario_weight_for_summon = 0.4  # 其他场景权重降低
+	return config
+
+## 创建非召唤法术配置（降低召唤场景权重）
+static func create_non_summon_focused() -> FitnessConfig:
+	var config = FitnessConfig.new()
+	# 召唤场景权重大幅降低
+	config.summon_scenario_weight_multiplier = 0.2
+	# 召唤奖励降低
+	config.summon_base_bonus = 3.0
+	config.flashy_summon_bonus = 4.0
+	return config
+
+## 创建非华丽法术配置（降低华丽场景权重）
+static func create_non_flashy_focused() -> FitnessConfig:
+	var config = FitnessConfig.new()
+	# 华丽场景权重大幅降低
+	config.flashy_scenario_weight_multiplier = 0.25
+	config.weight_flashy = 0.03
+	# 华丽奖励降低
+	config.flashy_chain_bonus = 4.0
+	config.flashy_explosion_bonus = 3.0
+	config.flashy_multi_fission_bonus = 2.0
+	config.flashy_combo_multiplier = 1.1
+	return config
+
+## 创建纯战斗法术配置（同时降低召唤和华丽场景权重）
+static func create_combat_focused() -> FitnessConfig:
+	var config = FitnessConfig.new()
+	# 提高伤害和效率权重
+	config.weight_damage = 0.25
+	config.weight_ttk = 0.20
+	config.weight_accuracy = 0.18
+	config.weight_resource_efficiency = 0.17
+	# 降低复杂度和华丽权重
+	config.weight_complexity = 0.10
+	config.weight_flashy = 0.02
+	# 召唤和华丽场景权重大幅降低
+	config.summon_scenario_weight_multiplier = 0.15
+	config.flashy_scenario_weight_multiplier = 0.20
+	# 召唤和华丽奖励降低
+	config.summon_base_bonus = 2.0
+	config.flashy_chain_bonus = 3.0
+	config.flashy_explosion_bonus = 2.0
 	return config
