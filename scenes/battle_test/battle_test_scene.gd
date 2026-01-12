@@ -6,7 +6,8 @@ enum TestScenario {
 	MOVING_TARGETS,
 	SURVIVAL,
 	CLOSE_RANGE,
-	DUMMY_TARGETS
+	DUMMY_TARGETS,
+	SHIELD_TEST
 }
 
 @onready var scenario_option: OptionButton = $UI/TopPanel/ScenarioOption
@@ -34,6 +35,7 @@ var spell_editor: SpellEditor = null
 
 var enemy_scene: PackedScene
 var dummy_enemy_scene: PackedScene
+var attacking_enemy_scene: PackedScene
 
 var batch_generator: BatchSpellGenerator
 
@@ -53,9 +55,22 @@ var survival_timer: Timer = null
 
 var last_batch_result: Dictionary = {}
 
+# 护盾测试统计
+var shield_test_stats = {
+	"current_shield": 0.0,
+	"damage_absorbed": 0.0,
+	"shield_activations": 0,
+	"shield_breaks": 0,
+	"attacks_received": 0
+}
+
+var shield_test_timer: Timer = null
+var shield_test_player: Node2D = null
+
 func _ready():
 	enemy_scene = preload("res://scenes/battle_test/entities/enemy.tscn")
 	dummy_enemy_scene = preload("res://scenes/battle_test/entities/dummy_enemy.tscn")
+	attacking_enemy_scene = preload("res://scenes/battle_test/entities/attacking_enemy.tscn")
 	spell_editor_scene = preload("res://scenes/battle_test/spell_editor.tscn")
 
 	batch_generator = BatchSpellGenerator.new()
@@ -77,6 +92,9 @@ func _process(delta: float) -> void:
 
 		if current_scenario == TestScenario.CLOSE_RANGE or current_scenario == TestScenario.SURVIVAL:
 			_check_enemy_reach_player()
+		
+		if current_scenario == TestScenario.SHIELD_TEST:
+			_update_shield_test_stats()
 
 func _setup_ui() -> void:
 	start_button.pressed.connect(_on_start_pressed)
@@ -107,6 +125,7 @@ func _setup_scenario_options() -> void:
 	scenario_option.add_item("生存模式 (敌人接近)", TestScenario.SURVIVAL)
 	scenario_option.add_item("近战场景", TestScenario.CLOSE_RANGE)
 	scenario_option.add_item("沙包测试 (不死亡)", TestScenario.DUMMY_TARGETS)
+	scenario_option.add_item("护盾测试", TestScenario.SHIELD_TEST)
 
 func _create_default_spell() -> void:
 	var spell = SpellCoreData.new()
@@ -134,6 +153,11 @@ func _create_default_spell() -> void:
 	spell.topology_rules = rules
 
 	available_spells.append(spell)
+	
+	# 添加护盾测试法术
+	var shield_spell = _create_shield_test_spell()
+	available_spells.append(shield_spell)
+	
 	_update_spell_list()
 
 func _update_spell_list() -> void:
@@ -206,6 +230,9 @@ func _on_stop_pressed() -> void:
 
 	if survival_timer != null:
 		survival_timer.stop()
+	
+	if shield_test_timer != null:
+		shield_test_timer.stop()
 
 	_show_final_results()
 
@@ -216,6 +243,18 @@ func _on_reset_pressed() -> void:
 	test_duration = 0.0
 	total_damage_dealt = 0.0
 	enemies_killed = 0
+	
+	# 重置护盾测试统计
+	shield_test_stats.current_shield = 0.0
+	shield_test_stats.damage_absorbed = 0.0
+	shield_test_stats.shield_activations = 0
+	shield_test_stats.shield_breaks = 0
+	shield_test_stats.attacks_received = 0
+	
+	# 清理护盾测试玩家
+	if shield_test_player != null:
+		shield_test_player.queue_free()
+		shield_test_player = null
 
 	for enemy in enemy_container.get_children():
 		if enemy is DummyEnemy:
@@ -329,6 +368,12 @@ func _spawn_enemies_for_scenario() -> void:
 			_spawn_dummy_enemy(battle_center + Vector2(400, -80), DummyEnemy.MovePattern.RANDOM_WALK, 90.0)
 			_spawn_dummy_enemy(battle_center + Vector2(400, 80), DummyEnemy.MovePattern.ORBIT, 100.0)
 			call_deferred("_setup_orbit_dummy", battle_center)
+		
+		TestScenario.SHIELD_TEST:
+			_spawn_attacking_enemy(battle_center + Vector2(250, 0), 100.0, 80.0, 15.0, 1.5)
+			_spawn_attacking_enemy(battle_center + Vector2(200, -150), 80.0, 70.0, 10.0, 2.0)
+			_spawn_attacking_enemy(battle_center + Vector2(200, 150), 80.0, 70.0, 10.0, 2.0)
+			_start_shield_test_spawner()
 
 func _setup_orbit_dummy(center: Vector2) -> void:
 	for enemy in enemy_container.get_children():
@@ -450,6 +495,8 @@ func _update_enemy_targets() -> void:
 	for enemy in enemy_container.get_children():
 		if enemy is Enemy:
 			enemy.set_target_position(player_position)
+		elif enemy is AttackingEnemy:
+			enemy.set_target_position(player_position)
 
 func _check_enemy_reach_player() -> void:
 	for enemy in enemy_container.get_children():
@@ -477,10 +524,20 @@ func _update_stats_display() -> void:
 	stats_text += "裂变次数: %d\n" % caster_stats.fissions_triggered
 	stats_text += "活跃子弹: %d\n" % caster_stats.active_projectiles
 
-	var scenario_names = ["单体目标", "群体目标", "移动目标", "生存模式", "近战场景", "沙包测试"]
+	var scenario_names = ["单体目标", "群体目标", "移动目标", "生存模式", "近战场景", "沙包测试", "护盾测试"]
 	stats_text += "\n[u]场景: %s[/u]\n" % scenario_names[current_scenario]
 
 	if current_scenario == TestScenario.SURVIVAL or current_scenario == TestScenario.CLOSE_RANGE:
+		var enemy_count = enemy_container.get_child_count()
+		stats_text += "当前敌人数: %d\n" % enemy_count
+	
+	if current_scenario == TestScenario.SHIELD_TEST:
+		stats_text += "\n[u]护盾统计[/u]\n"
+		stats_text += "护盾值: %.0f\n" % shield_test_stats.current_shield
+		stats_text += "吸收伤害: %.0f\n" % shield_test_stats.damage_absorbed
+		stats_text += "护盾激活次数: %d\n" % shield_test_stats.shield_activations
+		stats_text += "护盾破碎次数: %d\n" % shield_test_stats.shield_breaks
+		stats_text += "受到攻击: %d\n" % shield_test_stats.attacks_received
 		var enemy_count = enemy_container.get_child_count()
 		stats_text += "当前敌人数: %d\n" % enemy_count
 
@@ -527,6 +584,19 @@ func _show_final_results() -> void:
 				result_text += "  命中次数: %d\n" % dummy_stats.hit_count
 				result_text += "  平均单次伤害: %.1f\n" % dummy_stats.avg_damage_per_hit
 				dummy_index += 1
+	
+	if current_scenario == TestScenario.SHIELD_TEST:
+		result_text += "\n[u]护盾测试结果[/u]\n"
+		result_text += "护盾激活次数: %d\n" % shield_test_stats.shield_activations
+		result_text += "护盾破碎次数: %d\n" % shield_test_stats.shield_breaks
+		result_text += "总吸收伤害: %.0f\n" % shield_test_stats.damage_absorbed
+		result_text += "受到攻击次数: %d\n" % shield_test_stats.attacks_received
+		if shield_test_stats.attacks_received > 0:
+			var avg_absorbed = shield_test_stats.damage_absorbed / shield_test_stats.attacks_received
+			result_text += "平均每次吸收: %.1f\n" % avg_absorbed
+		if shield_test_stats.shield_activations > 0:
+			var avg_per_shield = shield_test_stats.damage_absorbed / shield_test_stats.shield_activations
+			result_text += "每次护盾平均吸收: %.1f\n" % avg_per_shield
 
 	stats_label.text = result_text
 
@@ -593,3 +663,155 @@ func _cleanup_spell_editor() -> void:
 	if spell_editor != null:
 		spell_editor.queue_free()
 		spell_editor = null
+
+
+## ========== 护盾测试相关函数 ==========
+
+func _spawn_attacking_enemy(pos: Vector2, health: float, speed: float, damage: float, cooldown: float) -> void:
+	call_deferred("_spawn_attacking_enemy_internal", pos, health, speed, damage, cooldown)
+
+func _spawn_attacking_enemy_internal(pos: Vector2, health: float, speed: float, damage: float, cooldown: float) -> AttackingEnemy:
+	var enemy = attacking_enemy_scene.instantiate() as AttackingEnemy
+	enemy_container.add_child(enemy)
+	enemy.global_position = pos
+	enemy.set_max_energy_cap(health)
+	enemy.move_speed = speed
+	enemy.attack_damage = damage
+	enemy.attack_cooldown = cooldown
+	enemy.set_target_position(player_position)
+	
+	enemy.damage_taken.connect(_on_enemy_damage_taken)
+	enemy.enemy_died.connect(_on_attacking_enemy_died)
+	enemy.attack_performed.connect(_on_enemy_attack_performed)
+	
+	return enemy
+
+func _on_attacking_enemy_died(_enemy: AttackingEnemy) -> void:
+	enemies_killed += 1
+	
+	if is_running and current_scenario == TestScenario.SHIELD_TEST:
+		# 生成新的攻击型敌人
+		var battle_center = battle_area.position + battle_area.size / 2
+		var angle = randf() * TAU
+		var distance = randf_range(200, 350)
+		var spawn_pos = battle_center + Vector2(cos(angle), sin(angle)) * distance
+		var health = 80.0 + enemies_killed * 5.0
+		var speed = 70.0 + mini(enemies_killed * 2, 40)
+		var damage = 10.0 + enemies_killed * 0.5
+		var cooldown = maxf(1.0, 2.0 - enemies_killed * 0.05)
+		_spawn_attacking_enemy(spawn_pos, health, speed, damage, cooldown)
+
+func _on_enemy_attack_performed(damage: float) -> void:
+	shield_test_stats.attacks_received += 1
+	
+	# 检查护盾状态
+	if shield_test_player and is_instance_valid(shield_test_player):
+		var old_shield = shield_test_stats.current_shield
+		shield_test_stats.current_shield = shield_test_player.current_shield
+		
+		if old_shield > 0 and shield_test_stats.current_shield < old_shield:
+			var absorbed = old_shield - shield_test_stats.current_shield
+			shield_test_stats.damage_absorbed += absorbed
+		
+		if old_shield > 0 and shield_test_stats.current_shield <= 0:
+			shield_test_stats.shield_breaks += 1
+
+func _start_shield_test_spawner() -> void:
+	if shield_test_timer != null:
+		shield_test_timer.queue_free()
+	
+	shield_test_timer = Timer.new()
+	shield_test_timer.wait_time = 3.0
+	shield_test_timer.timeout.connect(_on_shield_test_spawn_timer)
+	add_child(shield_test_timer)
+	shield_test_timer.start()
+	
+	# 创建测试用玩家实体
+	_setup_shield_test_player()
+
+func _setup_shield_test_player() -> void:
+	# 创建一个简单的玩家实体用于护盾测试
+	if shield_test_player != null:
+		shield_test_player.queue_free()
+	
+	shield_test_player = Node2D.new()
+	shield_test_player.name = "ShieldTestPlayer"
+	shield_test_player.set_script(load("res://scenes/battle_test/shield_test_player.gd"))
+	shield_test_player.global_position = player_position
+	add_child(shield_test_player)
+	
+	shield_test_player.add_to_group("players")
+	
+	# 连接护盾信号
+	if shield_test_player.has_signal("shield_changed"):
+		shield_test_player.shield_changed.connect(_on_shield_test_player_shield_changed)
+	
+	# 重置统计
+	shield_test_stats.current_shield = 0.0
+	shield_test_stats.damage_absorbed = 0.0
+	shield_test_stats.shield_activations = 0
+	shield_test_stats.shield_breaks = 0
+	shield_test_stats.attacks_received = 0
+
+func _on_shield_test_player_shield_changed(new_shield: float, old_shield: float) -> void:
+	shield_test_stats.current_shield = new_shield
+	
+	if new_shield > old_shield:
+		shield_test_stats.shield_activations += 1
+	elif old_shield > 0 and new_shield <= 0:
+		shield_test_stats.shield_breaks += 1
+
+func _on_shield_test_spawn_timer() -> void:
+	if not is_running or current_scenario != TestScenario.SHIELD_TEST:
+		return
+	
+	var battle_center = battle_area.position + battle_area.size / 2
+	var angle = randf() * TAU
+	var distance = randf_range(250, 400)
+	var spawn_pos = battle_center + Vector2(cos(angle), sin(angle)) * distance
+	var health = 80.0 + enemies_killed * 3.0
+	var speed = 70.0 + mini(enemies_killed * 2, 50)
+	var damage = 10.0 + enemies_killed * 0.3
+	var cooldown = maxf(1.0, 2.0 - enemies_killed * 0.03)
+	_spawn_attacking_enemy(spawn_pos, health, speed, damage, cooldown)
+
+func _update_shield_test_targets() -> void:
+	for enemy in enemy_container.get_children():
+		if enemy is AttackingEnemy:
+			enemy.set_target_position(player_position)
+
+func _create_shield_test_spell() -> SpellCoreData:
+	## 创建一个护盾测试法术
+	var spell = SpellCoreData.new()
+	spell.generate_id()
+	spell.spell_name = "测试护盾"
+	spell.description = "生成一个护盾保护自身"
+	spell.spell_type = SpellCoreData.SpellType.ENGRAVING
+	spell.resource_cost = 15.0
+	spell.cooldown = 3.0
+	
+	var trigger = TriggerData.new()
+	trigger.trigger_type = TriggerData.TriggerType.ON_TAKE_DAMAGE
+	trigger.trigger_once = false
+	
+	var shield_action = ShieldActionData.new()
+	shield_action.shield_type = ShieldActionData.ShieldType.PERSONAL
+	shield_action.shield_amount = 30.0
+	shield_action.shield_duration = 5.0
+	
+	var rule = TopologyRuleData.new()
+	rule.rule_name = "受伤护盾"
+	rule.trigger = trigger
+	var actions: Array[ActionData] = [shield_action]
+	rule.actions = actions
+	
+	var rules: Array[TopologyRuleData] = [rule]
+	spell.topology_rules = rules
+	
+	return spell
+
+
+func _update_shield_test_stats() -> void:
+	# 更新护盾测试玩家的护盾状态
+	if shield_test_player and is_instance_valid(shield_test_player):
+		shield_test_stats.current_shield = shield_test_player.current_shield

@@ -1,0 +1,29 @@
+[gd_scene load_steps=2 format=3 uid="uid://attacking_enemy"]
+
+[ext_resource type="Script" path="res://scenes/battle_test/entities/attacking_enemy.gd" id="1_script"]
+
+[node name="AttackingEnemy" type="Area2D"]
+collision_layer = 2
+collision_mask = 1
+script = ExtResource("1_script")
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="."]
+shape = SubResource("CircleShape2D_enemy")
+
+[node name="Visual" type="Polygon2D" parent="."]
+color = Color(0.8, 0.3, 0.3, 1)
+polygon = PackedVector2Array(-12, -12, 12, -12, 15, 0, 12, 12, -12, 12, -15, 0)
+
+[node name="AttackIndicator" type="Node2D" parent="."]
+modulate = Color(1, 1, 1, 0.3)
+
+[node name="HealthBar" type="ProgressBar" parent="."]
+offset_left = -20.0
+offset_top = -25.0
+offset_right = 20.0
+offset_bottom = -18.0
+show_percentage = false
+value = 100.0
+
+[sub_resource type="CircleShape2D" id="CircleShape2D_enemy"]
+radius = 15.0
