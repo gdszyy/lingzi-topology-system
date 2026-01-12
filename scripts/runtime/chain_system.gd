@@ -61,12 +61,19 @@ func start_chain(first_target: Node, chain_data: ChainActionData, source_positio
 
 	chain_started.emit(first_target, chain_data)
 
+	# 播放初始视觉效果（从来源到第一个目标）
+	_play_chain_visual_segment(source_position, first_target.global_position, chain_data)
+
 	# 对第一个目标造成伤害
 	_apply_chain_damage(chain, first_target)
 
-	# 设置延迟等待下一次跳跃
-	chain.is_waiting = true
-	chain.delay_timer = chain_data.chain_delay
+	# 如果链条次数大于1，设置延迟等待下一次跳跃
+	if chain_data.chain_count > 1:
+		chain.is_waiting = true
+		chain.delay_timer = chain_data.chain_delay
+	else:
+		# 只有一次跳跃，直接结束
+		chain.jump_count = chain_data.chain_count
 
 func _process_next_jump(chain: ChainInstance) -> void:
 	if chain.current_target == null or not is_instance_valid(chain.current_target):
@@ -80,6 +87,8 @@ func _process_next_jump(chain: ChainInstance) -> void:
 	var next_target = _find_next_chain_target(chain)
 
 	if next_target == null:
+		# 找不到下一个目标，结束该链
+		chain.jump_count = chain.data.chain_count
 		return
 
 	var from_target = chain.current_target
@@ -87,7 +96,7 @@ func _process_next_jump(chain: ChainInstance) -> void:
 	chain.hit_targets.append(next_target)
 	chain.jump_count += 1
 
-	# 播放链式视觉效果（使用 ChainVFX）
+	# 播放链式视觉效果
 	_play_chain_visual_segment(from_target.global_position, next_target.global_position, chain.data)
 
 	# 造成伤害
@@ -182,12 +191,17 @@ func _get_target_candidates(current_pos: Vector2, search_range: float, exclude: 
 		if not is_instance_valid(enemy):
 			continue
 
+		# 排除当前目标，防止原地跳跃
+		if enemy == exclude[-1]:
+			continue
+
 		# 检查是否可以返回已击中的目标
 		if not can_return and enemy in exclude:
 			continue
 
 		var dist = enemy.global_position.distance_to(current_pos)
-		if dist <= search_range and dist > 0:
+		# 允许距离非常近的目标
+		if dist <= search_range:
 			candidates.append({"target": enemy, "distance": dist})
 
 	return candidates
@@ -245,11 +259,12 @@ func _apply_status_to_target(target: Node, status_type: ApplyStatusActionData.St
 	elif target.has_method("apply_status"):
 		target.apply_status(status_type, duration)
 
-## 播放单段链式视觉效果（使用 ChainVFX 风格）
+## 播放单段链式视觉效果
 func _play_chain_visual_segment(from_pos: Vector2, to_pos: Vector2, chain_data: ChainActionData) -> void:
 	var chain_line = Line2D.new()
 	chain_line.name = "ChainSegment"
 	chain_line.width = chain_data.chain_visual_width
+	chain_line.z_index = 100 # 确保在上方显示
 	
 	# 获取链类型颜色
 	var colors = VFXManager.CHAIN_TYPE_COLORS.get(
@@ -258,24 +273,28 @@ func _play_chain_visual_segment(from_pos: Vector2, to_pos: Vector2, chain_data: 
 	)
 	chain_line.default_color = colors.primary
 	
-	# 根据链类型创建不同的路径
+	# 使用全局坐标
+	chain_line.global_position = Vector2.ZERO
 	chain_line.points = _create_chain_path(from_pos, to_pos, chain_data.chain_type)
 	
 	# 添加发光效果
-	var glow_line = chain_line.duplicate() as Line2D
+	var glow_line = Line2D.new()
 	glow_line.width = chain_data.chain_visual_width * 2.5
 	glow_line.default_color = colors.glow
 	glow_line.default_color.a = 0.4
+	glow_line.points = chain_line.points
 	chain_line.add_child(glow_line)
-	glow_line.position = Vector2.ZERO
 	
-	get_tree().current_scene.add_child(chain_line)
+	var scene_root = get_tree().current_scene
+	if scene_root:
+		scene_root.add_child(chain_line)
 	
 	# 创建撞击效果
 	_create_impact_effect(to_pos, colors)
 
 	# 动画效果
 	var tween = create_tween()
+	chain_line.modulate.a = 0.0
 	tween.tween_property(chain_line, "modulate:a", 1.0, 0.05)
 	tween.tween_property(chain_line, "modulate:a", 0.5, 0.05)
 	tween.tween_property(chain_line, "modulate:a", 1.0, 0.05)
@@ -387,7 +406,9 @@ func _create_impact_effect(pos: Vector2, colors: Dictionary) -> void:
 	flash.scale = Vector2.ZERO
 	container.add_child(flash)
 	
-	get_tree().current_scene.add_child(container)
+	var scene_root = get_tree().current_scene
+	if scene_root:
+		scene_root.add_child(container)
 	
 	# 闪光动画
 	var tween = create_tween()
