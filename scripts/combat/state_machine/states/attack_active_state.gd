@@ -101,12 +101,7 @@ func _start_weapon_swing() -> void:
 	if player.visuals != null:
 		var visuals = player.visuals as PlayerVisuals
 		if visuals != null:
-			visuals.start_weapon_swing(
-				current_attack.swing_start_angle,
-				current_attack.swing_end_angle,
-				current_attack.active_time,
-				current_attack.swing_curve
-			)
+			visuals.play_attack_effect(current_attack)
 	
 	swing_started = true
 
