@@ -54,14 +54,23 @@ func initialize_with_nesting(data: SpellCoreData, direction: Vector2, start_pos:
 
 	global_position = start_pos
 
-	var effective_velocity = carrier.get_effective_velocity()
-	velocity = direction.normalized() * effective_velocity
-
-	lifetime_remaining = carrier.get_effective_lifetime()
-	piercing_remaining = carrier.piercing
+	# 检查 carrier 是否为 null
+	if carrier == null:
+		push_warning("[子弹] carrier 为 null，使用默认值初始化")
+		velocity = direction.normalized() * 300.0  # 默认速度
+		lifetime_remaining = 3.0  # 默认寿命
+		piercing_remaining = 0
+	else:
+		var effective_velocity = carrier.get_effective_velocity()
+		velocity = direction.normalized() * effective_velocity
+		lifetime_remaining = carrier.get_effective_lifetime()
+		piercing_remaining = carrier.piercing
 
 	var type_names = ["Projectile", "Mine", "SlowOrb"]
-	print("[子弹] 类型=%s, 速度=%.1f, 寿命=%.1fs, 嵌套层级=%d" % [type_names[carrier.carrier_type], effective_velocity, lifetime_remaining, nesting_level])
+	if carrier != null:
+		print("[子弹] 类型=%s, 速度=%.1f, 寿命=%.1fs, 嵌套层级=%d" % [type_names[carrier.carrier_type], velocity.length(), lifetime_remaining, nesting_level])
+	else:
+		print("[子弹] 类型=默认, 速度=%.1f, 寿命=%.1fs, 嵌套层级=%d" % [velocity.length(), lifetime_remaining, nesting_level])
 
 	rule_timers.clear()
 	rule_triggered.clear()
