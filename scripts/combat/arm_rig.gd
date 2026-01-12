@@ -2,6 +2,7 @@ class_name ArmRig extends Node2D
 ## 单条手臂的渲染和 IK 解算
 ## 手臂由上臂、前臂、手三部分组成
 ## 武器作为手的子节点
+## 【优化】改进武器与手的绑定关系，确保握柄正确对齐
 
 signal hand_position_changed(position: Vector2)
 
@@ -21,11 +22,22 @@ signal hand_position_changed(position: Vector2)
 @export var ik_smoothing: float = 15.0
 @export var elbow_bend_factor: float = 1.0      ## 肘部弯曲方向 (正=向外弯)
 
+## 【新增】武器显示增强参数
+@export_group("Weapon Display Enhancement")
+@export var weapon_scale_on_swing: float = 1.1  ## 挥舞时武器缩放倍数
+@export var weapon_glow_intensity: float = 0.0  ## 武器发光强度（0-1）
+@export var weapon_trail_enabled: bool = true   ## 是否启用武器拖尾
+
 ## 内部状态
 var current_hand_pos: Vector2 = Vector2.ZERO    ## 当前手的位置
 var target_hand_pos: Vector2 = Vector2.ZERO     ## 目标手的位置
 var current_elbow_pos: Vector2 = Vector2.ZERO   ## 当前肘的位置
 var current_hand_rotation: float = 0.0          ## 手的旋转
+var target_hand_rotation: float = 0.0           ## 目标手旋转
+
+## 【新增】武器绑定参数
+var weapon_grip_offset: Vector2 = Vector2.ZERO  ## 握柄偏移（从武器中心到握柄）
+var weapon_base_rotation: float = -PI / 2       ## 武器基础旋转
 
 ## 绘制节点
 var upper_arm_line: Line2D = null
@@ -33,6 +45,15 @@ var forearm_line: Line2D = null
 var hand_node: Node2D = null
 var hand_sprite: Sprite2D = null
 var weapon_sprite: Sprite2D = null
+
+## 【新增】武器拖尾
+var weapon_trail_points: Array[Vector2] = []
+var weapon_trail_max_points: int = 8
+var weapon_trail_line: Line2D = null
+
+## 【新增】上一帧的武器位置，用于计算速度
+var last_weapon_pos: Vector2 = Vector2.ZERO
+var weapon_velocity: Vector2 = Vector2.ZERO
 
 func _ready() -> void:
 	_create_arm_visuals()
@@ -81,6 +102,15 @@ func _create_arm_visuals() -> void:
 	weapon_sprite.visible = false
 	weapon_sprite.z_index = 1
 	hand_node.add_child(weapon_sprite)
+	
+	## 【新增】创建武器拖尾
+	if weapon_trail_enabled:
+		weapon_trail_line = Line2D.new()
+		weapon_trail_line.name = "WeaponTrail"
+		weapon_trail_line.width = 3.0
+		weapon_trail_line.default_color = Color(1, 1, 1, 0.3)
+		weapon_trail_line.z_index = -3
+		add_child(weapon_trail_line)
 
 func _create_hand_texture() -> ImageTexture:
 	var size = int(hand_size)
@@ -104,13 +134,21 @@ func _initialize_positions() -> void:
 	var actual_shoulder = Vector2(shoulder_offset.x * sign_x, shoulder_offset.y)
 	target_hand_pos = actual_shoulder + Vector2(5 * sign_x, 18)
 	current_hand_pos = target_hand_pos
+	target_hand_rotation = 0.0
+	current_hand_rotation = 0.0
 	_update_ik()
 
 func _process(delta: float) -> void:
 	## 平滑移动手到目标位置
 	current_hand_pos = current_hand_pos.lerp(target_hand_pos, ik_smoothing * delta)
+	current_hand_rotation = lerp(current_hand_rotation, target_hand_rotation, ik_smoothing * delta)
+	
 	_update_ik()
 	_update_visuals()
+	
+	## 【新增】更新武器拖尾
+	if weapon_trail_enabled and weapon_sprite and weapon_sprite.visible:
+		_update_weapon_trail(delta)
 
 func _update_ik() -> void:
 	## Two-Bone IK 解算
@@ -162,22 +200,81 @@ func _update_visuals() -> void:
 		forearm_line.set_point_position(0, current_elbow_pos)
 		forearm_line.set_point_position(1, current_hand_pos)
 	
-	## 更新手
+	## 【修复】更新手节点位置和旋转
 	if hand_node:
 		hand_node.position = current_hand_pos
 		hand_node.rotation = current_hand_rotation
+		
+		## 【关键修复】确保武器精灵的位置与握柄对齐
+		if weapon_sprite and weapon_sprite.visible:
+			_update_weapon_position_and_rotation()
 	
 	hand_position_changed.emit(current_hand_pos)
+
+## 【新增】更新武器位置和旋转 - 确保握柄对齐
+func _update_weapon_position_and_rotation() -> void:
+	if weapon_sprite == null:
+		return
+	
+	## 武器精灵的位置应该使其握柄点对齐到手部位置
+	## 握柄偏移是从武器中心到握柄的距离
+	## 我们需要将武器移动，使得握柄点正好在原点（手部位置）
+	
+	## 武器的旋转是 weapon_base_rotation + hand_node.rotation
+	var total_rotation = weapon_base_rotation + hand_node.rotation
+	
+	## 握柄在武器坐标系中的位置
+	var grip_in_weapon_coords = weapon_grip_offset
+	
+	## 将握柄位置从武器坐标系转换到手坐标系
+	## 由于武器旋转了，握柄位置也需要旋转
+	var grip_rotated = grip_in_weapon_coords.rotated(total_rotation)
+	
+	## 武器精灵的偏移应该是负的握柄位置，这样握柄就会对齐到手部
+	weapon_sprite.offset = -grip_rotated
+	weapon_sprite.rotation = total_rotation
+
+## 【新增】更新武器拖尾
+func _update_weapon_trail(delta: float) -> void:
+	if weapon_sprite == null or weapon_trail_line == null:
+		return
+	
+	var weapon_global_pos = weapon_sprite.global_position
+	
+	## 计算武器速度
+	weapon_velocity = (weapon_global_pos - last_weapon_pos) / delta
+	last_weapon_pos = weapon_global_pos
+	
+	## 只在武器移动速度足够快时添加拖尾点
+	if weapon_velocity.length() > 50:
+		weapon_trail_points.append(weapon_global_pos)
+		
+		## 限制拖尾点数
+		if weapon_trail_points.size() > weapon_trail_max_points:
+			weapon_trail_points.pop_front()
+	
+	## 更新拖尾线
+	weapon_trail_line.clear_points()
+	for point in weapon_trail_points:
+		weapon_trail_line.add_point(point - global_position)
+	
+	## 拖尾逐渐消失
+	if weapon_trail_points.size() > 0:
+		var fade_rate = 0.15  ## 衰减速率
+		weapon_trail_line.default_color.a = max(0, weapon_trail_line.default_color.a - fade_rate * delta)
+	else:
+		weapon_trail_line.default_color.a = 0.3
 
 ## 设置手的目标位置
 func set_hand_target(target: Vector2, rotation: float = 0.0) -> void:
 	target_hand_pos = target
-	current_hand_rotation = rotation
+	target_hand_rotation = rotation
 
 ## 立即设置手的位置（跳过插值）
 func snap_hand_to(target: Vector2, rotation: float = 0.0) -> void:
 	target_hand_pos = target
 	current_hand_pos = target
+	target_hand_rotation = rotation
 	current_hand_rotation = rotation
 	_update_ik()
 	_update_visuals()
@@ -194,13 +291,24 @@ func get_hand_node() -> Node2D:
 func get_weapon_sprite() -> Sprite2D:
 	return weapon_sprite
 
-## 设置武器纹理和偏移
+## 【修复】设置武器纹理和握柄偏移
 func set_weapon(texture: Texture2D, grip_offset: Vector2, weapon_rotation: float = -PI/2) -> void:
 	if weapon_sprite:
 		weapon_sprite.texture = texture
-		weapon_sprite.offset = -grip_offset  ## 负偏移使握柄对齐到手
-		weapon_sprite.rotation = weapon_rotation
+		
+		## 【关键修复】保存握柄偏移用于位置计算
+		weapon_grip_offset = grip_offset
+		weapon_base_rotation = weapon_rotation
+		
 		weapon_sprite.visible = texture != null
+		
+		## 【新增】初始化武器显示效果
+		weapon_sprite.scale = Vector2.ONE
+		weapon_sprite.modulate = Color.WHITE
+		
+		## 立即更新武器位置确保握柄对齐
+		if weapon_sprite.visible:
+			_update_weapon_position_and_rotation()
 
 ## 隐藏武器
 func hide_weapon() -> void:
@@ -215,7 +323,39 @@ func show_weapon() -> void:
 ## 设置武器旋转（相对于手）
 func set_weapon_rotation(rotation: float) -> void:
 	if weapon_sprite:
-		weapon_sprite.rotation = rotation
+		## 【修复】不直接设置rotation，而是通过 hand_node.rotation 控制
+		## 这样可以确保握柄偏移的计算正确
+		pass
+
+## 【新增】设置武器缩放（用于挥舞时的视觉增强）
+func set_weapon_scale(scale: float) -> void:
+	if weapon_sprite:
+		weapon_sprite.scale = Vector2(scale, scale)
+
+## 【新增】设置武器发光
+func set_weapon_glow(intensity: float) -> void:
+	if weapon_sprite:
+		## 通过调整modulate实现发光效果
+		var glow_color = Color.WHITE.lerp(Color.YELLOW, intensity * 0.5)
+		weapon_sprite.modulate = glow_color.lerp(Color.WHITE, 1.0 - intensity)
+		weapon_sprite.self_modulate = Color(1.0 + intensity * 0.3, 1.0 + intensity * 0.3, 1.0 + intensity * 0.2, 1.0)
+
+## 【新增】播放武器挥舞动画
+func play_weapon_swing_effect(duration: float = 0.3) -> void:
+	if weapon_sprite == null:
+		return
+	
+	var tween = create_tween()
+	
+	## 缩放效果
+	tween.tween_property(weapon_sprite, "scale", Vector2(weapon_scale_on_swing, weapon_scale_on_swing), duration * 0.3)
+	tween.tween_property(weapon_sprite, "scale", Vector2.ONE, duration * 0.7)
+	
+	## 同时播放发光效果
+	if weapon_glow_intensity > 0:
+		var tween2 = create_tween()
+		tween2.tween_property(self, "weapon_glow_intensity", weapon_glow_intensity, duration * 0.3)
+		tween2.tween_property(self, "weapon_glow_intensity", 0.0, duration * 0.7)
 
 ## 设置手臂颜色
 func set_arm_color(color: Color) -> void:
@@ -244,3 +384,21 @@ func get_shoulder_position() -> Vector2:
 ## 获取肘部位置
 func get_elbow_position() -> Vector2:
 	return current_elbow_pos
+
+## 【新增】获取武器速度
+func get_weapon_velocity() -> Vector2:
+	return weapon_velocity
+
+## 【新增】清除武器拖尾
+func clear_weapon_trail() -> void:
+	weapon_trail_points.clear()
+	if weapon_trail_line:
+		weapon_trail_line.clear_points()
+
+## 【新增】获取武器握柄偏移
+func get_weapon_grip_offset() -> Vector2:
+	return weapon_grip_offset
+
+## 【新增】获取武器基础旋转
+func get_weapon_base_rotation() -> float:
+	return weapon_base_rotation

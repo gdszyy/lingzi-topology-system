@@ -295,8 +295,11 @@ func update_weapon_appearance(weapon: WeaponData) -> void:
 	else:
 		weapon_texture = _create_weapon_texture_for_type(weapon.weapon_type, weapon.weapon_length)
 	
-	## 计算握柄偏移（武器纹理的中心到握柄的距离）
-	var grip_offset = Vector2(0, weapon.weapon_length * 0.4)
+	## 【修复】计算握柄偏移 - 优先使用武器数据中定义的握点
+	var grip_offset = weapon.grip_point_main
+	if grip_offset == Vector2.ZERO:
+		## 如果武器数据中没有定义，使用默认值
+		grip_offset = Vector2(0, weapon.weapon_length * 0.3)
 	
 	## 设置右手武器
 	if right_arm:
