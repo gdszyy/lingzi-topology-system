@@ -200,11 +200,11 @@ func _update_slash_visuals_enhanced() -> void:
 	var swing_angle_deg = current_attack.get_swing_angle_at_progress(swing_progress)
 	var swing_angle_rad = deg_to_rad(swing_angle_deg)
 	
-	## 【新增】根据武器长度计算伸缩系数
+	## 【修复】根据武器长度计算伸缩系数（收紧上限）
 	var weapon_length_factor = 1.0
 	if current_weapon:
-		## 武器越长，挥舞半径和伸出距离应该越大
-		weapon_length_factor = clamp(current_weapon.weapon_length / 40.0, 0.8, 1.8)
+		## 武器越长，挥舞半径和伸出距离应该越大，但不能超过手臂最大位移
+		weapon_length_factor = clamp(current_weapon.weapon_length / 40.0, 0.8, 1.3)
 	
 	## 根据动画阶段调整挥舞参数
 	var swing_radius: float
@@ -214,20 +214,19 @@ func _update_slash_visuals_enhanced() -> void:
 	match animation_phase:
 		0:  ## windup - 蓄力阶段
 			## 手臂向后拉，准备挥舞
-			swing_radius = (20.0 + swing_progress * 8.0) * weapon_length_factor
-			weapon_extension = (-5.0 + swing_progress * 12.0) * weapon_length_factor  ## 武器略微后收
+			swing_radius = (18.0 + swing_progress * 6.0) * weapon_length_factor
+			weapon_extension = (-3.0 + swing_progress * 8.0) * weapon_length_factor  ## 武器略微后收
 			body_rotation = -swing_angle_rad * 0.2  ## 身体轻微反向
-		1:  ## active - 攻击阶段
-			## 【关键优化】武器快速挥出 - 大幅增加伸出距离
-			swing_radius = (32.0 + swing_momentum * 8.0) * weapon_length_factor  ## 动量增加挥舞半径
-			weapon_extension = (25.0 + swing_momentum * 15.0) * weapon_length_factor  ## 武器大幅伸出
+		1:  ## active - 【修复】武器快速挥出 - 收紧伸出距离
+			swing_radius = (26.0 + swing_momentum * 6.0) * weapon_length_factor  ## 动量增加挥舞半径
+			weapon_extension = (15.0 + swing_momentum * 10.0) * weapon_length_factor  ## 武器伸出
 			body_rotation = swing_angle_rad * 0.4  ## 身体跟随旋转增强
 		2:  ## recovery - 恢复阶段
 			## 收回动作
 			var recovery_progress = (animation_progress - (current_attack.windup_time + current_attack.active_time) / current_attack.get_total_duration())
 			recovery_progress = recovery_progress / (current_attack.recovery_time / current_attack.get_total_duration())
-			swing_radius = lerp(32.0, 22.0, recovery_progress) * weapon_length_factor
-			weapon_extension = lerp(25.0, 8.0, recovery_progress) * weapon_length_factor
+			swing_radius = lerp(26.0, 20.0, recovery_progress) * weapon_length_factor
+			weapon_extension = lerp(15.0, 5.0, recovery_progress) * weapon_length_factor
 			body_rotation = lerp(swing_angle_rad * 0.4, 0.0, recovery_progress)
 		_:
 			swing_radius = 25.0 * weapon_length_factor
@@ -330,8 +329,8 @@ func _update_thrust_visuals_enhanced() -> void:
 	## 【新增】根据武器长度计算伸缩系数
 	var weapon_length_factor = 1.0
 	if current_weapon:
-		## 长矛武器需要更大的刷击距离
-		weapon_length_factor = clamp(current_weapon.weapon_length / 40.0, 0.9, 2.0)
+		## 武器越长，刷击轨迹参数也应该越大（收紧上限）
+		weapon_length_factor = clamp(current_weapon.weapon_length / 40.0, 0.9, 1.3)
 	
 	## 刷击轨迹参数
 	var thrust_distance: float
@@ -345,15 +344,15 @@ func _update_thrust_visuals_enhanced() -> void:
 			arm_extension = lerp(0.0, -8.0, thrust_progress)
 			body_lean = lerp(0.0, -0.1, thrust_progress)
 		1:  ## active - 快速刷出
-			## 【关键优化】手臂快速伸出 - 大幅增加刷击距离
+			## 【修复】手臂快速伸出 - 收紧刷击距离
 			var active_progress = (thrust_progress - 0.0) / 1.0
-			thrust_distance = lerp(8.0, (60.0 + swing_momentum * 20.0) * weapon_length_factor, _ease_out_cubic(active_progress))
-			arm_extension = lerp(-8.0, (20.0 + swing_momentum * 8.0) * weapon_length_factor, _ease_out_cubic(active_progress))
+			thrust_distance = lerp(8.0, (40.0 + swing_momentum * 12.0) * weapon_length_factor, _ease_out_cubic(active_progress))
+			arm_extension = lerp(-8.0, (12.0 + swing_momentum * 6.0) * weapon_length_factor, _ease_out_cubic(active_progress))
 			body_lean = lerp(-0.1, 0.2, _ease_out_cubic(active_progress))
 		2:  ## recovery - 收回
 			var recovery_progress = _get_recovery_progress()
-			thrust_distance = lerp((60.0 * weapon_length_factor), (20.0 * weapon_length_factor), _ease_in_out_cubic(recovery_progress))
-			arm_extension = lerp((20.0 * weapon_length_factor), 0.0, recovery_progress)
+			thrust_distance = lerp((40.0 * weapon_length_factor), (15.0 * weapon_length_factor), _ease_in_out_cubic(recovery_progress))
+			arm_extension = lerp((12.0 * weapon_length_factor), 0.0, recovery_progress)
 			body_lean = lerp(0.2, 0.0, recovery_progress)
 		_:
 			thrust_distance = 20.0 * weapon_length_factor
@@ -411,7 +410,7 @@ func _update_smash_visuals_enhanced() -> void:
 	## 【新增】根据武器长度计算伸缩系数
 	var weapon_length_factor = 1.0
 	if current_weapon:
-		weapon_length_factor = clamp(current_weapon.weapon_length / 40.0, 0.8, 1.8)
+		weapon_length_factor = clamp(current_weapon.weapon_length / 40.0, 0.8, 1.3)
 	
 	## 重击轨迹：举起 -> 砂下
 	var angle_deg: float
@@ -493,7 +492,7 @@ func _update_sweep_visuals_enhanced() -> void:
 	## 【新增】根据武器长度计算伸缩系数
 	var weapon_length_factor = 1.0
 	if current_weapon:
-		weapon_length_factor = clamp(current_weapon.weapon_length / 40.0, 0.8, 1.8)
+		weapon_length_factor = clamp(current_weapon.weapon_length / 40.0, 0.8, 1.3)
 	
 	## 横扫参数 - 更大的挥舞范围
 	var swing_radius: float
@@ -561,7 +560,7 @@ func _update_spin_visuals_enhanced() -> void:
 	## 【新增】根据武器长度计算伸缩系数
 	var weapon_length_factor = 1.0
 	if current_weapon:
-		weapon_length_factor = clamp(current_weapon.weapon_length / 40.0, 0.8, 1.8)
+		weapon_length_factor = clamp(current_weapon.weapon_length / 40.0, 0.8, 1.3)
 	
 	## 旋转攻击参数
 	var spin_radius: float

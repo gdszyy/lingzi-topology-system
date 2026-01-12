@@ -267,7 +267,19 @@ func _update_weapon_trail(delta: float) -> void:
 
 ## 设置手的目标位置
 func set_hand_target(target: Vector2, rotation: float = 0.0) -> void:
-	target_hand_pos = target
+	## 【修复】限制手部最大位移半径，防止"飞出去"
+	var sign_x = -1.0 if is_left_arm else 1.0
+	var actual_shoulder = Vector2(shoulder_offset.x * sign_x, shoulder_offset.y)
+	
+	## 计算相对于肩部的向量
+	var to_target = target - actual_shoulder
+	var max_reach = (upper_arm_length + forearm_length) * 0.95 ## 留一点余量防止完全伸直
+	
+	if to_target.length() > max_reach:
+		target_hand_pos = actual_shoulder + to_target.normalized() * max_reach
+	else:
+		target_hand_pos = target
+		
 	target_hand_rotation = rotation
 
 ## 立即设置手的位置（跳过插值）
