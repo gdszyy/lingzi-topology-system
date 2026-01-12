@@ -17,6 +17,9 @@ var target: Node2D = null
 var homing_delay_timer: float = 0.0
 var time_alive: float = 0.0
 
+# 嵌套层级追踪
+var nesting_level: int = 0
+
 var rule_timers: Array[float] = []
 var rule_triggered: Array[bool] = []
 
@@ -39,9 +42,15 @@ func _ready():
 	body_entered.connect(_on_body_entered)
 	area_entered.connect(_on_area_entered)
 
+## 标准初始化（兼容旧版调用）
 func initialize(data: SpellCoreData, direction: Vector2, start_pos: Vector2) -> void:
+	initialize_with_nesting(data, direction, start_pos, 0)
+
+## 增强初始化（支持嵌套层级）
+func initialize_with_nesting(data: SpellCoreData, direction: Vector2, start_pos: Vector2, p_nesting_level: int = 0) -> void:
 	spell_data = data
 	carrier = data.carrier
+	nesting_level = p_nesting_level
 
 	global_position = start_pos
 
@@ -52,7 +61,7 @@ func initialize(data: SpellCoreData, direction: Vector2, start_pos: Vector2) -> 
 	piercing_remaining = carrier.piercing
 
 	var type_names = ["Projectile", "Mine", "SlowOrb"]
-	print("[子弹] 类型=%s, 速度=%.1f, 寿命=%.1fs" % [type_names[carrier.carrier_type], effective_velocity, lifetime_remaining])
+	print("[子弹] 类型=%s, 速度=%.1f, 寿命=%.1fs, 嵌套层级=%d" % [type_names[carrier.carrier_type], effective_velocity, lifetime_remaining, nesting_level])
 
 	rule_timers.clear()
 	rule_triggered.clear()
@@ -88,13 +97,13 @@ func _setup_visuals() -> void:
 
 	print("[子弹] 视觉设置: 颜色=%s, 缩放=%.2f, 位置=%s" % [color, base_scale, global_position])
 
-## 设置VFX特效
+## 设置VFX特效（增强版）
 func _setup_vfx() -> void:
 	if carrier == null:
 		return
 	
-	# 创建相态弹体特效
-	phase_vfx = VFXFactory.create_projectile_vfx(carrier.phase, carrier.size, velocity)
+	# 使用增强初始化创建相态弹体特效
+	phase_vfx = VFXFactory.create_projectile_vfx_enhanced(spell_data, nesting_level, velocity)
 	if phase_vfx:
 		add_child(phase_vfx)
 		phase_vfx.position = Vector2.ZERO
@@ -198,7 +207,7 @@ func _execute_action(action: ActionData) -> void:
 		_execute_spawn_damage_zone(zone)
 
 func _execute_fission(fission: FissionActionData) -> void:
-	print("[子弹] 执行裂变: 数量=%d, 角度=%.1f°, 方向模式=%d" % [fission.spawn_count, fission.spread_angle, fission.direction_mode])
+	print("[子弹] 执行裂变: 数量=%d, 角度=%.1f°, 方向模式=%d, 当前嵌套层级=%d" % [fission.spawn_count, fission.spread_angle, fission.direction_mode, nesting_level])
 	
 	# 播放裂变特效
 	var fission_vfx = VFXFactory.create_fission_vfx(carrier.phase, fission.spawn_count, fission.spread_angle, carrier.size)
@@ -206,10 +215,16 @@ func _execute_fission(fission: FissionActionData) -> void:
 		VFXFactory.spawn_at(fission_vfx, global_position, get_tree().current_scene)
 	
 	var parent_direction = velocity.normalized() if velocity.length() > 0 else Vector2.RIGHT
+	
+	# 发射裂变信号，传递当前嵌套层级+1
 	fission_triggered.emit(global_position, fission.child_spell_data, fission.spawn_count, fission.spread_angle, parent_direction, fission.direction_mode)
 
 	if fission.destroy_parent:
 		_die()
+
+## 获取当前嵌套层级（供外部查询）
+func get_nesting_level() -> int:
+	return nesting_level
 
 func _execute_area_effect(area: AreaEffectActionData) -> void:
 	var space_state = get_world_2d().direct_space_state
@@ -282,6 +297,54 @@ func _execute_contact_rule(rule: TopologyRuleData, enemy: Node2D) -> void:
 				enemy.apply_status(status.status_type, status.duration, status.effect_value)
 				# 播放状态效果特效
 				_spawn_status_vfx(enemy, status)
+		elif action is ChainActionData:
+			var chain = action as ChainActionData
+			_execute_chain_effect(chain, enemy)
+
+## 执行链接效果
+func _execute_chain_effect(chain: ChainActionData, initial_target: Node2D) -> void:
+	print("[子弹] 执行链接效果: 类型=%s, 链接数=%d" % [chain.get_type_name(), chain.chain_count])
+	
+	# 收集可链接的目标
+	var targets: Array[Node2D] = []
+	targets.append(initial_target)
+	
+	var enemies = get_tree().get_nodes_in_group("enemies")
+	var current_pos = initial_target.global_position
+	var visited = [initial_target]
+	
+	for i in range(chain.chain_count - 1):
+		var nearest: Node2D = null
+		var nearest_dist = chain.chain_range
+		
+		for enemy in enemies:
+			if not is_instance_valid(enemy) or enemy in visited:
+				continue
+			var dist = current_pos.distance_to(enemy.global_position)
+			if dist < nearest_dist:
+				nearest_dist = dist
+				nearest = enemy
+		
+		if nearest:
+			targets.append(nearest)
+			visited.append(nearest)
+			current_pos = nearest.global_position
+		else:
+			break
+	
+	# 创建链接特效
+	if targets.size() > 1:
+		var chain_vfx = VFXFactory.create_chain_vfx(chain.chain_type, targets, chain.chain_damage, chain.chain_delay)
+		if chain_vfx:
+			get_tree().current_scene.add_child(chain_vfx)
+	
+	# 对链接目标造成伤害
+	var current_damage = chain.chain_damage
+	for i in range(1, targets.size()):
+		var target_enemy = targets[i]
+		if target_enemy.has_method("take_damage"):
+			target_enemy.take_damage(current_damage, 0)
+		current_damage *= chain.chain_damage_decay
 
 ## 生成状态效果特效
 func _spawn_status_vfx(target: Node2D, status: ApplyStatusActionData) -> void:

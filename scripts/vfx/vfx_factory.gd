@@ -44,7 +44,7 @@ static func _get_scene(key: String) -> PackedScene:
 	
 	return _cached_scenes[path]
 
-## 创建相态弹体特效
+## 创建相态弹体特效（标准版，兼容旧代码）
 static func create_projectile_vfx(phase: CarrierConfigData.Phase, size: float = 1.0, velocity: Vector2 = Vector2.ZERO) -> PhaseProjectileVFX:
 	var scene = _get_scene("projectile")
 	if scene == null:
@@ -52,6 +52,16 @@ static func create_projectile_vfx(phase: CarrierConfigData.Phase, size: float = 
 	
 	var vfx = scene.instantiate() as PhaseProjectileVFX
 	vfx.initialize(phase, size, velocity)
+	return vfx
+
+## 创建相态弹体特效（增强版，支持完整法术数据）
+static func create_projectile_vfx_enhanced(spell_data: SpellCoreData, nesting_level: int = 0, velocity: Vector2 = Vector2.ZERO) -> PhaseProjectileVFX:
+	var scene = _get_scene("projectile")
+	if scene == null:
+		return null
+	
+	var vfx = scene.instantiate() as PhaseProjectileVFX
+	vfx.initialize_enhanced(spell_data, nesting_level, velocity)
 	return vfx
 
 ## 创建命中特效
