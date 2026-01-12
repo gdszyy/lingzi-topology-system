@@ -139,9 +139,8 @@ static func create_explosion_on_kill() -> SpellCoreData:
 	trigger.trigger_once = false
 
 	var explosion_action = SpawnExplosionActionData.new()
-	explosion_action.damage = 25.0
-	explosion_action.radius = 100.0
-	explosion_action.knockback_force = 200.0
+	explosion_action.explosion_damage = 25.0
+	explosion_action.explosion_radius = 100.0
 	explosion_action.damage_falloff = 0.5
 
 	var rule = TopologyRuleData.new()
