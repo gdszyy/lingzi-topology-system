@@ -7,13 +7,17 @@ signal health_changed(current: float, max_health: float)
 signal weapon_changed(weapon: WeaponData)
 signal state_changed(state_name: String)
 signal attack_started(attack: AttackData)
+signal attack_ended(attack: AttackData)
 signal attack_hit(target: Node2D, damage: float)
+signal took_damage(damage: float, source: Node2D)
 signal spell_cast(spell: SpellCoreData)
+signal spell_hit(target: Node2D, damage: float)
 
 ## 节点引用
 @onready var state_machine: StateMachine = $StateMachine
 @onready var input_buffer: InputBuffer = $InputBuffer
 @onready var weapon_manager: Node = $WeaponManager
+@onready var engraving_manager: EngravingManager = $EngravingManager
 @onready var visuals: Node2D = $Visuals
 @onready var legs_pivot: Node2D = $Visuals/LegsPivot
 @onready var torso_pivot: Node2D = $Visuals/TorsoPivot
@@ -26,6 +30,7 @@ signal spell_cast(spell: SpellCoreData)
 
 ## 状态
 var is_flying: bool = false
+var was_flying: bool = false  # 用于检测飞行状态变化
 var is_attacking: bool = false
 var is_casting: bool = false
 var can_move: bool = true
@@ -41,6 +46,10 @@ var current_spell: SpellCoreData = null
 var max_health: float = 100.0
 var current_health: float = 100.0
 
+## 护盾
+var current_shield: float = 0.0
+var shield_duration: float = 0.0
+
 ## 输入状态
 var input_direction: Vector2 = Vector2.ZERO
 var mouse_position: Vector2 = Vector2.ZERO
@@ -54,7 +63,8 @@ var current_facing_direction: Vector2 = Vector2.RIGHT
 var stats = {
 	"total_damage_dealt": 0.0,
 	"total_hits": 0,
-	"spells_cast": 0
+	"spells_cast": 0,
+	"engravings_triggered": 0
 }
 
 func _ready() -> void:
@@ -71,8 +81,26 @@ func _ready() -> void:
 	if current_weapon == null:
 		current_weapon = WeaponData.create_unarmed()
 	
+	# 初始化刻录管理器
+	_initialize_engraving_manager()
+	
 	# 添加到玩家组
 	add_to_group("players")
+	add_to_group("allies")
+
+## 初始化刻录管理器
+func _initialize_engraving_manager() -> void:
+	# 如果场景中没有刻录管理器，创建一个
+	if engraving_manager == null:
+		engraving_manager = EngravingManager.new()
+		engraving_manager.name = "EngravingManager"
+		add_child(engraving_manager)
+	
+	# 初始化
+	engraving_manager.initialize(self)
+	
+	# 连接刻录信号
+	engraving_manager.engraving_triggered.connect(_on_engraving_triggered)
 
 func _input(event: InputEvent) -> void:
 	# 更新鼠标位置
@@ -93,6 +121,9 @@ func _process(delta: float) -> void:
 	
 	# 更新目标角度（鼠标位置）
 	_update_target_angle()
+	
+	# 更新护盾
+	_update_shield(delta)
 	
 	# 状态机帧更新
 	if state_machine != null:
@@ -131,6 +162,9 @@ func _update_input_direction() -> void:
 	if input_direction.length() > 1:
 		input_direction = input_direction.normalized()
 	
+	# 记录之前的飞行状态
+	was_flying = is_flying
+	
 	# 检测飞行输入
 	is_flying = Input.is_key_pressed(KEY_SPACE)
 
@@ -139,6 +173,13 @@ func _update_target_angle() -> void:
 	var direction_to_mouse = mouse_position - global_position
 	if direction_to_mouse.length_squared() > 1:
 		target_angle = direction_to_mouse.angle()
+
+## 更新护盾
+func _update_shield(delta: float) -> void:
+	if shield_duration > 0:
+		shield_duration -= delta
+		if shield_duration <= 0:
+			current_shield = 0
 
 ## 应用移动
 func _apply_movement(delta: float) -> void:
@@ -222,6 +263,10 @@ func rotate_toward(from: float, to: float, max_delta: float) -> float:
 func apply_attack_impulse(direction: Vector2, strength: float) -> void:
 	velocity += direction * strength
 
+## 施加通用冲量
+func apply_impulse(impulse: Vector2) -> void:
+	velocity += impulse
+
 ## 检查是否可以攻击（角度检查）
 func can_attack_at_angle() -> bool:
 	return movement_config.is_angle_valid_for_attack(torso_pivot.rotation, target_angle)
@@ -241,6 +286,11 @@ func get_target_angle() -> float:
 ## 设置武器
 func set_weapon(weapon: WeaponData) -> void:
 	current_weapon = weapon
+	
+	# 初始化武器刻录槽
+	if current_weapon != null and current_weapon.engraving_slots.is_empty():
+		current_weapon.initialize_engraving_slots()
+	
 	weapon_changed.emit(weapon)
 
 ## 设置法术
@@ -248,12 +298,40 @@ func set_spell(spell: SpellCoreData) -> void:
 	current_spell = spell
 
 ## 受到伤害
-func take_damage(damage: float) -> void:
-	current_health = max(0, current_health - damage)
+func take_damage(damage: float, source: Node2D = null) -> void:
+	var actual_damage = damage
+	
+	# 先扣护盾
+	if current_shield > 0:
+		var shield_absorb = min(current_shield, actual_damage)
+		current_shield -= shield_absorb
+		actual_damage -= shield_absorb
+	
+	# 再扣生命
+	if actual_damage > 0:
+		current_health = max(0, current_health - actual_damage)
+	
 	health_changed.emit(current_health, max_health)
+	took_damage.emit(damage, source)
 	
 	if current_health <= 0:
 		_on_death()
+
+## 治疗
+func heal(amount: float) -> float:
+	var old_health = current_health
+	current_health = min(max_health, current_health + amount)
+	var healed = current_health - old_health
+	
+	if healed > 0:
+		health_changed.emit(current_health, max_health)
+	
+	return healed
+
+## 应用护盾
+func apply_shield(amount: float, duration: float) -> void:
+	current_shield = max(current_shield, amount)
+	shield_duration = max(shield_duration, duration)
 
 ## 死亡处理
 func _on_death() -> void:
@@ -264,6 +342,33 @@ func _on_death() -> void:
 func _on_state_changed(_old_state: State, new_state: State) -> void:
 	state_changed.emit(new_state.name if new_state else "")
 
+## 刻录触发回调
+func _on_engraving_triggered(trigger_type: int, spell: SpellCoreData, source: String) -> void:
+	stats.engravings_triggered += 1
+	print("[刻录触发] 类型: %d, 法术: %s, 来源: %s" % [trigger_type, spell.spell_name, source])
+
+## 获取刻录管理器
+func get_engraving_manager() -> EngravingManager:
+	return engraving_manager
+
+## 获取肢体部件
+func get_body_parts() -> Array[BodyPartData]:
+	if engraving_manager != null:
+		return engraving_manager.get_body_parts()
+	return []
+
+## 刻录法术到肢体
+func engrave_to_body(part_type: int, slot_index: int, spell: SpellCoreData) -> bool:
+	if engraving_manager != null:
+		return engraving_manager.engrave_to_body_part(part_type, slot_index, spell)
+	return false
+
+## 刻录法术到武器
+func engrave_to_weapon(slot_index: int, spell: SpellCoreData) -> bool:
+	if engraving_manager != null:
+		return engraving_manager.engrave_to_weapon(slot_index, spell)
+	return false
+
 ## 获取统计数据
 func get_stats() -> Dictionary:
 	return stats.duplicate()
@@ -273,3 +378,4 @@ func reset_stats() -> void:
 	stats.total_damage_dealt = 0.0
 	stats.total_hits = 0
 	stats.spells_cast = 0
+	stats.engravings_triggered = 0

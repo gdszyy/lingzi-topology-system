@@ -54,6 +54,11 @@ enum GripType {
 @export var secondary_attacks: Array[AttackData] = [] # 右键攻击序列
 @export var combo_attacks: Array[AttackData] = []     # 组合攻击（同时按）
 
+## 刻录系统
+@export_group("Engraving")
+@export var engraving_slots: Array[EngravingSlot] = []  # 武器刻录槽
+@export var max_engraving_capacity: float = 100.0       # 最大刻录容量
+
 ## 获取基于重量的转身速度修正
 func get_turn_speed_modifier() -> float:
 	# 重量越大，转身越慢
@@ -94,6 +99,94 @@ func get_attacks_for_input(input_type: int) -> Array[AttackData]:
 		_:
 			return primary_attacks
 
+## 初始化刻录槽
+func initialize_engraving_slots(slot_count: int = 2) -> void:
+	engraving_slots.clear()
+	
+	# 根据武器类型设置默认槽位数和容量
+	var capacity = max_engraving_capacity
+	match weapon_type:
+		WeaponType.UNARMED:
+			slot_count = 0
+			capacity = 0
+		WeaponType.DAGGER:
+			slot_count = 1
+			capacity = 50.0
+		WeaponType.SWORD, WeaponType.DUAL_BLADE:
+			slot_count = 2
+			capacity = 80.0
+		WeaponType.GREATSWORD, WeaponType.SPEAR:
+			slot_count = 3
+			capacity = 120.0
+		WeaponType.STAFF:
+			slot_count = 4
+			capacity = 150.0
+	
+	for i in range(slot_count):
+		var slot = EngravingSlot.new()
+		slot.initialize(
+			"%s_slot_%d" % [weapon_name.to_lower().replace(" ", "_"), i],
+			"%s刻录槽%d" % [weapon_name, i + 1],
+			capacity / slot_count
+		)
+		# 武器槽位默认允许攻击相关触发器
+		slot.allowed_triggers = [
+			TriggerData.TriggerType.ON_WEAPON_HIT,
+			TriggerData.TriggerType.ON_ATTACK_START,
+			TriggerData.TriggerType.ON_ATTACK_ACTIVE,
+			TriggerData.TriggerType.ON_ATTACK_END,
+			TriggerData.TriggerType.ON_COMBO_HIT,
+			TriggerData.TriggerType.ON_CRITICAL_HIT,
+			TriggerData.TriggerType.ON_DEAL_DAMAGE,
+			TriggerData.TriggerType.ON_KILL_ENEMY
+		]
+		engraving_slots.append(slot)
+
+## 获取所有已刻录的法术
+func get_engraved_spells() -> Array[SpellCoreData]:
+	var spells: Array[SpellCoreData] = []
+	for slot in engraving_slots:
+		if slot.engraved_spell != null:
+			spells.append(slot.engraved_spell)
+	return spells
+
+## 获取可触发的规则
+func get_triggerable_rules(trigger_type: int) -> Array[TopologyRuleData]:
+	var rules: Array[TopologyRuleData] = []
+	for slot in engraving_slots:
+		var slot_rules = slot.trigger(trigger_type)
+		rules.append_array(slot_rules)
+	return rules
+
+## 更新所有槽位冷却
+func update_engraving_cooldowns(delta: float) -> void:
+	for slot in engraving_slots:
+		slot.update_cooldown(delta)
+
+## 刻录法术到指定槽位
+func engrave_spell_to_slot(slot_index: int, spell: SpellCoreData) -> bool:
+	if slot_index < 0 or slot_index >= engraving_slots.size():
+		return false
+	return engraving_slots[slot_index].engrave_spell(spell)
+
+## 移除指定槽位的法术
+func remove_spell_from_slot(slot_index: int) -> SpellCoreData:
+	if slot_index < 0 or slot_index >= engraving_slots.size():
+		return null
+	return engraving_slots[slot_index].remove_spell()
+
+## 获取刻录槽数量
+func get_engraving_slot_count() -> int:
+	return engraving_slots.size()
+
+## 获取已使用的刻录容量
+func get_used_engraving_capacity() -> float:
+	var used = 0.0
+	for slot in engraving_slots:
+		if slot.engraved_spell != null:
+			used += slot.engraved_spell.calculate_total_instability()
+	return used
+
 ## 创建默认徒手武器
 static func create_unarmed() -> WeaponData:
 	var weapon = WeaponData.new()
@@ -103,6 +196,7 @@ static func create_unarmed() -> WeaponData:
 	weapon.weight = 0.0
 	weapon.base_damage = 5.0
 	weapon.attack_range = 30.0
+	weapon.max_engraving_capacity = 0.0
 	
 	# 创建基础拳击攻击
 	var punch = AttackData.new()
