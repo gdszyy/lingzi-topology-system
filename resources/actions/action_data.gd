@@ -13,8 +13,10 @@ enum ActionType {
 	REFLECT,
 	CHAIN,
 	SUMMON,
-	ENERGY_RESTORE,  # 新增：能量恢复
-	CULTIVATION      # 新增：修炼（恢复能量上限）
+	ENERGY_RESTORE,   # 能量恢复
+	CULTIVATION,      # 修炼（恢复能量上限）
+	SPAWN_EXPLOSION,  # 生成爆炸
+	SPAWN_DAMAGE_ZONE # 生成伤害区域
 }
 
 @export var action_type: ActionType = ActionType.DAMAGE
@@ -47,6 +49,10 @@ func get_type_name() -> String:
 			return "能量恢复"
 		ActionType.CULTIVATION:
 			return "修炼"
+		ActionType.SPAWN_EXPLOSION:
+			return "生成爆炸"
+		ActionType.SPAWN_DAMAGE_ZONE:
+			return "生成伤害区域"
 	return "未知动作"
 
 func clone_deep() -> ActionData:
@@ -93,6 +99,10 @@ static func from_dict(data: Dictionary) -> ActionData:
 			action = EnergyRestoreActionData.from_dict(data)
 		ActionType.CULTIVATION:
 			action = CultivationActionData.from_dict(data)
+		ActionType.SPAWN_EXPLOSION:
+			action = SpawnExplosionActionData.from_dict(data)
+		ActionType.SPAWN_DAMAGE_ZONE:
+			action = SpawnDamageZoneActionData.from_dict(data)
 		_:
 			action = ActionData.new()
 			action.action_type = action_type_val

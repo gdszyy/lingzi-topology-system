@@ -368,7 +368,7 @@ static func print_comparison_table() -> void:
 	print("%-10s | %-6s | %-6s | %-6s | %-6s | %-6s | %-6s | %-6s" % [
 		"武器类型", "特质", "前摇", "消耗", "效果", "冷却", "容量", "槽位"
 	])
-	print("-" * 70)
+	print("-".repeat(70))
 	
 	for data in get_comparison_table():
 		var type_name = WeaponData.WeaponType.keys()[data.weapon_type]
