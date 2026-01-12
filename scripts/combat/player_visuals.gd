@@ -72,6 +72,11 @@ func _setup_body_animation_controller() -> void:
 	body_animation_controller.name = "BodyAnimationController"
 	add_child(body_animation_controller)
 	
+	## 【修复】先设置 CombatAnimator 引用，避免循环引用
+	if combat_animator != null:
+		body_animation_controller.set_combat_animator(combat_animator)
+		combat_animator.set_body_animation_controller(body_animation_controller)
+	
 	## 初始化控制器
 	body_animation_controller.initialize(
 		player,
@@ -84,10 +89,6 @@ func _setup_body_animation_controller() -> void:
 	
 	## 连接状态变化信号（可选，用于调试或其他用途）
 	body_animation_controller.animation_state_changed.connect(_on_body_animation_state_changed)
-	
-	## 【新增】让 CombatAnimator 知道 BodyAnimationController 的存在
-	if combat_animator != null:
-		combat_animator.set_body_animation_controller(body_animation_controller)
 
 func _setup_weapon_physics() -> void:
 	if weapon_physics != null:

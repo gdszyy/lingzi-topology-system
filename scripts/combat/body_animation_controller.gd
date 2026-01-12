@@ -24,6 +24,9 @@ var torso_pivot: Node2D = null
 var head_sprite: Sprite2D = null
 var legs_pivot: Node2D = null
 
+## 【修复】直接引用 CombatAnimator，避免循环引用
+var combat_animator: CombatAnimator = null
+
 ## 当前状态
 var current_state: AnimationState = AnimationState.IDLE
 var is_combat_animator_active: bool = false  ## CombatAnimator 是否正在播放攻击动画
@@ -32,35 +35,35 @@ var is_combat_animator_active: bool = false  ## CombatAnimator 是否正在播�
 var animation_cycle: float = 0.0
 var animation_speed: float = 10.0
 
-## 配置参数
+## 配置参数 - 【增强】增大动画幅度使效果更明显
 @export_group("Walk Animation")
-@export var walk_arm_swing_amplitude: float = 12.0      ## 行走手臂摆动幅度
-@export var walk_torso_bob_amplitude: float = 2.0       ## 行走躯干上下摆动幅度
-@export var walk_torso_sway_amplitude: float = 0.05     ## 行走躯干左右摇摆幅度（弧度）
-@export var walk_head_bob_amplitude: float = 1.0        ## 行走头部摆动幅度
+@export var walk_arm_swing_amplitude: float = 15.0      ## 行走手臂摆动幅度（增大）
+@export var walk_torso_bob_amplitude: float = 2.5       ## 行走躯干上下摆动幅度
+@export var walk_torso_sway_amplitude: float = 0.08     ## 行走躯干左右摇摆幅度（弧度）
+@export var walk_head_bob_amplitude: float = 1.5        ## 行走头部摆动幅度
 
 @export_group("Run Animation")
-@export var run_arm_swing_amplitude: float = 18.0       ## 奔跑手臂摆动幅度
-@export var run_torso_bob_amplitude: float = 3.0        ## 奔跑躯干上下摆动幅度
-@export var run_torso_lean_max: float = 0.15            ## 奔跑躯干前倾最大角度（弧度）
-@export var run_head_bob_amplitude: float = 1.5         ## 奔跑头部摆动幅度
+@export var run_arm_swing_amplitude: float = 22.0       ## 奔跑手臂摆动幅度（增大）
+@export var run_torso_bob_amplitude: float = 4.0        ## 奔跑躯干上下摆动幅度
+@export var run_torso_lean_max: float = 0.2             ## 奔跑躯干前倾最大角度（弧度）
+@export var run_head_bob_amplitude: float = 2.0         ## 奔跑头部摆动幅度
 
 @export_group("Flight Animation")
-@export var flight_arm_spread_angle: float = 0.8        ## 飞行手臂展开角度（弧度）
-@export var flight_arm_wave_amplitude: float = 8.0      ## 飞行手臂波动幅度
-@export var flight_arm_wave_speed: float = 3.0          ## 飞行手臂波动速度
-@export var flight_torso_lean_factor: float = 0.2       ## 飞行躯干倾斜因子
-@export var flight_torso_lean_max: float = 0.4          ## 飞行躯干最大倾斜角度（弧度）
-@export var flight_head_tilt_factor: float = 0.1        ## 飞行头部倾斜因子
+@export var flight_arm_spread_angle: float = 1.0        ## 飞行手臂展开角度（弧度，增大）
+@export var flight_arm_wave_amplitude: float = 10.0     ## 飞行手臂波动幅度（增大）
+@export var flight_arm_wave_speed: float = 4.0          ## 飞行手臂波动速度
+@export var flight_torso_lean_factor: float = 0.25      ## 飞行躯干倾斜因子
+@export var flight_torso_lean_max: float = 0.5          ## 飞行躯干最大倾斜角度（弧度）
+@export var flight_head_tilt_factor: float = 0.15       ## 飞行头部倾斜因子
 
 @export_group("Fast Flight Animation")
-@export var fast_flight_arm_back_angle: float = 1.2     ## 高速飞行手臂后掠角度
-@export var fast_flight_torso_lean: float = 0.5         ## 高速飞行躯干前倾角度
-@export var fast_flight_speed_threshold: float = 350.0  ## 高速飞行速度阈值
+@export var fast_flight_arm_back_angle: float = 1.5     ## 高速飞行手臂后掠角度（增大）
+@export var fast_flight_torso_lean: float = 0.6         ## 高速飞行躯干前倾角度
+@export var fast_flight_speed_threshold: float = 300.0  ## 高速飞行速度阈值（降低）
 
 @export_group("Transition")
-@export var state_transition_speed: float = 8.0         ## 状态过渡速度
-@export var arm_smoothing: float = 12.0                 ## 手臂平滑度
+@export var state_transition_speed: float = 10.0        ## 状态过渡速度（加快）
+@export var arm_smoothing: float = 15.0                 ## 手臂平滑度（加快）
 
 ## 肩膀位置
 var left_shoulder: Vector2 = Vector2(-12, 0)
@@ -87,6 +90,9 @@ var current_head_offset: Vector2 = Vector2.ZERO
 ## 速度相关
 var speed_factor: float = 0.0  ## 0-1，表示当前速度占最大速度的比例
 
+## 【新增】调试标志
+var _initialized: bool = false
+
 func _ready() -> void:
 	_initialize_positions()
 
@@ -105,6 +111,15 @@ func initialize(p_player: PlayerController, p_left_arm: ArmRig, p_right_arm: Arm
 		right_shoulder = right_arm.get_shoulder_position()
 	
 	_initialize_positions()
+	_initialized = true
+	
+	print("[BodyAnimationController] 初始化完成 - player: %s, left_arm: %s, right_arm: %s" % [
+		player != null, left_arm != null, right_arm != null
+	])
+
+## 【修复】设置 CombatAnimator 引用，避免通过 player.visuals 获取
+func set_combat_animator(animator: CombatAnimator) -> void:
+	combat_animator = animator
 
 func _initialize_positions() -> void:
 	target_left_hand_pos = left_shoulder + idle_left_hand_offset
@@ -113,10 +128,10 @@ func _initialize_positions() -> void:
 	current_right_hand_pos = target_right_hand_pos
 
 func _process(delta: float) -> void:
-	if player == null:
+	if not _initialized or player == null:
 		return
 	
-	## 检查是否在攻击状态
+	## 【修复】直接检查 combat_animator 而不是通过 player.visuals
 	_check_combat_animator_state()
 	
 	## 如果 CombatAnimator 正在控制，不更新移动/飞行动画
@@ -139,13 +154,7 @@ func _process(delta: float) -> void:
 	_apply_animation()
 
 func _check_combat_animator_state() -> void:
-	## 检查 CombatAnimator 是否正在播放攻击动画
-	var visuals = player.visuals as PlayerVisuals
-	if visuals == null:
-		is_combat_animator_active = false
-		return
-	
-	var combat_animator = visuals.get_combat_animator()
+	## 【修复】直接使用已设置的 combat_animator 引用
 	if combat_animator == null:
 		is_combat_animator_active = false
 		return
@@ -160,7 +169,11 @@ func _check_combat_animator_state() -> void:
 func _update_animation_state() -> void:
 	var old_state = current_state
 	var speed = player.velocity.length()
-	var max_speed = player.movement_config.max_speed_ground if not player.is_flying else player.movement_config.max_speed_flight
+	
+	## 【修复】安全获取 movement_config
+	var max_speed: float = 300.0
+	if player.movement_config != null:
+		max_speed = player.movement_config.max_speed_ground if not player.is_flying else player.movement_config.max_speed_flight
 	
 	## 计算速度因子
 	speed_factor = clamp(speed / max_speed, 0.0, 1.0)
@@ -170,7 +183,7 @@ func _update_animation_state() -> void:
 			current_state = AnimationState.FLYING_FAST
 		else:
 			current_state = AnimationState.FLYING
-	elif speed > 200:
+	elif speed > 150:  ## 【修改】降低奔跑阈值
 		current_state = AnimationState.RUNNING
 	elif speed > 10:
 		current_state = AnimationState.WALKING
@@ -179,15 +192,18 @@ func _update_animation_state() -> void:
 	
 	if old_state != current_state:
 		animation_state_changed.emit(current_state)
+		print("[BodyAnimationController] 状态变化: %s -> %s (速度: %.1f)" % [
+			AnimationState.keys()[old_state], AnimationState.keys()[current_state], speed
+		])
 
 func _update_animation_cycle(delta: float) -> void:
 	var speed = player.velocity.length()
 	
 	match current_state:
 		AnimationState.WALKING:
-			animation_cycle += delta * animation_speed * (speed / 200.0)
+			animation_cycle += delta * animation_speed * max(speed / 150.0, 0.5)
 		AnimationState.RUNNING:
-			animation_cycle += delta * animation_speed * 1.5 * (speed / 300.0)
+			animation_cycle += delta * animation_speed * 1.5 * max(speed / 250.0, 0.5)
 		AnimationState.FLYING, AnimationState.FLYING_FAST:
 			animation_cycle += delta * flight_arm_wave_speed
 		AnimationState.IDLE:
@@ -213,7 +229,7 @@ func _calculate_animation_targets() -> void:
 
 func _calculate_idle_animation() -> void:
 	## 待机状态：轻微的呼吸动画
-	var breath_offset = sin(animation_cycle) * 0.5
+	var breath_offset = sin(animation_cycle) * 1.0
 	
 	target_left_hand_pos = left_shoulder + idle_left_hand_offset + Vector2(0, breath_offset)
 	target_right_hand_pos = right_shoulder + idle_right_hand_offset + Vector2(0, breath_offset)
@@ -225,43 +241,44 @@ func _calculate_idle_animation() -> void:
 func _calculate_walk_animation() -> void:
 	## 行走动画：手臂交替摆动
 	var swing = sin(animation_cycle)
-	var swing_offset = cos(animation_cycle)
 	
-	## 手臂摆动（左右手相位相反）
-	var arm_swing = swing * walk_arm_swing_amplitude * speed_factor
+	## 【增强】手臂摆动幅度与速度相关，但保持最小幅度
+	var effective_factor = max(speed_factor, 0.5)
+	var arm_swing = swing * walk_arm_swing_amplitude * effective_factor
 	
-	## 左手向前时右手向后
-	target_left_hand_pos = left_shoulder + idle_left_hand_offset + Vector2(arm_swing * 0.3, -arm_swing)
-	target_right_hand_pos = right_shoulder + idle_right_hand_offset + Vector2(-arm_swing * 0.3, arm_swing)
+	## 左手向前时右手向后（交替摆动）
+	target_left_hand_pos = left_shoulder + idle_left_hand_offset + Vector2(arm_swing * 0.4, -arm_swing)
+	target_right_hand_pos = right_shoulder + idle_right_hand_offset + Vector2(-arm_swing * 0.4, arm_swing)
 	
 	## 躯干上下摆动和轻微左右摇摆
-	var torso_bob = abs(sin(animation_cycle * 2)) * walk_torso_bob_amplitude * speed_factor
-	var torso_sway = swing * walk_torso_sway_amplitude * speed_factor
+	var torso_bob = abs(sin(animation_cycle * 2)) * walk_torso_bob_amplitude * effective_factor
+	var torso_sway = swing * walk_torso_sway_amplitude * effective_factor
 	
 	target_torso_rotation = torso_sway
 	target_torso_offset = Vector2(0, -torso_bob)
 	
 	## 头部轻微摆动
-	target_head_offset = Vector2(0, -torso_bob * 0.5 + sin(animation_cycle) * walk_head_bob_amplitude * speed_factor * 0.3)
+	target_head_offset = Vector2(0, -torso_bob * 0.5 + sin(animation_cycle) * walk_head_bob_amplitude * effective_factor * 0.3)
 
 func _calculate_run_animation() -> void:
 	## 奔跑动画：更大幅度的手臂摆动和躯干前倾
 	var swing = sin(animation_cycle)
 	
-	## 手臂大幅摆动
-	var arm_swing = swing * run_arm_swing_amplitude * speed_factor
+	## 【增强】手臂大幅摆动
+	var effective_factor = max(speed_factor, 0.6)
+	var arm_swing = swing * run_arm_swing_amplitude * effective_factor
 	
 	## 奔跑时手臂弯曲更多，位置更靠近身体
-	target_left_hand_pos = left_shoulder + Vector2(-3, 12) + Vector2(arm_swing * 0.4, -arm_swing)
-	target_right_hand_pos = right_shoulder + Vector2(3, 12) + Vector2(-arm_swing * 0.4, arm_swing)
+	target_left_hand_pos = left_shoulder + Vector2(-3, 10) + Vector2(arm_swing * 0.5, -arm_swing)
+	target_right_hand_pos = right_shoulder + Vector2(3, 10) + Vector2(-arm_swing * 0.5, arm_swing)
 	
 	## 躯干前倾（根据移动方向）
-	var move_dir = player.velocity.normalized()
+	var move_dir = player.velocity.normalized() if player.velocity.length() > 10 else Vector2.ZERO
 	var face_dir = player.current_facing_direction
-	var forward_factor = face_dir.dot(move_dir)
+	var forward_factor = face_dir.dot(move_dir) if move_dir.length() > 0 else 0.0
 	
-	var torso_lean = run_torso_lean_max * speed_factor * max(forward_factor, 0.3)
-	var torso_bob = abs(sin(animation_cycle * 2)) * run_torso_bob_amplitude * speed_factor
+	var torso_lean = run_torso_lean_max * effective_factor * max(forward_factor, 0.3)
+	var torso_bob = abs(sin(animation_cycle * 2)) * run_torso_bob_amplitude * effective_factor
 	
 	target_torso_rotation = torso_lean * 0.3  ## 轻微的侧向倾斜
 	target_torso_offset = Vector2(torso_lean * 5, -torso_bob)
@@ -274,33 +291,34 @@ func _calculate_flight_animation() -> void:
 	var wave = sin(animation_cycle)
 	var wave_offset = cos(animation_cycle * 0.7)
 	
-	## 计算飞行方向相关的倾斜
+	## 【增强】计算飞行方向相关的倾斜
 	var velocity_dir = player.velocity.normalized() if player.velocity.length() > 10 else Vector2.ZERO
 	var face_dir = player.current_facing_direction
 	
-	## 手臂向两侧展开，带有波动效果
-	var arm_spread = flight_arm_spread_angle * speed_factor
-	var arm_wave = wave * flight_arm_wave_amplitude * speed_factor
+	## 【增强】手臂向两侧展开，带有波动效果
+	var effective_factor = max(speed_factor, 0.4)
+	var arm_spread = flight_arm_spread_angle * effective_factor
+	var arm_wave = wave * flight_arm_wave_amplitude * effective_factor
 	
 	## 左臂向左后方展开
-	var left_arm_angle = -arm_spread - 0.3
-	var left_arm_length = 20.0 + arm_wave
+	var left_arm_angle = -arm_spread - 0.4
+	var left_arm_length = 22.0 + arm_wave
 	target_left_hand_pos = left_shoulder + Vector2(left_arm_length, 0).rotated(left_arm_angle)
 	
 	## 右臂向右后方展开
-	var right_arm_angle = arm_spread + 0.3
-	var right_arm_length = 20.0 - arm_wave  ## 相位相反
+	var right_arm_angle = arm_spread + 0.4
+	var right_arm_length = 22.0 - arm_wave  ## 相位相反
 	target_right_hand_pos = right_shoulder + Vector2(right_arm_length, 0).rotated(right_arm_angle)
 	
 	## 躯干根据飞行方向倾斜
-	var lateral_velocity = velocity_dir.rotated(-face_dir.angle())
+	var lateral_velocity = velocity_dir.rotated(-face_dir.angle()) if velocity_dir.length() > 0 else Vector2.ZERO
 	var torso_lean = lateral_velocity.x * flight_torso_lean_factor * flight_torso_lean_max
 	
 	target_torso_rotation = clamp(torso_lean, -flight_torso_lean_max, flight_torso_lean_max)
-	target_torso_offset = Vector2(0, wave_offset * 1.5 * speed_factor)
+	target_torso_offset = Vector2(0, wave_offset * 2.0 * effective_factor)
 	
 	## 头部轻微倾斜
-	target_head_offset = Vector2(0, wave_offset * 0.5)
+	target_head_offset = Vector2(0, wave_offset * 0.8)
 
 func _calculate_fast_flight_animation() -> void:
 	## 高速飞行动画：手臂向后掠，身体大幅前倾
@@ -310,29 +328,28 @@ func _calculate_fast_flight_animation() -> void:
 	var velocity_dir = player.velocity.normalized() if player.velocity.length() > 10 else player.current_facing_direction
 	var face_dir = player.current_facing_direction
 	
-	## 手臂向后掠，贴近身体
-	var arm_back_angle = fast_flight_arm_back_angle
+	## 【增强】手臂向后掠，贴近身体
 	var arm_wave = wave * flight_arm_wave_amplitude * 0.5  ## 高速时波动减小
 	
 	## 左臂向后
-	target_left_hand_pos = left_shoulder + Vector2(-8, 15 + arm_wave).rotated(-0.2)
+	target_left_hand_pos = left_shoulder + Vector2(-10, 18 + arm_wave).rotated(-0.3)
 	
 	## 右臂向后
-	target_right_hand_pos = right_shoulder + Vector2(8, 15 - arm_wave).rotated(0.2)
+	target_right_hand_pos = right_shoulder + Vector2(10, 18 - arm_wave).rotated(0.3)
 	
 	## 躯干大幅前倾
-	var forward_factor = face_dir.dot(velocity_dir)
+	var forward_factor = face_dir.dot(velocity_dir) if velocity_dir.length() > 0 else 0.5
 	var torso_lean = fast_flight_torso_lean * max(forward_factor, 0.5)
 	
 	## 侧向速度导致的倾斜
-	var lateral_velocity = velocity_dir.rotated(-face_dir.angle())
-	var lateral_lean = lateral_velocity.x * 0.3
+	var lateral_velocity = velocity_dir.rotated(-face_dir.angle()) if velocity_dir.length() > 0 else Vector2.ZERO
+	var lateral_lean = lateral_velocity.x * 0.4
 	
-	target_torso_rotation = clamp(lateral_lean, -0.4, 0.4)
-	target_torso_offset = Vector2(torso_lean * 8, wave * 1.0)
+	target_torso_rotation = clamp(lateral_lean, -0.5, 0.5)
+	target_torso_offset = Vector2(torso_lean * 10, wave * 1.5)
 	
 	## 头部保持向前
-	target_head_offset = Vector2(torso_lean * 2, 0)
+	target_head_offset = Vector2(torso_lean * 3, 0)
 
 func _apply_smooth_transition(delta: float) -> void:
 	var lerp_factor = state_transition_speed * delta
@@ -352,8 +369,9 @@ func _apply_animation() -> void:
 	if right_arm and not is_combat_animator_active:
 		right_arm.set_hand_target(current_right_hand_pos)
 	
-	## 应用躯干动画（注意：这里只应用额外的偏移，不覆盖玩家控制的旋转）
-	## 躯干的主旋转由 PlayerController 控制，这里只添加动画效果
+	## 【新增】应用躯干偏移动画
+	if torso_pivot:
+		torso_pivot.position = current_torso_offset
 	
 	## 应用头部动画
 	if head_sprite:
