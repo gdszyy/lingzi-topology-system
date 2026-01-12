@@ -5,10 +5,10 @@ signal spell_engraved(target_type: String, target_index: int, slot_index: int, s
 signal spell_removed(target_type: String, target_index: int, slot_index: int)
 signal panel_closed
 
-@onready var body_parts_container: VBoxContainer = $MainContainer/LeftPanel/BodyPartsContainer
-@onready var weapon_slots_container: VBoxContainer = $MainContainer/LeftPanel/WeaponSlotsContainer
-@onready var spell_library_list: ItemList = $MainContainer/RightPanel/SpellLibraryList
-@onready var spell_info_label: RichTextLabel = $MainContainer/RightPanel/SpellInfoLabel
+@onready var body_parts_container: VBoxContainer = $MainContainer/ContentContainer/LeftPanel/BodyPartsScroll/BodyPartsContainer
+@onready var weapon_slots_container: VBoxContainer = $MainContainer/ContentContainer/LeftPanel/WeaponSlotsContainer
+@onready var spell_library_list: ItemList = $MainContainer/ContentContainer/RightPanel/SpellLibraryList
+@onready var spell_info_label: RichTextLabel = $MainContainer/ContentContainer/RightPanel/SpellInfoLabel
 @onready var close_button: Button = $MainContainer/TopBar/CloseButton
 @onready var clear_all_button: Button = $MainContainer/TopBar/ClearAllButton
 
