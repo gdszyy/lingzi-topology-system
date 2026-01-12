@@ -2,6 +2,7 @@ class_name CombatAnimator extends Node
 ## 战斗动画控制器
 ## 根据攻击动作驱动手部轨迹
 ## 管理武器旋转和手臂 IK
+## 【修复】确保武器精灵旋转与手臂动画同步
 
 signal animation_started(attack: AttackData)
 signal animation_finished(attack: AttackData)
@@ -30,6 +31,9 @@ var idle_right_hand_offset: Vector2 = Vector2(5, 18)
 ## 肩膀位置
 var left_shoulder: Vector2 = Vector2(-12, 0)
 var right_shoulder: Vector2 = Vector2(12, 0)
+
+## 武器基础旋转偏移（使武器纹理方向正确）
+const WEAPON_BASE_ROTATION: float = -PI / 2
 
 func _ready() -> void:
 	pass
@@ -132,54 +136,64 @@ func _update_animation(delta: float) -> void:
 	if old_phase == 0 and animation_phase == 1:
 		hit_frame_reached.emit(current_attack)
 	
-	## 更新手部位置
-	_update_hand_positions_for_attack()
-	
-	## 更新武器旋转
-	_update_weapon_rotation()
+	## 【修复】统一更新手部位置和武器旋转
+	_update_attack_visuals()
 	
 	## 检查动画结束
 	if animation_progress >= 1.0:
 		_finish_animation()
 
-func _update_hand_positions_for_attack() -> void:
+## 【修复】统一的攻击视觉更新方法
+## 同时更新手部IK目标和武器精灵旋转
+func _update_attack_visuals() -> void:
 	if current_attack == null:
 		return
 	
-	## 根据攻击类型和进度计算手的位置
 	var attack_type = current_attack.attack_type
 	
 	match attack_type:
 		AttackData.AttackType.SLASH, AttackData.AttackType.REVERSE_SLASH:
-			_update_slash_hand_positions()
+			_update_slash_visuals()
 		AttackData.AttackType.THRUST:
-			_update_thrust_hand_positions()
+			_update_thrust_visuals()
 		AttackData.AttackType.SMASH:
-			_update_smash_hand_positions()
+			_update_smash_visuals()
 		AttackData.AttackType.SWEEP:
-			_update_sweep_hand_positions()
+			_update_sweep_visuals()
+		AttackData.AttackType.SPIN:
+			_update_spin_visuals()
 		_:
-			_update_slash_hand_positions()
+			_update_slash_visuals()
 
-func _update_slash_hand_positions() -> void:
-	## 挥砍攻击的手部轨迹
-	var swing_angle = current_attack.get_swing_angle_at_progress(_get_swing_progress())
-	var swing_rad = deg_to_rad(swing_angle)
+## 【修复】挥砍攻击的视觉更新
+func _update_slash_visuals() -> void:
+	var swing_progress = _get_swing_progress()
+	var swing_angle_deg = current_attack.get_swing_angle_at_progress(swing_progress)
+	var swing_angle_rad = deg_to_rad(swing_angle_deg)
 	
 	## 手的位置跟随武器挥舞
 	var swing_radius = 25.0
-	var hand_pos = right_shoulder + Vector2(swing_radius, 0).rotated(swing_rad)
+	var hand_pos = right_shoulder + Vector2(swing_radius, 0).rotated(swing_angle_rad)
+	
+	## 手的旋转跟随挥舞角度
+	var hand_rotation = swing_angle_rad
 	
 	if right_arm:
-		right_arm.set_hand_target(hand_pos, swing_rad)
+		right_arm.set_hand_target(hand_pos, hand_rotation)
+		## 【关键修复】同步更新武器精灵的旋转
+		right_arm.set_weapon_rotation(WEAPON_BASE_ROTATION)
 	
 	## 双手武器时，左手也跟随
 	if current_weapon and current_weapon.is_two_handed() and left_arm:
-		var off_hand_pos = hand_pos + off_hand_grip_offset.rotated(swing_rad)
-		left_arm.set_hand_target(off_hand_pos, swing_rad)
+		var off_hand_pos = hand_pos + off_hand_grip_offset.rotated(swing_angle_rad)
+		left_arm.set_hand_target(off_hand_pos, hand_rotation)
+	
+	## 同时更新 WeaponPhysics（保持兼容性）
+	if weapon_physics:
+		weapon_physics.set_target(Vector2.ZERO, swing_angle_rad)
 
-func _update_thrust_hand_positions() -> void:
-	## 刺击攻击的手部轨迹
+## 【修复】刺击攻击的视觉更新
+func _update_thrust_visuals() -> void:
 	var thrust_progress = _get_swing_progress()
 	
 	## 刺击轨迹：后拉 -> 前刺 -> 收回
@@ -196,39 +210,78 @@ func _update_thrust_hand_positions() -> void:
 	
 	var hand_pos = right_shoulder + Vector2(thrust_distance, 0)
 	
+	## 刺击时手部保持水平方向
+	var hand_rotation = 0.0
+	
 	if right_arm:
-		right_arm.set_hand_target(hand_pos, 0)
+		right_arm.set_hand_target(hand_pos, hand_rotation)
+		## 【关键修复】刺击时武器指向前方
+		right_arm.set_weapon_rotation(WEAPON_BASE_ROTATION)
 	
 	if current_weapon and current_weapon.is_two_handed() and left_arm:
 		var off_hand_pos = hand_pos + Vector2(-15, 0)
-		left_arm.set_hand_target(off_hand_pos, 0)
+		left_arm.set_hand_target(off_hand_pos, hand_rotation)
+	
+	## 同时更新 WeaponPhysics
+	if weapon_physics:
+		weapon_physics.set_target(Vector2.ZERO, 0)
 
-func _update_smash_hand_positions() -> void:
-	## 重击攻击的手部轨迹
+## 【修复】重击攻击的视觉更新
+func _update_smash_visuals() -> void:
 	var smash_progress = _get_swing_progress()
 	
 	## 重击轨迹：举起 -> 砸下
-	var angle: float
+	var angle_deg: float
 	if smash_progress < 0.5:
 		## 举起
-		angle = lerp(0.0, -90.0, smash_progress / 0.5)
+		angle_deg = lerp(0.0, -90.0, smash_progress / 0.5)
 	else:
 		## 砸下
-		angle = lerp(-90.0, 30.0, (smash_progress - 0.5) / 0.5)
+		angle_deg = lerp(-90.0, 30.0, (smash_progress - 0.5) / 0.5)
 	
-	var angle_rad = deg_to_rad(angle)
+	var angle_rad = deg_to_rad(angle_deg)
 	var hand_pos = right_shoulder + Vector2(20, 0).rotated(angle_rad)
+	var hand_rotation = angle_rad
 	
 	if right_arm:
-		right_arm.set_hand_target(hand_pos, angle_rad)
+		right_arm.set_hand_target(hand_pos, hand_rotation)
+		## 【关键修复】同步更新武器精灵的旋转
+		right_arm.set_weapon_rotation(WEAPON_BASE_ROTATION)
 	
 	if current_weapon and current_weapon.is_two_handed() and left_arm:
 		var off_hand_pos = hand_pos + off_hand_grip_offset.rotated(angle_rad)
-		left_arm.set_hand_target(off_hand_pos, angle_rad)
+		left_arm.set_hand_target(off_hand_pos, hand_rotation)
+	
+	## 同时更新 WeaponPhysics
+	if weapon_physics:
+		weapon_physics.set_target(Vector2.ZERO, angle_rad)
 
-func _update_sweep_hand_positions() -> void:
-	## 横扫攻击的手部轨迹（类似挥砍但范围更大）
-	_update_slash_hand_positions()
+## 【修复】横扫攻击的视觉更新
+func _update_sweep_visuals() -> void:
+	## 横扫类似挥砍但范围更大
+	_update_slash_visuals()
+
+## 【新增】旋转攻击的视觉更新
+func _update_spin_visuals() -> void:
+	var spin_progress = _get_swing_progress()
+	var swing_angle_deg = current_attack.get_swing_angle_at_progress(spin_progress)
+	var swing_angle_rad = deg_to_rad(swing_angle_deg)
+	
+	## 旋转攻击时手臂绕身体旋转
+	var spin_radius = 20.0
+	var hand_pos = Vector2(spin_radius, 0).rotated(swing_angle_rad)
+	var hand_rotation = swing_angle_rad
+	
+	if right_arm:
+		right_arm.set_hand_target(hand_pos, hand_rotation)
+		right_arm.set_weapon_rotation(WEAPON_BASE_ROTATION)
+	
+	if current_weapon and current_weapon.is_two_handed() and left_arm:
+		var off_hand_pos = hand_pos + off_hand_grip_offset.rotated(swing_angle_rad)
+		left_arm.set_hand_target(off_hand_pos, hand_rotation)
+	
+	if weapon_physics:
+		weapon_physics.set_target(Vector2.ZERO, swing_angle_rad)
 
 func _get_swing_progress() -> float:
 	## 获取挥舞进度（只在 windup 和 active 阶段）
@@ -243,13 +296,6 @@ func _get_swing_progress() -> float:
 		return 1.0
 	
 	return animation_progress / swing_ratio
-
-func _update_weapon_rotation() -> void:
-	if weapon_physics == null or current_attack == null:
-		return
-	
-	var swing_angle = current_attack.get_swing_angle_at_progress(_get_swing_progress())
-	weapon_physics.set_target(Vector2.ZERO, deg_to_rad(swing_angle))
 
 func _finish_animation() -> void:
 	var finished_attack = current_attack

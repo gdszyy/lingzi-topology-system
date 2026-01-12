@@ -1,6 +1,7 @@
 class_name PlayerVisuals extends Node2D
 ## 玩家视觉系统
 ## 管理角色的视觉渲染，包括躯干、头部、手臂和武器
+## 【修复】移除冗余的武器挥舞逻辑，统一由 CombatAnimator 驱动
 
 @onready var legs_pivot: Node2D = $LegsPivot
 @onready var legs_sprite: Sprite2D = $LegsPivot/LegsSprite
@@ -22,14 +23,6 @@ var player: PlayerController = null
 var is_walking: bool = false
 var walk_cycle: float = 0.0
 var walk_speed: float = 10.0
-
-## 武器挥舞状态（现在由 CombatAnimator 驱动）
-var is_swinging: bool = false
-var swing_progress: float = 0.0
-var swing_start_angle: float = 0.0
-var swing_end_angle: float = 0.0
-var swing_duration: float = 0.0
-var swing_curve: Curve = null
 
 func _ready() -> void:
 	player = get_parent() as PlayerController
@@ -95,7 +88,9 @@ func _on_weapon_position_changed(_pos: Vector2, _rot: float) -> void:
 	pass
 
 func _on_attack_animation_finished(_attack: AttackData) -> void:
-	is_swinging = false
+	## 【修复】动画结束后重置武器物理状态
+	if weapon_physics != null:
+		weapon_physics.set_to_rest()
 
 func _on_hit_frame_reached(_attack: AttackData) -> void:
 	## 可以在这里触发命中检测
@@ -103,7 +98,6 @@ func _on_hit_frame_reached(_attack: AttackData) -> void:
 
 func _process(delta: float) -> void:
 	_update_walk_animation(delta)
-	_update_weapon_swing_physics(delta)
 
 func _setup_default_visuals() -> void:
 	_create_placeholder_sprites()
@@ -177,38 +171,6 @@ func _update_walk_animation(delta: float) -> void:
 		torso_pivot.position.y = lerp(torso_pivot.position.y, 0.0, delta * 10)
 		legs_pivot.scale.y = lerp(legs_pivot.scale.y, 1.0, delta * 10)
 
-## 使用物理系统驱动武器挥舞（保留兼容性）
-func _update_weapon_swing_physics(delta: float) -> void:
-	if not is_swinging or weapon_physics == null:
-		return
-
-	swing_progress += delta / swing_duration
-
-	if swing_progress >= 1.0:
-		is_swinging = false
-		swing_progress = 1.0
-		weapon_physics.set_to_rest()
-		return
-
-	var curve_value = swing_progress
-	if swing_curve != null:
-		curve_value = swing_curve.sample(swing_progress)
-	
-	var target_angle = lerp(swing_start_angle, swing_end_angle, curve_value)
-	weapon_physics.set_target(Vector2.ZERO, deg_to_rad(target_angle))
-
-## 开始武器挥舞（使用物理系统）
-func start_weapon_swing(start_angle: float, end_angle: float, duration: float, curve: Curve = null) -> void:
-	is_swinging = true
-	swing_progress = 0.0
-	swing_start_angle = start_angle
-	swing_end_angle = end_angle
-	swing_duration = max(0.01, duration)
-	swing_curve = curve
-	
-	if weapon_physics != null:
-		weapon_physics.set_target(Vector2.ZERO, deg_to_rad(start_angle))
-
 ## 开始攻击动作的武器回正阶段
 func start_weapon_repositioning(_target_position: Vector2, target_rotation: float) -> void:
 	if weapon_physics != null:
@@ -228,7 +190,6 @@ func get_weapon_settle_time() -> float:
 
 ## 重置武器位置（立即跳转）
 func reset_weapon_position() -> void:
-	is_swinging = false
 	if weapon_physics != null:
 		weapon_physics.snap_to_rest()
 	else:
@@ -310,21 +271,14 @@ func play_hit_effect() -> void:
 	tween.tween_property(self, "modulate", Color.RED, 0.05)
 	tween.tween_property(self, "modulate", Color.WHITE, 0.1)
 
+## 【修复】简化攻击效果播放，完全由 CombatAnimator 驱动
 func play_attack_effect(attack: AttackData) -> void:
 	if attack == null:
 		return
 	
-	## 使用新的战斗动画系统
+	## 使用战斗动画系统驱动攻击动画
 	if combat_animator != null:
 		combat_animator.play_attack(attack)
-	
-	## 同时启动武器物理挥舞（保持兼容性）
-	start_weapon_swing(
-		attack.swing_start_angle,
-		attack.swing_end_angle,
-		attack.windup_time + attack.active_time,
-		attack.swing_curve
-	)
 
 ## 施加武器冲量（已禁用，保留接口兼容）
 func apply_weapon_impulse(_impulse: Vector2) -> void:

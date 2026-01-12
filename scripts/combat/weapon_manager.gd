@@ -1,4 +1,7 @@
 class_name WeaponManager extends Node
+## 武器管理器
+## 负责管理武器数据和库存
+## 【修复】移除冗余的视觉更新逻辑，渲染由 ArmRig 统一处理
 
 signal weapon_equipped(weapon: WeaponData)
 signal weapon_unequipped(weapon: WeaponData)
@@ -13,15 +16,8 @@ var weapon_inventory: Array[WeaponData] = []
 
 var current_weapon_index: int = 0
 
-var main_hand_sprite: Sprite2D = null
-var off_hand_sprite: Sprite2D = null
-
 func _ready() -> void:
 	player = get_parent() as PlayerController
-
-	if player != null and player.weapon_rig != null:
-		main_hand_sprite = player.weapon_rig.get_node_or_null("MainHandWeapon")
-		off_hand_sprite = player.weapon_rig.get_node_or_null("OffHandWeapon")
 
 func initialize(_player: PlayerController) -> void:
 	player = _player
@@ -48,7 +44,8 @@ func equip_weapon(weapon: WeaponData) -> void:
 	if player != null:
 		player.current_weapon = weapon
 
-	_update_weapon_visuals()
+	## 【修复】移除 _update_weapon_visuals() 调用
+	## 武器视觉由 PlayerVisuals 通过 weapon_changed 信号处理
 
 	if old_weapon != weapon:
 		weapon_switched.emit(old_weapon, weapon)
@@ -104,25 +101,6 @@ func remove_weapon_from_inventory(weapon: WeaponData) -> void:
 				equip_weapon(weapon_inventory[current_weapon_index])
 			else:
 				unequip_weapon()
-
-func _update_weapon_visuals() -> void:
-	if main_hand_sprite != null:
-		if main_hand_weapon != null and main_hand_weapon.weapon_texture != null:
-			main_hand_sprite.texture = main_hand_weapon.weapon_texture
-			main_hand_sprite.offset = main_hand_weapon.weapon_offset
-			main_hand_sprite.scale = main_hand_weapon.weapon_scale
-			main_hand_sprite.visible = true
-		else:
-			main_hand_sprite.visible = false
-
-	if off_hand_sprite != null:
-		if off_hand_weapon != null and off_hand_weapon.weapon_texture != null:
-			off_hand_sprite.texture = off_hand_weapon.weapon_texture
-			off_hand_sprite.offset = off_hand_weapon.weapon_offset
-			off_hand_sprite.scale = off_hand_weapon.weapon_scale
-			off_hand_sprite.visible = true
-		else:
-			off_hand_sprite.visible = false
 
 func _get_or_create_unarmed() -> WeaponData:
 	for weapon in weapon_inventory:
