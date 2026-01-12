@@ -333,6 +333,9 @@ func _execute_rule_actions(rule: TopologyRuleData, context: Dictionary, slot: En
 			action_executor.execute_action(action, modified_context)
 			action_executed.emit(action, modified_context)
 
+func get_body_parts() -> Array[BodyPartData]:
+	return body_parts
+
 func get_body_part(type: int) -> BodyPartData:
 	for part in body_parts:
 		if part.part_type == type:

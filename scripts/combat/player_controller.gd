@@ -484,19 +484,19 @@ func get_engraving_manager() -> EngravingManager:
 	return engraving_manager
 
 func get_body_parts() -> Array[BodyPartData]:
-	if engraving_manager != null:
+	if engraving_manager != null and engraving_manager.has_method("get_body_parts"):
 		return engraving_manager.get_body_parts()
 	return []
 
 ## 获取特定肢体
 func get_body_part(part_type: int) -> BodyPartData:
-	if engraving_manager != null:
+	if engraving_manager != null and engraving_manager.has_method("get_body_part"):
 		return engraving_manager.get_body_part(part_type)
 	return null
 
 ## 获取肢体状态摘要
 func get_body_parts_summary() -> String:
-	if engraving_manager != null:
+	if engraving_manager != null and engraving_manager.has_method("get_body_parts_summary"):
 		return engraving_manager.get_body_parts_summary()
 	return ""
 
