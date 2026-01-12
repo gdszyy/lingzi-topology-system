@@ -24,6 +24,19 @@ var swing_duration: float = 0.0
 func _ready() -> void:
 	player = get_parent() as PlayerController
 	_setup_default_visuals()
+	_connect_player_signals()
+	_initialize_weapon_appearance()
+
+func _connect_player_signals() -> void:
+	if player != null:
+		player.weapon_changed.connect(_on_weapon_changed)
+
+func _initialize_weapon_appearance() -> void:
+	if player != null and player.current_weapon != null:
+		update_weapon_appearance(player.current_weapon)
+
+func _on_weapon_changed(weapon: WeaponData) -> void:
+	update_weapon_appearance(weapon)
 
 func _process(delta: float) -> void:
 	_update_walk_animation(delta)
