@@ -2,14 +2,20 @@ extends Area2D
 class_name Enemy
 
 ## 敌人单位
-## 集成了新的能量系统，替代传统的血量系统
+## 集成了新的能量系统和二维体素战斗系统
+## 支持肢体目标伤害和法术失效机制
 
 signal enemy_died(enemy: Enemy)
 signal damage_taken(amount: float)
 signal energy_cap_changed(current_cap: float, max_cap: float)
+signal body_part_damaged(part: BodyPartData, damage: float)
+signal body_part_destroyed(part: BodyPartData)
 
 ## 能量系统配置
 @export var energy_system: EnergySystemData
+
+## 是否启用二维体素战斗系统
+@export var use_voxel_system: bool = true
 
 ## 移动速度
 @export var move_speed: float = 0.0
@@ -46,6 +52,12 @@ var move_direction: Vector2 = Vector2.RIGHT
 var target_position: Vector2 = Vector2.ZERO
 var zigzag_offset: float = 0.0
 
+## 二维体素战斗系统：敌人肢体
+var body_parts: Array[BodyPartData] = []
+
+## 移动速度惩罚（受肢体损伤影响）
+var movement_penalty: float = 1.0
+
 @onready var health_bar: ProgressBar = $HealthBar
 @onready var sprite: Polygon2D = $Visual
 
@@ -63,6 +75,10 @@ func _ready():
 	energy_system.energy_cap_changed.connect(_on_energy_cap_changed)
 	energy_system.depleted.connect(_on_energy_depleted)
 	
+	# 初始化二维体素系统
+	if use_voxel_system:
+		_initialize_body_parts()
+	
 	start_position = global_position
 	_update_health_bar()
 
@@ -70,6 +86,58 @@ func _ready():
 		move_direction = Vector2(randf_range(-1, 1), randf_range(-1, 1)).normalized()
 
 	zigzag_offset = randf() * TAU
+
+## 初始化敌人肢体（简化版，只有核心部位）
+func _initialize_body_parts() -> void:
+	body_parts.clear()
+	
+	# 敌人使用简化的肢体系统
+	var torso = BodyPartData.new()
+	torso.initialize(BodyPartData.PartType.TORSO, 0, 0.0)
+	torso.max_health = energy_system.max_energy_cap * 0.4
+	torso.current_health = torso.max_health
+	torso.core_damage_ratio = 0.5
+	torso.is_vital = true
+	torso.destroyed.connect(_on_body_part_destroyed)
+	torso.damage_taken.connect(_on_body_part_damage_taken.bind(torso))
+	body_parts.append(torso)
+	
+	var head = BodyPartData.new()
+	head.initialize(BodyPartData.PartType.HEAD, 0, 0.0)
+	head.max_health = energy_system.max_energy_cap * 0.2
+	head.current_health = head.max_health
+	head.core_damage_ratio = 0.8  # 头部伤害传递更多
+	head.is_vital = true
+	head.destroyed.connect(_on_body_part_destroyed)
+	head.damage_taken.connect(_on_body_part_damage_taken.bind(head))
+	body_parts.append(head)
+	
+	var left_arm = BodyPartData.new()
+	left_arm.initialize(BodyPartData.PartType.LEFT_ARM, 0, 0.0)
+	left_arm.max_health = energy_system.max_energy_cap * 0.15
+	left_arm.current_health = left_arm.max_health
+	left_arm.core_damage_ratio = 0.2
+	left_arm.destroyed.connect(_on_body_part_destroyed)
+	left_arm.damage_taken.connect(_on_body_part_damage_taken.bind(left_arm))
+	body_parts.append(left_arm)
+	
+	var right_arm = BodyPartData.new()
+	right_arm.initialize(BodyPartData.PartType.RIGHT_ARM, 0, 0.0)
+	right_arm.max_health = energy_system.max_energy_cap * 0.15
+	right_arm.current_health = right_arm.max_health
+	right_arm.core_damage_ratio = 0.2
+	right_arm.destroyed.connect(_on_body_part_destroyed)
+	right_arm.damage_taken.connect(_on_body_part_damage_taken.bind(right_arm))
+	body_parts.append(right_arm)
+	
+	var legs = BodyPartData.new()
+	legs.initialize(BodyPartData.PartType.LEGS, 0, 0.0)
+	legs.max_health = energy_system.max_energy_cap * 0.1
+	legs.current_health = legs.max_health
+	legs.core_damage_ratio = 0.3
+	legs.destroyed.connect(_on_body_part_destroyed)
+	legs.damage_taken.connect(_on_body_part_damage_taken.bind(legs))
+	body_parts.append(legs)
 
 func _physics_process(delta: float) -> void:
 	_update_movement(delta)
@@ -89,6 +157,10 @@ func set_max_energy_cap(value: float) -> void:
 		energy_system.current_energy_cap = value
 		energy_system.current_energy = value * 0.5
 		_update_health_bar()
+		
+		# 重新初始化肢体系统
+		if use_voxel_system:
+			_initialize_body_parts()
 
 func _update_movement(delta: float) -> void:
 	if move_speed <= 0:
@@ -96,7 +168,7 @@ func _update_movement(delta: float) -> void:
 
 	move_time += delta
 
-	var actual_speed = move_speed
+	var actual_speed = move_speed * movement_penalty
 	if status_effects.has(ApplyStatusActionData.StatusType.STRUCTURE_LOCK):
 		actual_speed *= 0.5
 
@@ -135,8 +207,9 @@ func _update_movement(delta: float) -> void:
 			var final_direction = (direction + perpendicular * zigzag).normalized()
 			global_position += final_direction * actual_speed * delta
 
-## 承受伤害（新能量系统）
-func take_damage(amount: float, _damage_type: int = 0) -> void:
+## 承受伤害（二维体素战斗系统）
+## 支持指定目标肢体
+func take_damage(amount: float, _damage_type: int = 0, target_part_type: int = -1) -> void:
 	var final_damage = amount
 
 	# 状态效果修正
@@ -146,12 +219,92 @@ func take_damage(amount: float, _damage_type: int = 0) -> void:
 	if status_effects.has(ApplyStatusActionData.StatusType.CRYO_CRYSTAL):
 		final_damage *= 0.8
 
-	# 通过能量系统处理伤害
-	if energy_system:
-		energy_system.take_damage(final_damage)
+	# 二维体素战斗系统处理
+	if use_voxel_system and body_parts.size() > 0:
+		var core_damage = _damage_body_part(target_part_type, final_damage)
+		
+		# 核心伤害传递到能量系统
+		if energy_system and core_damage > 0:
+			energy_system.take_damage(core_damage)
+	else:
+		# 传统伤害处理
+		if energy_system:
+			energy_system.take_damage(final_damage)
 	
 	damage_taken.emit(final_damage)
 	_flash_damage()
+
+## 对特定肢体造成伤害
+## 返回传递到核心的伤害值
+func _damage_body_part(part_type: int, damage: float) -> float:
+	var target_part: BodyPartData = null
+	
+	# 如果指定了肢体类型，尝试找到对应肢体
+	if part_type >= 0:
+		for part in body_parts:
+			if part.part_type == part_type and part.is_functional:
+				target_part = part
+				break
+	
+	# 如果没有找到指定肢体或未指定，随机选择一个功能正常的肢体
+	if target_part == null:
+		var functional_parts: Array[BodyPartData] = []
+		for part in body_parts:
+			if part.is_functional:
+				functional_parts.append(part)
+		
+		if functional_parts.is_empty():
+			# 所有肢体都被摧毁，伤害直接作用于核心
+			return damage
+		
+		target_part = functional_parts[randi() % functional_parts.size()]
+	
+	# 对肢体造成伤害
+	var actual_damage = target_part.take_damage(damage)
+	var core_damage = actual_damage * target_part.core_damage_ratio
+	
+	return core_damage
+
+## 获取特定类型的肢体
+func get_body_part(part_type: int) -> BodyPartData:
+	for part in body_parts:
+		if part.part_type == part_type:
+			return part
+	return null
+
+## 获取所有功能正常的肢体
+func get_functional_body_parts() -> Array[BodyPartData]:
+	var functional: Array[BodyPartData] = []
+	for part in body_parts:
+		if part.is_functional:
+			functional.append(part)
+	return functional
+
+## 肢体受伤回调
+func _on_body_part_damage_taken(damage: float, _remaining_health: float, part: BodyPartData) -> void:
+	body_part_damaged.emit(part, damage)
+
+## 肢体被摧毁回调
+func _on_body_part_destroyed(part: BodyPartData) -> void:
+	body_part_destroyed.emit(part)
+	
+	# 检查是否为关键部位
+	if part.is_vital:
+		_die()
+		return
+	
+	# 更新移动惩罚
+	_update_movement_penalty()
+	
+	print("[敌人肢体摧毁] %s 的 %s 被摧毁" % [name, part.part_name])
+
+## 更新移动惩罚
+func _update_movement_penalty() -> void:
+	var legs = get_body_part(BodyPartData.PartType.LEGS)
+	if legs == null or not legs.is_functional:
+		movement_penalty = 0.3
+	else:
+		movement_penalty = legs.efficiency
 
 func apply_status(status_type: int, duration: float, value: float) -> void:
 	var is_new_status = not status_effects.has(status_type)
@@ -269,6 +422,11 @@ func _die() -> void:
 	set_deferred("monitorable", false)
 	call_deferred("queue_free")
 
+func is_dead() -> bool:
+	if energy_system:
+		return energy_system.is_depleted()
+	return false
+
 func reset() -> void:
 	if energy_system:
 		energy_system.reset()
@@ -280,6 +438,11 @@ func reset() -> void:
 		_remove_status_vfx(status_type)
 	status_vfx_instances.clear()
 	
+	# 重置肢体系统
+	if use_voxel_system:
+		_initialize_body_parts()
+	
+	movement_penalty = 1.0
 	position = start_position
 	move_time = 0.0
 	_update_health_bar()
@@ -296,3 +459,13 @@ func get_distance_to_target() -> float:
 ## 获取能量系统
 func get_energy_system() -> EnergySystemData:
 	return energy_system
+
+## 获取肢体状态摘要
+func get_body_parts_summary() -> String:
+	if not use_voxel_system or body_parts.is_empty():
+		return "无肢体系统"
+	
+	var summary_lines = []
+	for part in body_parts:
+		summary_lines.append(part.get_status_summary())
+	return "\n".join(summary_lines)
