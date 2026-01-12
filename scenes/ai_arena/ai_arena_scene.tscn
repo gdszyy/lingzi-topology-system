@@ -1,8 +1,9 @@
-[gd_scene load_steps=4 format=3 uid="uid://ai_arena_scene"]
+[gd_scene load_steps=5 format=3 uid="uid://ai_arena_scene"]
 
 [ext_resource type="Script" path="res://scenes/ai_arena/ai_arena_scene.gd" id="1_arena"]
 [ext_resource type="PackedScene" uid="uid://player_scene" path="res://scenes/player/player.tscn" id="2_player"]
 [ext_resource type="Script" path="res://scripts/ai/enemy_manager.gd" id="3_manager"]
+[ext_resource type="Script" path="res://scenes/ai_arena/arena_battle_recorder.gd" id="4_recorder"]
 
 [node name="AIArenaScene" type="Node2D"]
 script = ExtResource("1_arena")
@@ -10,13 +11,16 @@ script = ExtResource("1_arena")
 [node name="Background" type="ColorRect" parent="."]
 offset_right = 1920.0
 offset_bottom = 1080.0
-color = Color(0.08, 0.08, 0.12, 1)
+color = Color(0.06, 0.06, 0.1, 1)
 
 [node name="ArenaFloor" type="Polygon2D" parent="."]
-color = Color(0.12, 0.12, 0.18, 1)
-polygon = PackedVector2Array(100, 100, 1820, 100, 1820, 980, 100, 980)
+color = Color(0.1, 0.1, 0.15, 1)
+polygon = PackedVector2Array(80, 80, 1840, 80, 1840, 1000, 80, 1000)
 
-[node name="ArenaGrid" type="Node2D" parent="."]
+[node name="ArenaBorder" type="Line2D" parent="."]
+points = PackedVector2Array(80, 80, 1840, 80, 1840, 1000, 80, 1000, 80, 80)
+width = 3.0
+default_color = Color(0.3, 0.3, 0.5, 1)
 
 [node name="Player" parent="." instance=ExtResource("2_player")]
 position = Vector2(960, 540)
@@ -25,6 +29,9 @@ position = Vector2(960, 540)
 
 [node name="EnemyManager" type="Node" parent="."]
 script = ExtResource("3_manager")
+
+[node name="BattleRecorder" type="Node" parent="."]
+script = ExtResource("4_recorder")
 
 [node name="ArenaBounds" type="Area2D" parent="."]
 
@@ -38,73 +45,112 @@ offset_left = 10.0
 offset_top = 10.0
 offset_right = 1910.0
 offset_bottom = 60.0
-theme_override_constants/separation = 20
+theme_override_constants/separation = 15
 
 [node name="WaveLabel" type="Label" parent="UI/TopPanel"]
 layout_mode = 2
-theme_override_font_sizes/font_size = 24
-text = "波次: 0"
+theme_override_font_sizes/font_size = 22
+text = "波次: 0/10"
 
 [node name="EnemyCountLabel" type="Label" parent="UI/TopPanel"]
 layout_mode = 2
-theme_override_font_sizes/font_size = 24
+theme_override_font_sizes/font_size = 22
 text = "敌人: 0"
+
+[node name="VSeparator1" type="VSeparator" parent="UI/TopPanel"]
+layout_mode = 2
 
 [node name="PlayerHealthLabel" type="Label" parent="UI/TopPanel"]
 layout_mode = 2
-theme_override_font_sizes/font_size = 18
-text = "玩家生命:"
+theme_override_font_sizes/font_size = 16
+text = "生命:"
 
 [node name="PlayerHealthBar" type="ProgressBar" parent="UI/TopPanel"]
-custom_minimum_size = Vector2(200, 30)
+custom_minimum_size = Vector2(180, 25)
 layout_mode = 2
 value = 100.0
 show_percentage = false
 
+[node name="VSeparator2" type="VSeparator" parent="UI/TopPanel"]
+layout_mode = 2
+
 [node name="ScoreLabel" type="Label" parent="UI/TopPanel"]
 layout_mode = 2
-theme_override_font_sizes/font_size = 24
+theme_override_font_sizes/font_size = 22
 text = "分数: 0"
+
+[node name="TimerLabel" type="Label" parent="UI/TopPanel"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 22
+text = "时间: 00:00"
+
+[node name="ComboLabel" type="Label" parent="UI/TopPanel"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 24
+theme_override_colors/font_color = Color(1, 0.8, 0.2, 1)
+text = "连击: x1"
 
 [node name="Spacer" type="Control" parent="UI/TopPanel"]
 layout_mode = 2
 size_flags_horizontal = 3
 
 [node name="BackButton" type="Button" parent="UI/TopPanel"]
-custom_minimum_size = Vector2(120, 40)
+custom_minimum_size = Vector2(100, 40)
 layout_mode = 2
-theme_override_font_sizes/font_size = 18
-text = "返回菜单"
+theme_override_font_sizes/font_size = 16
+text = "返回"
 
 [node name="SpawnPanel" type="PanelContainer" parent="UI"]
 offset_left = 10.0
 offset_top = 80.0
-offset_right = 260.0
-offset_bottom = 450.0
+offset_right = 280.0
+offset_bottom = 680.0
 
 [node name="VBoxContainer" type="VBoxContainer" parent="UI/SpawnPanel"]
 layout_mode = 2
-theme_override_constants/separation = 10
+theme_override_constants/separation = 8
 
 [node name="Title" type="Label" parent="UI/SpawnPanel/VBoxContainer"]
 layout_mode = 2
-theme_override_font_sizes/font_size = 20
-text = "敌人生成控制"
+theme_override_font_sizes/font_size = 18
+text = "控制面板"
 horizontal_alignment = 1
 
-[node name="HSeparator" type="HSeparator" parent="UI/SpawnPanel/VBoxContainer"]
+[node name="HSeparator1" type="HSeparator" parent="UI/SpawnPanel/VBoxContainer"]
+layout_mode = 2
+
+[node name="ModeContainer" type="HBoxContainer" parent="UI/SpawnPanel/VBoxContainer"]
+layout_mode = 2
+
+[node name="ModeLabel" type="Label" parent="UI/SpawnPanel/VBoxContainer/ModeContainer"]
+layout_mode = 2
+text = "模式:"
+
+[node name="ModeOption" type="OptionButton" parent="UI/SpawnPanel/VBoxContainer/ModeContainer"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="DifficultyContainer" type="HBoxContainer" parent="UI/SpawnPanel/VBoxContainer"]
+layout_mode = 2
+
+[node name="DifficultyLabel" type="Label" parent="UI/SpawnPanel/VBoxContainer/DifficultyContainer"]
+layout_mode = 2
+text = "难度:"
+
+[node name="DifficultyOption" type="OptionButton" parent="UI/SpawnPanel/VBoxContainer/DifficultyContainer"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="HSeparator2" type="HSeparator" parent="UI/SpawnPanel/VBoxContainer"]
 layout_mode = 2
 
 [node name="TypeLabel" type="Label" parent="UI/SpawnPanel/VBoxContainer"]
 layout_mode = 2
 text = "敌人类型:"
 
-[node name="EnemyTypeList" type="ItemList" parent="UI/SpawnPanel"]
+[node name="EnemyTypeList" type="ItemList" parent="UI/SpawnPanel/VBoxContainer"]
+custom_minimum_size = Vector2(0, 200)
 layout_mode = 2
-offset_left = 10.0
-offset_top = 100.0
-offset_right = 240.0
-offset_bottom = 220.0
 
 [node name="CountContainer" type="HBoxContainer" parent="UI/SpawnPanel/VBoxContainer"]
 layout_mode = 2
@@ -113,86 +159,140 @@ layout_mode = 2
 layout_mode = 2
 text = "数量:"
 
-[node name="SpawnCountSpinBox" type="SpinBox" parent="UI/SpawnPanel"]
+[node name="SpawnCountSpinBox" type="SpinBox" parent="UI/SpawnPanel/VBoxContainer/CountContainer"]
 layout_mode = 2
-offset_left = 60.0
-offset_top = 260.0
-offset_right = 140.0
-offset_bottom = 290.0
+size_flags_horizontal = 3
 min_value = 1.0
 max_value = 20.0
 value = 1.0
 
-[node name="SpawnButton" type="Button" parent="UI/SpawnPanel"]
+[node name="SpawnButton" type="Button" parent="UI/SpawnPanel/VBoxContainer"]
 layout_mode = 2
-offset_left = 10.0
-offset_top = 300.0
-offset_right = 240.0
-offset_bottom = 340.0
-theme_override_font_sizes/font_size = 16
+theme_override_font_sizes/font_size = 14
 text = "生成敌人"
 
-[node name="StartWaveButton" type="Button" parent="UI/SpawnPanel"]
+[node name="HSeparator3" type="HSeparator" parent="UI/SpawnPanel/VBoxContainer"]
 layout_mode = 2
-offset_left = 10.0
-offset_top = 350.0
-offset_right = 240.0
-offset_bottom = 390.0
-theme_override_font_sizes/font_size = 16
+
+[node name="StartWaveButton" type="Button" parent="UI/SpawnPanel/VBoxContainer"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 14
 text = "开始波次战斗"
 
-[node name="ClearButton" type="Button" parent="UI/SpawnPanel"]
+[node name="PauseWaveButton" type="Button" parent="UI/SpawnPanel/VBoxContainer"]
 layout_mode = 2
-offset_left = 10.0
-offset_top = 400.0
-offset_right = 240.0
-offset_bottom = 440.0
-theme_override_font_sizes/font_size = 16
+theme_override_font_sizes/font_size = 14
+text = "暂停"
+
+[node name="ClearButton" type="Button" parent="UI/SpawnPanel/VBoxContainer"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 14
 text = "清除所有敌人"
 
 [node name="DebugPanel" type="PanelContainer" parent="UI"]
-offset_left = 1620.0
+offset_left = 1630.0
 offset_top = 80.0
 offset_right = 1910.0
-offset_bottom = 600.0
+offset_bottom = 680.0
 
 [node name="VBoxContainer" type="VBoxContainer" parent="UI/DebugPanel"]
 layout_mode = 2
-theme_override_constants/separation = 10
+theme_override_constants/separation = 8
 
 [node name="Title" type="Label" parent="UI/DebugPanel/VBoxContainer"]
 layout_mode = 2
-theme_override_font_sizes/font_size = 20
-text = "AI调试面板"
+theme_override_font_sizes/font_size = 18
+text = "调试面板"
 horizontal_alignment = 1
 
 [node name="HSeparator" type="HSeparator" parent="UI/DebugPanel/VBoxContainer"]
 layout_mode = 2
 
-[node name="DebugToggle" type="CheckButton" parent="UI/DebugPanel"]
+[node name="DebugToggle" type="CheckButton" parent="UI/DebugPanel/VBoxContainer"]
 layout_mode = 2
-offset_left = 10.0
-offset_top = 60.0
-offset_right = 280.0
-offset_bottom = 90.0
-text = "显示AI调试信息"
+text = "显示AI调试"
 
-[node name="AIInfoLabel" type="RichTextLabel" parent="UI/DebugPanel"]
+[node name="AIInfoLabel" type="RichTextLabel" parent="UI/DebugPanel/VBoxContainer"]
+custom_minimum_size = Vector2(0, 250)
 layout_mode = 2
-offset_left = 10.0
-offset_top = 100.0
-offset_right = 280.0
-offset_bottom = 510.0
 bbcode_enabled = true
 text = "[b]AI调试信息[/b]
 
 等待敌人生成..."
 
+[node name="HSeparator2" type="HSeparator" parent="UI/DebugPanel/VBoxContainer"]
+layout_mode = 2
+
+[node name="StatsLabel" type="RichTextLabel" parent="UI/DebugPanel/VBoxContainer"]
+custom_minimum_size = Vector2(0, 150)
+layout_mode = 2
+bbcode_enabled = true
+text = "[b]战斗统计[/b]
+
+击杀: 0
+输出: 0
+承伤: 0
+连击: 0"
+
+[node name="ResultPanel" type="PanelContainer" parent="UI"]
+visible = false
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -200.0
+offset_top = -200.0
+offset_right = 200.0
+offset_bottom = 200.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="VBoxContainer" type="VBoxContainer" parent="UI/ResultPanel"]
+layout_mode = 2
+theme_override_constants/separation = 15
+
+[node name="TitleLabel" type="Label" parent="UI/ResultPanel/VBoxContainer"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 36
+text = "战斗结束"
+horizontal_alignment = 1
+
+[node name="HSeparator" type="HSeparator" parent="UI/ResultPanel/VBoxContainer"]
+layout_mode = 2
+
+[node name="ContentLabel" type="RichTextLabel" parent="UI/ResultPanel/VBoxContainer"]
+custom_minimum_size = Vector2(0, 200)
+layout_mode = 2
+bbcode_enabled = true
+fit_content = true
+text = "[center][b]战斗统计[/b][/center]
+
+到达波次: 0
+击杀敌人: 0
+总分数: 0"
+
+[node name="RestartButton" type="Button" parent="UI/ResultPanel/VBoxContainer"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 18
+text = "重新开始"
+
+[node name="MenuButton" type="Button" parent="UI/ResultPanel/VBoxContainer"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 18
+text = "返回菜单"
+
 [node name="Instructions" type="Label" parent="UI"]
-offset_left = 10.0
-offset_top = 1030.0
-offset_right = 1910.0
-offset_bottom = 1070.0
-theme_override_colors/font_color = Color(0.6, 0.6, 0.7, 1)
-text = "操作说明: WASD移动 | 鼠标左键攻击 | 鼠标右键施法 | 空格闪避 | 数字键切换法术"
+anchors_preset = 7
+anchor_left = 0.5
+anchor_top = 1.0
+anchor_right = 0.5
+anchor_bottom = 1.0
+offset_left = -450.0
+offset_top = -40.0
+offset_right = 450.0
+grow_horizontal = 2
+grow_vertical = 0
+theme_override_colors/font_color = Color(0.5, 0.5, 0.6, 1)
+text = "操作: WASD移动 | 鼠标左键攻击 | 鼠标右键施法 | 空格闪避 | 数字键切换法术 | ESC暂停"
 horizontal_alignment = 1
