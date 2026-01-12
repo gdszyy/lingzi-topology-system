@@ -36,6 +36,10 @@ func execute_action(action: ActionData, context: Dictionary) -> void:
 	var slot_level = context.get("slot_level", 1)
 	effect_multiplier = 1.0 + (slot_level - 1) * 0.1
 	
+	# 应用武器特质效果修正
+	var total_effect_modifier = context.get("total_effect_modifier", 1.0)
+	effect_multiplier *= total_effect_modifier
+	
 	# 获取当前相态（如果有载体信息）
 	var carrier = context.get("carrier", null) as CarrierConfigData
 	if carrier:

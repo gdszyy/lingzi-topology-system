@@ -40,11 +40,27 @@ var pending_context: Dictionary = {}
 
 var trigger_count: int = 0
 
+## 武器特质修正器（由外部设置）
+var weapon_modifier: WeaponTraitModifier = null
+
+## 连续触发计数
+var consecutive_trigger_count: int = 0
+
+## 上次触发时间
+var last_trigger_time: float = 0.0
+
+## 连续触发窗口时间（秒）
+const CHAIN_TRIGGER_WINDOW: float = 2.0
+
 func initialize(id: String, name: String, capacity: float = 100.0) -> void:
 	slot_id = id
 	slot_name = name
 	slot_capacity = capacity
 	generate_id()
+
+## 设置武器特质修正器
+func set_weapon_modifier(modifier: WeaponTraitModifier) -> void:
+	weapon_modifier = modifier
 
 func generate_id() -> void:
 	if slot_id.is_empty():
@@ -114,6 +130,70 @@ func calculate_engraved_windup(proficiency: float = 0.0) -> float:
 		return 0.0
 
 	return engraved_spell.calculate_windup_time(proficiency, true)
+
+## 计算调整后的前摇时间（应用武器特质修正）
+func calculate_modified_windup(proficiency: float = 0.0, trigger_type: int = -1) -> float:
+	if engraved_spell == null:
+		return 0.0
+	
+	var base_windup = engraved_spell.calculate_windup_time(proficiency, true)
+	
+	if weapon_modifier != null:
+		var modifier = weapon_modifier.get_windup_for_trigger(trigger_type)
+		base_windup *= modifier
+	
+	return base_windup
+
+## 计算调整后的能量消耗
+func calculate_modified_cost(trigger_type: int = -1) -> float:
+	if engraved_spell == null:
+		return 0.0
+	
+	var base_cost = engraved_spell.resource_cost
+	
+	if weapon_modifier != null:
+		var modifier = weapon_modifier.get_cost_for_trigger(trigger_type)
+		base_cost *= modifier
+	
+	return base_cost
+
+## 计算调整后的效果强度
+func calculate_modified_effect(action_type: int = -1) -> float:
+	var base_effect = 1.0
+	
+	if weapon_modifier != null:
+		base_effect = weapon_modifier.get_effect_for_action(action_type)
+	
+	return base_effect
+
+## 计算调整后的冷却时间
+func calculate_modified_cooldown(trigger_type: int = -1) -> float:
+	var base_cooldown = cooldown
+	
+	if weapon_modifier != null:
+		base_cooldown *= weapon_modifier.get_cooldown_for_trigger(trigger_type)
+	
+	return base_cooldown
+
+## 获取连续触发加成
+func get_chain_bonus() -> float:
+	if weapon_modifier == null:
+		return 0.0
+	return weapon_modifier.get_chain_bonus(consecutive_trigger_count)
+
+## 更新连续触发计数
+func update_consecutive_count() -> void:
+	var current_time = Time.get_unix_time_from_system()
+	if current_time - last_trigger_time > CHAIN_TRIGGER_WINDOW:
+		consecutive_trigger_count = 0
+	else:
+		consecutive_trigger_count += 1
+	last_trigger_time = current_time
+
+## 重置连续触发计数
+func reset_consecutive_count() -> void:
+	consecutive_trigger_count = 0
+	last_trigger_time = 0.0
 
 func start_trigger(trigger_type: int, context: Dictionary = {}, proficiency: float = 0.0) -> bool:
 	if not can_trigger():

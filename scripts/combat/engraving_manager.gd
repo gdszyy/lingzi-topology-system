@@ -188,23 +188,65 @@ func distribute_trigger(trigger_type: int, context: Dictionary = {}) -> void:
 					slot.spell_triggered.connect(_on_slot_spell_triggered.bind(slot, efficiency_context))
 
 	# 武器槽位单独处理（不受肢体损伤影响，但受手臂状态影响）
+	# 应用武器特质修正器
 	if player != null and player.current_weapon != null:
+		var weapon = player.current_weapon
+		var trait_modifier = weapon.get_trait_modifier()
+		
+		# 检查是否可以使用武器
 		var can_use_weapon = _can_use_weapon()
-		if can_use_weapon:
-			for slot in player.current_weapon.engraving_slots:
-				if not slot.can_trigger():
-					continue
+		if not can_use_weapon:
+			return
+		
+		# 检查武器特质规则
+		var is_attacking = context.get("is_attacking", false)
+		var is_moving = context.get("is_moving", false)
+		if not trait_modifier.can_trigger_in_state(is_attacking, is_moving):
+			return
+		
+		# 检查武器命中要求
+		if not trait_modifier.check_weapon_hit_requirement(trigger_type):
+			return
+		
+		for slot in weapon.engraving_slots:
+			if not slot.can_trigger():
+				continue
 
-				if slot.engraved_spell == null:
-					continue
+			if slot.engraved_spell == null:
+				continue
+			
+			# 设置武器特质修正器
+			slot.set_weapon_modifier(trait_modifier)
 
-				var proficiency = proficiency_manager.get_proficiency_value(slot.engraved_spell.spell_id)
+			var proficiency = proficiency_manager.get_proficiency_value(slot.engraved_spell.spell_id)
+			
+			# 计算调整后的能量消耗
+			var modified_cost = slot.calculate_modified_cost(trigger_type)
+			
+			# 检查能量是否足够
+			if player.energy_system != null and not player.energy_system.can_consume(modified_cost):
+				continue
+			
+			# 准备上下文，包含武器特质信息
+			var weapon_context = context.duplicate()
+			weapon_context["weapon_trait_modifier"] = trait_modifier
+			weapon_context["trigger_type"] = trigger_type
+			weapon_context["modified_cost"] = modified_cost
+			weapon_context["consecutive_count"] = slot.consecutive_trigger_count
+			weapon_context["chain_bonus"] = slot.get_chain_bonus()
 
-				var started = slot.start_trigger(trigger_type, context, proficiency)
+			var started = slot.start_trigger(trigger_type, weapon_context, proficiency)
 
-				if started:
-					if not slot.spell_triggered.is_connected(_on_slot_spell_triggered):
-						slot.spell_triggered.connect(_on_slot_spell_triggered.bind(slot, context))
+			if started:
+				# 扣除能量
+				if player.energy_system != null:
+					player.energy_system.consume_energy(modified_cost)
+				
+				# 更新连续触发计数
+				slot.update_consecutive_count()
+				
+				if not slot.spell_triggered.is_connected(_on_slot_spell_triggered):
+					slot.spell_triggered.connect(_on_slot_spell_triggered.bind(slot, weapon_context))
 
 ## 检查是否可以使用武器（需要至少一只手臂功能正常）
 func _can_use_weapon() -> bool:
@@ -277,9 +319,28 @@ func _execute_rule_actions(rule: TopologyRuleData, context: Dictionary, slot: En
 	# 应用肢体效率修正到效果
 	var part_efficiency = context.get("part_efficiency", 1.0)
 	full_context["effect_multiplier"] = part_efficiency
+	
+	# 应用武器特质效果修正
+	var weapon_trait_modifier = context.get("weapon_trait_modifier", null) as WeaponTraitModifier
+	var chain_bonus = context.get("chain_bonus", 0.0)
+	var consecutive_count = context.get("consecutive_count", 0)
 
 	for action in rule.actions:
 		if action != null:
+			# 计算武器特质对该动作的效果修正
+			var weapon_effect_modifier = 1.0
+			if weapon_trait_modifier != null:
+				weapon_effect_modifier = weapon_trait_modifier.get_effect_for_action(action.action_type)
+				
+				# 应用连续触发加成或首次触发加成
+				if consecutive_count == 0:
+					weapon_effect_modifier *= (1.0 + weapon_trait_modifier.first_cast_bonus)
+				else:
+					weapon_effect_modifier *= (1.0 + chain_bonus)
+			
+			full_context["weapon_effect_modifier"] = weapon_effect_modifier
+			full_context["total_effect_modifier"] = part_efficiency * weapon_effect_modifier
+			
 			action_executor.execute_action(action, full_context)
 			action_executed.emit(action, full_context)
 

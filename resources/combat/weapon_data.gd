@@ -55,6 +55,10 @@ enum GripType {
 @export var engraving_slots: Array[EngravingSlot] = []
 @export var max_engraving_capacity: float = 100.0
 
+@export_group("Trait Modifier")
+@export var trait_modifier: WeaponTraitModifier = null  ## 自定义特质修正器
+@export var use_preset_modifier: bool = true            ## 是否使用预设修正器
+
 ## 运行时状态
 var last_attack_direction: int = 0  ## 0=正向, 1=反向
 
@@ -168,6 +172,103 @@ func toggle_attack_direction() -> void:
 ## 重置攻击方向
 func reset_attack_direction() -> void:
 	last_attack_direction = 0
+
+## ==================== 武器特质修正器相关方法 ====================
+
+## 获取武器特质修正器
+func get_trait_modifier() -> WeaponTraitModifier:
+	if trait_modifier != null and not use_preset_modifier:
+		return trait_modifier
+	if use_preset_modifier:
+		return WeaponTraitPresets.get_modifier_for_type(weapon_type)
+	return WeaponTraitModifier.new()
+
+## 获取特质名称
+func get_trait_name() -> String:
+	var modifier = get_trait_modifier()
+	if modifier != null and not modifier.trait_name.is_empty():
+		return modifier.trait_name
+	return WeaponTraitPresets.get_trait_name(weapon_type)
+
+## 获取特质描述
+func get_trait_description() -> String:
+	var modifier = get_trait_modifier()
+	if modifier != null and not modifier.trait_description.is_empty():
+		return modifier.trait_description
+	return WeaponTraitPresets.get_trait_description(weapon_type)
+
+## 获取调整后的篆刻容量
+func get_modified_engraving_capacity() -> float:
+	var modifier = get_trait_modifier()
+	return max_engraving_capacity * modifier.capacity_multiplier
+
+## 获取调整后的槽位数量
+func get_modified_slot_count() -> int:
+	var modifier = get_trait_modifier()
+	var base_count = engraving_slots.size()
+	return max(0, base_count + modifier.slot_count_modifier)
+
+## 检查是否可以在当前状态下触发篆刻法术
+func can_trigger_engraving_in_state(is_attacking: bool, is_moving: bool) -> bool:
+	var modifier = get_trait_modifier()
+	return modifier.can_trigger_in_state(is_attacking, is_moving)
+
+## 检查触发器类型是否满足武器命中要求
+func check_weapon_hit_requirement(trigger_type: int) -> bool:
+	var modifier = get_trait_modifier()
+	return modifier.check_weapon_hit_requirement(trigger_type)
+
+## 获取调整后的前摇时间
+func get_modified_windup(base_windup: float, trigger_type: int = -1) -> float:
+	var modifier = get_trait_modifier()
+	return base_windup * modifier.get_windup_for_trigger(trigger_type)
+
+## 获取调整后的能量消耗
+func get_modified_cost(base_cost: float, trigger_type: int = -1) -> float:
+	var modifier = get_trait_modifier()
+	return base_cost * modifier.get_cost_for_trigger(trigger_type)
+
+## 获取调整后的效果强度
+func get_modified_effect(base_effect: float, action_type: int = -1) -> float:
+	var modifier = get_trait_modifier()
+	return base_effect * modifier.get_effect_for_action(action_type)
+
+## 获取调整后的冷却时间
+func get_modified_cooldown(base_cooldown: float, trigger_type: int = -1) -> float:
+	var modifier = get_trait_modifier()
+	return base_cooldown * modifier.get_cooldown_for_trigger(trigger_type)
+
+## 获取连续触发加成
+func get_chain_bonus(consecutive_count: int) -> float:
+	var modifier = get_trait_modifier()
+	return modifier.get_chain_bonus(consecutive_count)
+
+## 获取触发器亲和度
+func get_trigger_affinity(trigger_type: int) -> float:
+	var modifier = get_trait_modifier()
+	return modifier.get_trigger_affinity(trigger_type)
+
+## 获取动作亲和度
+func get_action_affinity(action_type: int) -> float:
+	var modifier = get_trait_modifier()
+	return modifier.get_action_affinity(action_type)
+
+## 获取高亲和度触发器列表
+func get_high_affinity_triggers() -> Array[int]:
+	var modifier = get_trait_modifier()
+	return modifier.get_high_affinity_triggers()
+
+## 获取高亲和度动作列表
+func get_high_affinity_actions() -> Array[int]:
+	var modifier = get_trait_modifier()
+	return modifier.get_high_affinity_actions()
+
+## 获取武器特质摘要
+func get_trait_summary() -> String:
+	var modifier = get_trait_modifier()
+	return "[%s] %s - %s" % [get_trait_name(), weapon_name, modifier.get_summary()]
+
+## ==================== 篆刻槽位相关方法 ====================
 
 func initialize_engraving_slots(slot_count: int = 2) -> void:
 	engraving_slots.clear()
