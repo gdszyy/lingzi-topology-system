@@ -144,8 +144,8 @@ func _update_shield(delta: float) -> void:
 
 func _apply_movement(delta: float) -> void:
 	if not can_move:
-		var friction = movement_config.friction_ground if not is_flying else movement_config.friction_flight
-		velocity = velocity.move_toward(Vector2.ZERO, friction * delta)
+		var stop_friction = movement_config.friction_ground if not is_flying else movement_config.friction_flight
+		velocity = velocity.move_toward(Vector2.ZERO, stop_friction * delta)
 		return
 
 	var max_speed: float

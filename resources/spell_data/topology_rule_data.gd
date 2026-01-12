@@ -31,7 +31,7 @@ func to_dict() -> Dictionary:
 	return {
 		"rule_name": rule_name,
 		"enabled": enabled,
-		"trigger": trigger.to_dict() if trigger != null else null,
+		"trigger": trigger.to_dict() if trigger != null else {},
 		"actions": actions_array
 	}
 

@@ -117,13 +117,13 @@ func _calculate_windup_time() -> void:
 		" (刻录)" if is_engraved_cast else ""
 	])
 
-func _update_windup_phase(delta: float) -> void:
+func _update_windup_phase(_delta: float) -> void:
 	if phase_timer >= windup_duration:
 		current_phase = CastPhase.RELEASE
 		phase_timer = 0.0
 		_play_release_animation()
 
-func _update_release_phase(delta: float) -> void:
+func _update_release_phase(_delta: float) -> void:
 	if not spell_fired:
 		_fire_spell()
 		spell_fired = true
@@ -133,7 +133,7 @@ func _update_release_phase(delta: float) -> void:
 		phase_timer = 0.0
 		_play_recovery_animation()
 
-func _update_recovery_phase(delta: float) -> void:
+func _update_recovery_phase(_delta: float) -> void:
 	if phase_timer >= recovery_duration:
 		_on_cast_complete()
 

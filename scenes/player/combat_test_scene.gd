@@ -433,7 +433,7 @@ func _on_engraving_triggered(trigger_type: int, spell: SpellCoreData, source: St
 	trigger_name.trigger_type = trigger_type
 	print("[刻录效果] %s 触发了 %s (来源: %s)" % [trigger_name.get_type_name(), spell.spell_name, source])
 
-func _on_proficiency_updated(spell_id: String, proficiency: float) -> void:
+func _on_proficiency_updated(_spell_id: String, _proficiency: float) -> void:
 	_refresh_spell_list()
 
 func _on_engraving_windup_started(slot: EngravingSlot, windup_time: float) -> void:

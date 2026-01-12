@@ -379,5 +379,5 @@ func _on_spell_hit(target: Node2D, damage: float) -> void:
 	if player.current_spell != null:
 		proficiency_manager.record_spell_hit(player.current_spell.spell_id)
 
-func _on_weapon_changed(weapon: WeaponData) -> void:
+func _on_weapon_changed(_weapon: WeaponData) -> void:
 	_register_all_slots()

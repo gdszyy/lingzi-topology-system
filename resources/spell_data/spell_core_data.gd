@@ -120,7 +120,7 @@ func to_dict() -> Dictionary:
 		"min_windup_time": min_windup_time,
 		"max_windup_time": max_windup_time,
 		"engraving_windup_multiplier": engraving_windup_multiplier,
-		"carrier": carrier.to_dict() if carrier != null else null,
+		"carrier": carrier.to_dict() if carrier != null else {},
 		"topology_rules": rules_array
 	}
 

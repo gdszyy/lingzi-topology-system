@@ -237,15 +237,15 @@ func _execute_contact_rule(rule: TopologyRuleData, enemy: Node2D) -> void:
 
 func _calculate_damage() -> float:
 	var total = 0.0
-	var contact_rules_found = 0
-	var damage_actions_found = 0
+	var _contact_rules_found = 0
+	var _damage_actions_found = 0
 
 	for rule in spell_data.topology_rules:
 		if rule.trigger.trigger_type == TriggerData.TriggerType.ON_CONTACT:
-			contact_rules_found += 1
+			_contact_rules_found += 1
 			for action in rule.actions:
 				if action is DamageActionData:
-					damage_actions_found += 1
+					_damage_actions_found += 1
 					var dmg = action as DamageActionData
 					var action_damage = dmg.damage_value * dmg.damage_multiplier
 					total += action_damage

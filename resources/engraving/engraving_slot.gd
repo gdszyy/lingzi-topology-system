@@ -153,7 +153,7 @@ func _execute_trigger(trigger_type: int, context: Dictionary) -> bool:
 	var rules = _execute_trigger_internal(trigger_type, context)
 	return rules.size() > 0
 
-func _execute_trigger_internal(trigger_type: int, context: Dictionary) -> Array[TopologyRuleData]:
+func _execute_trigger_internal(trigger_type: int, _context: Dictionary) -> Array[TopologyRuleData]:
 	var triggered_rules: Array[TopologyRuleData] = []
 
 	for rule in engraved_spell.topology_rules:
@@ -255,7 +255,7 @@ func to_dict() -> Dictionary:
 		"slot_capacity": slot_capacity,
 		"cooldown": cooldown,
 		"engraving_windup_multiplier": engraving_windup_multiplier,
-		"engraved_spell": engraved_spell.to_dict() if engraved_spell != null else null
+		"engraved_spell": engraved_spell.to_dict() if engraved_spell != null else {}
 	}
 
 static func from_dict(data: Dictionary) -> EngravingSlot:

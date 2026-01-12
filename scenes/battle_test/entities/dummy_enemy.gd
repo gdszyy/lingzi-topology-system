@@ -67,13 +67,13 @@ func _move_patrol(delta: float) -> void:
 	if abs(position.x - start_position.x) > patrol_distance:
 		patrol_direction *= -1
 
-func _move_circular(delta: float) -> void:
+func _move_circular(_delta: float) -> void:
 	var radius = 100.0
 	var angular_speed = move_speed / radius
 	position.x = start_position.x + cos(move_time * angular_speed) * radius
 	position.y = start_position.y + sin(move_time * angular_speed) * radius
 
-func _move_figure_eight(delta: float) -> void:
+func _move_figure_eight(_delta: float) -> void:
 	var scale_x = 120.0
 	var scale_y = 60.0
 	var t = move_time * move_speed * 0.01
@@ -97,7 +97,7 @@ func _move_random_walk(delta: float) -> void:
 		var to_center = (start_position - position).normalized()
 		position += to_center * move_speed * delta * 2
 
-func _move_orbit(delta: float) -> void:
+func _move_orbit(_delta: float) -> void:
 	var angle = move_time * orbit_speed
 	position.x = orbit_center.x + cos(angle) * orbit_radius
 	position.y = orbit_center.y + sin(angle) * orbit_radius

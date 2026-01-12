@@ -173,6 +173,6 @@ static func create_unarmed() -> WeaponData:
 	punch.active_time = 0.1
 	punch.recovery_time = 0.2
 	punch.can_combo = true
-	weapon.primary_attacks = [punch]
+	weapon.primary_attacks.append(punch)
 
 	return weapon

@@ -109,7 +109,7 @@ func _execute_displacement_action(action: DisplacementActionData, context: Dicti
 		var self_dir = direction.normalized()
 		player.apply_impulse(self_dir * force * 0.5)
 
-func _execute_shield_action(action: ShieldActionData, context: Dictionary) -> void:
+func _execute_shield_action(action: ShieldActionData, _context: Dictionary) -> void:
 	if player == null:
 		return
 
@@ -223,10 +223,10 @@ func _execute_area_effect_action(action: AreaEffectActionData, context: Dictiona
 	for target in targets:
 		pass
 
-func _execute_summon_action(action: SummonActionData, context: Dictionary) -> void:
+func _execute_summon_action(_action: SummonActionData, _context: Dictionary) -> void:
 	pass
 
-func _execute_generic_action(action: ActionData, context: Dictionary) -> void:
+func _execute_generic_action(action: ActionData, _context: Dictionary) -> void:
 	print("执行通用动作: %s" % action.get_type_name())
 
 func _get_nearby_enemies(position: Vector2, radius: float) -> Array[Node2D]:

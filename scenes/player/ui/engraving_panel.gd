@@ -31,7 +31,7 @@ func _ready() -> void:
 	clear_all_button.pressed.connect(_on_clear_all_pressed)
 	spell_library_list.item_selected.connect(_on_spell_selected)
 
-func _process(delta: float) -> void:
+func _process(_delta: float) -> void:
 	_update_slot_progress_bars()
 
 func initialize(_player: PlayerController, _spell_library: Array[SpellCoreData]) -> void:
