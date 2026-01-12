@@ -350,9 +350,9 @@ func get_combat_animator() -> CombatAnimator:
 ## 设置手臂可见性
 func set_arms_visible(visible_flag: bool) -> void:
 	if left_arm:
-		left_arm.set_visible(visible_flag)
+		left_arm.set_arm_visible(visible_flag)
 	if right_arm:
-		right_arm.set_visible(visible_flag)
+		right_arm.set_arm_visible(visible_flag)
 
 ## 设置手臂颜色
 func set_arms_color(color: Color) -> void:

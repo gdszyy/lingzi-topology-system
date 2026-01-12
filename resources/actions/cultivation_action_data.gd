@@ -35,7 +35,7 @@ enum CultivationType {
 @export var effect_radius: float = 100.0
 
 func _init():
-	action_type = ActionType.CULTIVATION
+	action_type = 12  # ActionType.CULTIVATION
 
 func get_type_name() -> String:
 	match cultivation_type:

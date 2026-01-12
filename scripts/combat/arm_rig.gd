@@ -228,7 +228,7 @@ func set_arm_color(color: Color) -> void:
 		hand_sprite.texture = _create_hand_texture()
 
 ## 设置手臂可见性
-func set_visible(visible_flag: bool) -> void:
+func set_arm_visible(visible_flag: bool) -> void:
 	if upper_arm_line:
 		upper_arm_line.visible = visible_flag
 	if forearm_line:

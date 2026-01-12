@@ -32,7 +32,7 @@ enum RestoreType {
 @export var effect_radius: float = 100.0
 
 func _init():
-	action_type = ActionType.ENERGY_RESTORE
+	action_type = 11  # ActionType.ENERGY_RESTORE
 
 func get_type_name() -> String:
 	match restore_type:
