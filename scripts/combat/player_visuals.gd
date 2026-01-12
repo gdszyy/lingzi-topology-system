@@ -160,7 +160,7 @@ func _update_weapon_swing_physics(delta: float) -> void:
 	var target_angle = lerp(swing_start_angle, swing_end_angle, curve_value)
 	
 	## 设置武器物理系统的目标旋转
-	weapon_physics.set_target(weapon_physics.rest_position, deg_to_rad(target_angle))
+	weapon_physics.set_target(Vector2.ZERO, deg_to_rad(target_angle))
 
 ## 开始武器挥舞（使用物理系统）
 func start_weapon_swing(start_angle: float, end_angle: float, duration: float, curve: Curve = null) -> void:
@@ -173,12 +173,12 @@ func start_weapon_swing(start_angle: float, end_angle: float, duration: float, c
 	
 	## 设置初始目标角度
 	if weapon_physics != null:
-		weapon_physics.set_target(weapon_physics.rest_position, deg_to_rad(start_angle))
+		weapon_physics.set_target(Vector2.ZERO, deg_to_rad(start_angle))
 
 ## 开始攻击动作的武器回正阶段
-func start_weapon_repositioning(target_position: Vector2, target_rotation: float) -> void:
+func start_weapon_repositioning(_target_position: Vector2, target_rotation: float) -> void:
 	if weapon_physics != null:
-		weapon_physics.set_target(target_position, target_rotation)
+		weapon_physics.set_target(Vector2.ZERO, target_rotation)
 
 ## 检查武器是否已经回正到位
 func is_weapon_settled() -> bool:
@@ -257,10 +257,10 @@ func play_attack_effect(attack: AttackData) -> void:
 		attack.swing_curve
 	)
 
-## 施加武器冲量（用于攻击时的物理效果）
-func apply_weapon_impulse(impulse: Vector2) -> void:
-	if weapon_physics != null:
-		weapon_physics.apply_impulse(impulse)
+## 施加武器冲量（已禁用，保留接口兼容）
+func apply_weapon_impulse(_impulse: Vector2) -> void:
+	## 武器物理现在只控制旋转，不控制位置
+	pass
 
 ## 施加武器角冲量
 func apply_weapon_angular_impulse(angular_impulse: float) -> void:

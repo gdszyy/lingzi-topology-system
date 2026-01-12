@@ -52,24 +52,18 @@ scale = Vector2(0.6, 0.6)
 [node name="WeaponRig" type="Node2D" parent="Visuals/TorsoPivot"]
 
 [node name="WeaponPhysics" type="Node2D" parent="Visuals/TorsoPivot/WeaponRig"]
-position = Vector2(20, 0)
 script = ExtResource("15_weaponphysics")
-position_stiffness = 200.0
-position_damping = 25.0
 rotation_stiffness = 150.0
 rotation_damping = 20.0
-position_settle_threshold = 2.0
-velocity_settle_threshold = 5.0
 rotation_settle_threshold = 0.05
 angular_velocity_settle_threshold = 0.1
-max_displacement = 100.0
-max_velocity = 1000.0
 
 [node name="MainHandWeapon" type="Sprite2D" parent="Visuals/TorsoPivot/WeaponRig/WeaponPhysics"]
+position = Vector2(20, 0)
 modulate = Color(0.7, 0.7, 0.7, 1)
 
 [node name="OffHandWeapon" type="Sprite2D" parent="Visuals/TorsoPivot/WeaponRig/WeaponPhysics"]
-position = Vector2(-35, 5)
+position = Vector2(-15, 5)
 visible = false
 modulate = Color(0.7, 0.7, 0.7, 1)
 
