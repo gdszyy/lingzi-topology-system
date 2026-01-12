@@ -392,12 +392,12 @@ func _generate_random_action(allow_fission: bool = true) -> ActionData:
 			status.effect_value = randf_range(2.0, 15.0)
 			return status
 
-			ActionData.ActionType.AREA_EFFECT:
-				var area = AreaEffectActionData.new()
-				area.area_shape = randi() % 4
-				area.radius = randf_range(30.0, 120.0)
-				area.damage_value = randf_range(5.0, 30.0)
-				return area
+		ActionData.ActionType.AREA_EFFECT:
+			var area = AreaEffectActionData.new()
+			area.area_shape = randi() % 4
+			area.radius = randf_range(30.0, 120.0)
+			area.damage_value = randf_range(5.0, 30.0)
+			return area
 		
 		4:  # 召唤动作 - 支持所有召唤实体类型
 			var summon = SummonActionData.new()
