@@ -1,4 +1,6 @@
 class_name PlayerVisuals extends Node2D
+## 玩家视觉系统
+## 管理角色的视觉渲染，包括躯干、头部、手臂和武器
 
 @onready var legs_pivot: Node2D = $LegsPivot
 @onready var legs_sprite: Sprite2D = $LegsPivot/LegsSprite
@@ -7,9 +9,13 @@ class_name PlayerVisuals extends Node2D
 @onready var head_sprite: Sprite2D = $TorsoPivot/HeadSprite
 @onready var weapon_rig: Node2D = $TorsoPivot/WeaponRig
 @onready var weapon_physics: WeaponPhysics = $TorsoPivot/WeaponRig/WeaponPhysics
-@onready var main_hand_weapon: Sprite2D = $TorsoPivot/WeaponRig/WeaponPhysics/MainHandWeapon
-@onready var off_hand_weapon: Sprite2D = $TorsoPivot/WeaponRig/WeaponPhysics/OffHandWeapon
-@onready var arm_ik_controller: ArmIKController = $TorsoPivot/ArmIKController
+
+## 手臂装配
+var left_arm: ArmRig = null
+var right_arm: ArmRig = null
+
+## 战斗动画控制器
+var combat_animator: CombatAnimator = null
 
 var player: PlayerController = null
 
@@ -17,7 +23,7 @@ var is_walking: bool = false
 var walk_cycle: float = 0.0
 var walk_speed: float = 10.0
 
-## 武器挥舞状态（现在由 WeaponPhysics 驱动）
+## 武器挥舞状态（现在由 CombatAnimator 驱动）
 var is_swinging: bool = false
 var swing_progress: float = 0.0
 var swing_start_angle: float = 0.0
@@ -28,22 +34,43 @@ var swing_curve: Curve = null
 func _ready() -> void:
 	player = get_parent() as PlayerController
 	_setup_default_visuals()
+	_create_arm_rigs()
+	_setup_combat_animator()
 	_connect_player_signals()
 	_initialize_weapon_appearance()
 	_setup_weapon_physics()
-	_setup_arm_ik()
+
+func _create_arm_rigs() -> void:
+	## 创建左臂
+	left_arm = ArmRig.new()
+	left_arm.name = "LeftArmRig"
+	left_arm.is_left_arm = true
+	left_arm.shoulder_offset = Vector2(12, 0)
+	left_arm.arm_color = Color(0.9, 0.75, 0.6)
+	torso_pivot.add_child(left_arm)
+	
+	## 创建右臂
+	right_arm = ArmRig.new()
+	right_arm.name = "RightArmRig"
+	right_arm.is_left_arm = false
+	right_arm.shoulder_offset = Vector2(12, 0)
+	right_arm.arm_color = Color(0.9, 0.75, 0.6)
+	torso_pivot.add_child(right_arm)
+
+func _setup_combat_animator() -> void:
+	combat_animator = CombatAnimator.new()
+	combat_animator.name = "CombatAnimator"
+	add_child(combat_animator)
+	combat_animator.initialize(left_arm, right_arm, weapon_physics)
+	
+	## 连接信号
+	combat_animator.animation_finished.connect(_on_attack_animation_finished)
+	combat_animator.hit_frame_reached.connect(_on_hit_frame_reached)
 
 func _setup_weapon_physics() -> void:
 	if weapon_physics != null:
 		weapon_physics.weapon_settled.connect(_on_weapon_settled)
 		weapon_physics.weapon_position_changed.connect(_on_weapon_position_changed)
-
-func _setup_arm_ik() -> void:
-	## 初始化手臂 IK 控制器
-	if arm_ik_controller != null:
-		## 根据当前武器配置手臂
-		if player != null and player.current_weapon != null:
-			arm_ik_controller.configure_for_weapon(player.current_weapon)
 
 func _connect_player_signals() -> void:
 	if player != null:
@@ -57,17 +84,21 @@ func _on_weapon_changed(weapon: WeaponData) -> void:
 	update_weapon_appearance(weapon)
 	if weapon_physics != null:
 		weapon_physics.update_physics_from_weapon(weapon)
-	## 更新手臂 IK 配置
-	if arm_ik_controller != null:
-		arm_ik_controller.configure_for_weapon(weapon)
+	if combat_animator != null:
+		combat_animator.set_weapon(weapon)
 
 func _on_weapon_settled() -> void:
-	## 武器稳定后的回调，可用于通知状态机
 	if player != null and player.has_signal("weapon_settled"):
 		player.emit_signal("weapon_settled")
 
 func _on_weapon_position_changed(_pos: Vector2, _rot: float) -> void:
-	## 武器位置变化时的回调，可用于更新特效等
+	pass
+
+func _on_attack_animation_finished(_attack: AttackData) -> void:
+	is_swinging = false
+
+func _on_hit_frame_reached(_attack: AttackData) -> void:
+	## 可以在这里触发命中检测
 	pass
 
 func _process(delta: float) -> void:
@@ -89,10 +120,6 @@ func _create_placeholder_sprites() -> void:
 	if head_sprite != null:
 		var head_texture = _create_circle_texture(16, Color(0.9, 0.75, 0.6))
 		head_sprite.texture = head_texture
-
-	if main_hand_weapon != null:
-		var weapon_texture = _create_rect_texture(8, 40, Color(0.7, 0.7, 0.7))
-		main_hand_weapon.texture = weapon_texture
 
 func _create_circle_texture(radius: int, color: Color) -> ImageTexture:
 	var size = radius * 2
@@ -150,7 +177,7 @@ func _update_walk_animation(delta: float) -> void:
 		torso_pivot.position.y = lerp(torso_pivot.position.y, 0.0, delta * 10)
 		legs_pivot.scale.y = lerp(legs_pivot.scale.y, 1.0, delta * 10)
 
-## 使用物理系统驱动武器挥舞
+## 使用物理系统驱动武器挥舞（保留兼容性）
 func _update_weapon_swing_physics(delta: float) -> void:
 	if not is_swinging or weapon_physics == null:
 		return
@@ -160,18 +187,14 @@ func _update_weapon_swing_physics(delta: float) -> void:
 	if swing_progress >= 1.0:
 		is_swinging = false
 		swing_progress = 1.0
-		## 挥舞结束，让武器回到休息位置
 		weapon_physics.set_to_rest()
 		return
 
-	## 计算当前目标角度
 	var curve_value = swing_progress
 	if swing_curve != null:
 		curve_value = swing_curve.sample(swing_progress)
 	
 	var target_angle = lerp(swing_start_angle, swing_end_angle, curve_value)
-	
-	## 设置武器物理系统的目标旋转
 	weapon_physics.set_target(Vector2.ZERO, deg_to_rad(target_angle))
 
 ## 开始武器挥舞（使用物理系统）
@@ -183,7 +206,6 @@ func start_weapon_swing(start_angle: float, end_angle: float, duration: float, c
 	swing_duration = max(0.01, duration)
 	swing_curve = curve
 	
-	## 设置初始目标角度
 	if weapon_physics != null:
 		weapon_physics.set_target(Vector2.ZERO, deg_to_rad(start_angle))
 
@@ -217,41 +239,71 @@ func get_weapon_physics() -> WeaponPhysics:
 	return weapon_physics
 
 func update_weapon_appearance(weapon: WeaponData) -> void:
-	if weapon == null:
-		main_hand_weapon.visible = false
-		off_hand_weapon.visible = false
+	if weapon == null or weapon.weapon_type == WeaponData.WeaponType.UNARMED:
+		## 徒手：隐藏武器
+		if right_arm:
+			right_arm.hide_weapon()
+		if left_arm:
+			left_arm.hide_weapon()
 		return
-
+	
+	## 创建武器纹理
+	var weapon_texture: Texture2D
 	if weapon.weapon_texture != null:
-		main_hand_weapon.texture = weapon.weapon_texture
+		weapon_texture = weapon.weapon_texture
 	else:
-		var weapon_texture = _create_weapon_texture_for_type(weapon.weapon_type)
-		main_hand_weapon.texture = weapon_texture
-
-	main_hand_weapon.offset = weapon.weapon_offset
-	main_hand_weapon.scale = weapon.weapon_scale
-	main_hand_weapon.visible = weapon.weapon_type != WeaponData.WeaponType.UNARMED
-
-	off_hand_weapon.visible = weapon.is_dual_wield()
+		weapon_texture = _create_weapon_texture_for_type(weapon.weapon_type, weapon.weapon_length)
+	
+	## 计算握柄偏移（武器纹理的中心到握柄的距离）
+	var grip_offset = Vector2(0, weapon.weapon_length * 0.4)
+	
+	## 设置右手武器
+	if right_arm:
+		right_arm.set_weapon(weapon_texture, grip_offset, -PI/2)
+		right_arm.show_weapon()
+	
+	## 双持时设置左手武器
+	if weapon.is_dual_wield() and left_arm:
+		left_arm.set_weapon(weapon_texture, grip_offset, -PI/2)
+		left_arm.show_weapon()
+	elif left_arm:
+		left_arm.hide_weapon()
 	
 	## 更新武器物理参数
 	if weapon_physics != null:
 		weapon_physics.update_physics_from_weapon(weapon)
 
-func _create_weapon_texture_for_type(weapon_type: int) -> ImageTexture:
+func _create_weapon_texture_for_type(weapon_type: int, weapon_length: float = 40.0) -> ImageTexture:
+	## 创建武器纹理，刀尖向下（+Y），这样旋转 -90° 后刀尖向右
+	var length = int(weapon_length)
+	var width: int
+	var color: Color
+	
 	match weapon_type:
 		WeaponData.WeaponType.GREATSWORD:
-			return _create_rect_texture(12, 60, Color(0.6, 0.6, 0.7))
+			width = 12
+			color = Color(0.6, 0.6, 0.7)
 		WeaponData.WeaponType.DUAL_BLADE:
-			return _create_rect_texture(8, 50, Color(0.7, 0.7, 0.8))
+			width = 8
+			color = Color(0.7, 0.7, 0.8)
 		WeaponData.WeaponType.SPEAR:
-			return _create_rect_texture(6, 80, Color(0.5, 0.4, 0.3))
+			width = 6
+			color = Color(0.5, 0.4, 0.3)
 		WeaponData.WeaponType.DAGGER:
-			return _create_rect_texture(6, 25, Color(0.8, 0.8, 0.8))
+			width = 6
+			length = 25
+			color = Color(0.8, 0.8, 0.8)
 		WeaponData.WeaponType.STAFF:
-			return _create_rect_texture(8, 55, Color(0.4, 0.3, 0.2))
+			width = 8
+			color = Color(0.4, 0.3, 0.2)
+		WeaponData.WeaponType.SWORD:
+			width = 8
+			color = Color(0.7, 0.7, 0.7)
 		_:
-			return _create_rect_texture(8, 40, Color(0.7, 0.7, 0.7))
+			width = 8
+			color = Color(0.7, 0.7, 0.7)
+	
+	return _create_rect_texture(width, length, color)
 
 func play_hit_effect() -> void:
 	var tween = create_tween()
@@ -261,7 +313,12 @@ func play_hit_effect() -> void:
 func play_attack_effect(attack: AttackData) -> void:
 	if attack == null:
 		return
-
+	
+	## 使用新的战斗动画系统
+	if combat_animator != null:
+		combat_animator.play_attack(attack)
+	
+	## 同时启动武器物理挥舞（保持兼容性）
 	start_weapon_swing(
 		attack.swing_start_angle,
 		attack.swing_end_angle,
@@ -271,7 +328,6 @@ func play_attack_effect(attack: AttackData) -> void:
 
 ## 施加武器冲量（已禁用，保留接口兼容）
 func apply_weapon_impulse(_impulse: Vector2) -> void:
-	## 武器物理现在只控制旋转，不控制位置
 	pass
 
 ## 施加武器角冲量
@@ -279,16 +335,28 @@ func apply_weapon_angular_impulse(angular_impulse: float) -> void:
 	if weapon_physics != null:
 		weapon_physics.apply_angular_impulse(angular_impulse)
 
-## 获取手臂 IK 控制器
-func get_arm_ik_controller() -> ArmIKController:
-	return arm_ik_controller
+## 获取左臂
+func get_left_arm() -> ArmRig:
+	return left_arm
+
+## 获取右臂
+func get_right_arm() -> ArmRig:
+	return right_arm
+
+## 获取战斗动画控制器
+func get_combat_animator() -> CombatAnimator:
+	return combat_animator
 
 ## 设置手臂可见性
 func set_arms_visible(visible_flag: bool) -> void:
-	if arm_ik_controller != null:
-		arm_ik_controller.set_arm_visible(visible_flag)
+	if left_arm:
+		left_arm.set_visible(visible_flag)
+	if right_arm:
+		right_arm.set_visible(visible_flag)
 
 ## 设置手臂颜色
 func set_arms_color(color: Color) -> void:
-	if arm_ik_controller != null:
-		arm_ik_controller.set_arm_color(color)
+	if left_arm:
+		left_arm.set_arm_color(color)
+	if right_arm:
+		right_arm.set_arm_color(color)

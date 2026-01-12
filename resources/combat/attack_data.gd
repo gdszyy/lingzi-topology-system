@@ -64,6 +64,12 @@ enum AttackDirection {
 @export var swing_end_angle: float = 45.0
 @export var swing_curve: Curve
 
+@export_group("Hand Trajectory")
+@export var main_hand_trajectory: Array[Vector2] = []  ## 主手轨迹点
+@export var off_hand_trajectory: Array[Vector2] = []   ## 副手轨迹点
+@export var trajectory_timing: Array[float] = []       ## 每个点的时间比例 (0-1)
+@export var main_hand_rotation_curve: Curve            ## 主手旋转曲线
+
 @export_group("Effects")
 @export var hit_effect_scene: PackedScene
 @export var swing_effect_scene: PackedScene
@@ -214,3 +220,42 @@ static func create_spear_sweep() -> AttackData:
 	attack.windup_start_position = Vector2(15, -15)
 	attack.windup_start_rotation = -120.0
 	return attack
+
+
+## 获取指定进度时的主手位置
+func get_main_hand_position_at_progress(progress: float) -> Vector2:
+	return _interpolate_trajectory(main_hand_trajectory, trajectory_timing, progress)
+
+## 获取指定进度时的副手位置
+func get_off_hand_position_at_progress(progress: float) -> Vector2:
+	return _interpolate_trajectory(off_hand_trajectory, trajectory_timing, progress)
+
+## 轨迹插值
+func _interpolate_trajectory(trajectory: Array[Vector2], timing: Array[float], progress: float) -> Vector2:
+	if trajectory.size() == 0:
+		return Vector2.ZERO
+	
+	if trajectory.size() == 1:
+		return trajectory[0]
+	
+	## 如果没有时间数组，均匀分布
+	if timing.size() == 0:
+		var segment_count = trajectory.size() - 1
+		var segment_progress = progress * segment_count
+		var segment_index = int(segment_progress)
+		segment_index = clamp(segment_index, 0, segment_count - 1)
+		var local_progress = segment_progress - segment_index
+		return trajectory[segment_index].lerp(trajectory[segment_index + 1], local_progress)
+	
+	## 使用时间数组插值
+	for i in range(timing.size() - 1):
+		if progress >= timing[i] and progress <= timing[i + 1]:
+			var local_progress = (progress - timing[i]) / (timing[i + 1] - timing[i])
+			if i < trajectory.size() - 1:
+				return trajectory[i].lerp(trajectory[i + 1], local_progress)
+	
+	return trajectory[-1] if trajectory.size() > 0 else Vector2.ZERO
+
+## 检查是否有自定义手部轨迹
+func has_hand_trajectory() -> bool:
+	return main_hand_trajectory.size() > 0

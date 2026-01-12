@@ -256,15 +256,61 @@ static func create_unarmed() -> WeaponData:
 	weapon.base_damage = 5.0
 	weapon.attack_range = 30.0
 	weapon.max_engraving_capacity = 0.0
+	weapon.weapon_length = 0.0
 
-	var punch = AttackData.new()
-	punch.attack_name = "拳击"
-	punch.damage_multiplier = 1.0
-	punch.windup_time = 0.1
-	punch.active_time = 0.1
-	punch.recovery_time = 0.2
-	punch.can_combo = true
-	weapon.primary_attacks.append(punch)
+	## 右拳
+	var right_punch = AttackData.new()
+	right_punch.attack_name = "右拳"
+	right_punch.attack_type = AttackData.AttackType.THRUST
+	right_punch.attack_direction = AttackData.AttackDirection.THRUST_FORWARD
+	right_punch.damage_multiplier = 1.0
+	right_punch.windup_time = 0.08
+	right_punch.active_time = 0.05
+	right_punch.recovery_time = 0.15
+	right_punch.can_combo = true
+	right_punch.combo_window = 0.3
+	right_punch.swing_start_angle = 0.0
+	right_punch.swing_end_angle = 0.0
+	right_punch.windup_start_position = Vector2(10, 5)
+	right_punch.windup_start_rotation = 0.0
+	right_punch.preferred_next_direction = AttackData.AttackDirection.REVERSE
+	weapon.primary_attacks.append(right_punch)
+	weapon.forward_attacks.append(right_punch)
+
+	## 左拳
+	var left_punch = AttackData.new()
+	left_punch.attack_name = "左拳"
+	left_punch.attack_type = AttackData.AttackType.THRUST
+	left_punch.attack_direction = AttackData.AttackDirection.REVERSE
+	left_punch.damage_multiplier = 0.9
+	left_punch.windup_time = 0.06
+	left_punch.active_time = 0.05
+	left_punch.recovery_time = 0.12
+	left_punch.can_combo = true
+	left_punch.combo_window = 0.25
+	left_punch.swing_start_angle = 0.0
+	left_punch.swing_end_angle = 0.0
+	left_punch.windup_start_position = Vector2(-10, 5)
+	left_punch.windup_start_rotation = 0.0
+	left_punch.preferred_next_direction = AttackData.AttackDirection.FORWARD
+	weapon.reverse_attacks.append(left_punch)
+
+	## 重拳（双键）
+	var heavy_punch = AttackData.new()
+	heavy_punch.attack_name = "重拳"
+	heavy_punch.attack_type = AttackData.AttackType.SMASH
+	heavy_punch.attack_direction = AttackData.AttackDirection.OVERHEAD
+	heavy_punch.damage_multiplier = 1.8
+	heavy_punch.windup_time = 0.2
+	heavy_punch.active_time = 0.1
+	heavy_punch.recovery_time = 0.3
+	heavy_punch.can_combo = false
+	heavy_punch.knockback_multiplier = 1.5
+	heavy_punch.swing_start_angle = -30.0
+	heavy_punch.swing_end_angle = 30.0
+	weapon.combo_attacks.append(heavy_punch)
+
+	weapon.alternate_attacks = true
 
 	return weapon
 
