@@ -48,6 +48,11 @@ func initialize(data: SpellCoreData, direction: Vector2, start_pos: Vector2) -> 
 
 ## 增强初始化（支持嵌套层级）
 func initialize_with_nesting(data: SpellCoreData, direction: Vector2, start_pos: Vector2, p_nesting_level: int = 0) -> void:
+	# 检查 data 是否为 null
+	if data == null:
+		push_error("[子弹] 初始化失败: spell_data 为 null")
+		return
+	
 	spell_data = data
 	carrier = data.carrier
 	nesting_level = p_nesting_level
@@ -74,9 +79,10 @@ func initialize_with_nesting(data: SpellCoreData, direction: Vector2, start_pos:
 
 	rule_timers.clear()
 	rule_triggered.clear()
-	for rule in spell_data.topology_rules:
-		rule_timers.append(0.0)
-		rule_triggered.append(false)
+	if spell_data != null and spell_data.topology_rules != null:
+		for rule in spell_data.topology_rules:
+			rule_timers.append(0.0)
+			rule_triggered.append(false)
 
 	_setup_visuals()
 	_setup_vfx()
@@ -154,6 +160,9 @@ func _physics_process(delta: float) -> void:
 	_check_bounds()
 
 func _update_rule_timers(delta: float) -> void:
+	if spell_data == null:
+		return
+	
 	for i in range(spell_data.topology_rules.size()):
 		var rule = spell_data.topology_rules[i]
 		if not rule.enabled:
@@ -261,6 +270,11 @@ func _on_area_entered(area: Area2D) -> void:
 		_handle_enemy_collision(area)
 
 func _handle_enemy_collision(enemy: Node2D) -> void:
+	# 检查 spell_data 是否为 null
+	if spell_data == null:
+		push_warning("[子弹] spell_data 为 null，跳过碰撞处理")
+		return
+	
 	for i in range(spell_data.topology_rules.size()):
 		var rule = spell_data.topology_rules[i]
 		if not rule.enabled:
@@ -336,6 +350,9 @@ func _calculate_damage() -> float:
 	var total = 0.0
 	var _contact_rules_found = 0
 	var _damage_actions_found = 0
+	
+	if spell_data == null:
+		return 10.0  # 返回默认伤害
 
 	for rule in spell_data.topology_rules:
 		if rule.trigger.trigger_type == TriggerData.TriggerType.ON_CONTACT:
@@ -358,6 +375,9 @@ func _calculate_damage() -> float:
 	return total
 
 func _trigger_death_rules() -> void:
+	if spell_data == null:
+		return
+	
 	for i in range(spell_data.topology_rules.size()):
 		var rule = spell_data.topology_rules[i]
 		if rule.trigger.trigger_type == TriggerData.TriggerType.ON_DEATH:
