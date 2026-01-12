@@ -253,10 +253,10 @@ static func create_damage_trail_on_move() -> SpellCoreData:
 	trigger.trigger_once = false
 
 	var zone_action = SpawnDamageZoneActionData.new()
-	zone_action.damage_per_tick = 5.0
+	zone_action.zone_damage = 5.0
 	zone_action.tick_interval = 0.5
-	zone_action.duration = 3.0
-	zone_action.radius = 50.0
+	zone_action.zone_duration = 3.0
+	zone_action.zone_radius = 50.0
 
 	var rule = TopologyRuleData.new()
 	rule.rule_name = "毒雾轨迹"
