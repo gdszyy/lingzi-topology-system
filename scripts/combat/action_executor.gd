@@ -328,7 +328,10 @@ func _execute_summon_action(action: SummonActionData, context: Dictionary) -> vo
 	if summon_vfx:
 		VFXFactory.spawn_at(summon_vfx, position, get_tree().current_scene)
 	
-	# TODO: 实际召唤物生成逻辑
+	# 实际创建召唤物
+	var runtime_manager = get_tree().get_first_node_in_group("runtime_systems_manager")
+	if runtime_manager and runtime_manager.has_method("create_summon"):
+		runtime_manager.create_summon(action, position, player)
 
 ## 执行能量恢复动作
 func _execute_energy_restore_action(action: EnergyRestoreActionData, context: Dictionary) -> void:

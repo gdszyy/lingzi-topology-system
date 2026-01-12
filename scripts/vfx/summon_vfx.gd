@@ -184,6 +184,10 @@ func _create_summon_silhouette() -> Node2D:
 			container.add_child(_create_minion_silhouette())
 		SummonActionData.SummonType.ORBITER:
 			container.add_child(_create_orbiter_silhouette())
+		SummonActionData.SummonType.DECOY:
+			container.add_child(_create_decoy_silhouette())
+		SummonActionData.SummonType.BARRIER:
+			container.add_child(_create_barrier_silhouette())
 		SummonActionData.SummonType.TOTEM:
 			container.add_child(_create_totem_silhouette())
 		_:
@@ -282,6 +286,88 @@ func _create_totem_silhouette() -> Polygon2D:
 	totem.color = _colors.secondary
 	totem.color.a = 0.7
 	return totem
+
+func _create_decoy_silhouette() -> Node2D:
+	var container = Node2D.new()
+	
+	# 诱饵形状（幽灵般的人形轮廓，带波动效果）
+	var decoy = Polygon2D.new()
+	decoy.polygon = PackedVector2Array([
+		Vector2(0, -18),
+		Vector2(8, -12),
+		Vector2(6, -5),
+		Vector2(12, 0),
+		Vector2(8, 5),
+		Vector2(10, 15),
+		Vector2(5, 12),
+		Vector2(0, 18),
+		Vector2(-5, 12),
+		Vector2(-10, 15),
+		Vector2(-8, 5),
+		Vector2(-12, 0),
+		Vector2(-6, -5),
+		Vector2(-8, -12),
+	])
+	decoy.color = Color(1.0, 0.8, 0.3, 0.7)  # 金色幽灵
+	container.add_child(decoy)
+	
+	# 内层光晕
+	var glow = Polygon2D.new()
+	var glow_points: PackedVector2Array = []
+	for i in range(12):
+		var angle = i * TAU / 12
+		glow_points.append(Vector2(cos(angle), sin(angle)) * 8.0)
+	glow.polygon = glow_points
+	glow.color = Color(1.0, 1.0, 0.5, 0.5)
+	container.add_child(glow)
+	
+	return container
+
+func _create_barrier_silhouette() -> Node2D:
+	var container = Node2D.new()
+	
+	# 屏障形状（盾牌状）
+	var barrier = Polygon2D.new()
+	barrier.polygon = PackedVector2Array([
+		Vector2(-20, -25),
+		Vector2(20, -25),
+		Vector2(25, -20),
+		Vector2(25, 20),
+		Vector2(20, 25),
+		Vector2(-20, 25),
+		Vector2(-25, 20),
+		Vector2(-25, -20),
+	])
+	barrier.color = Color(0.3, 0.5, 0.9, 0.6)  # 蓝色护盾
+	container.add_child(barrier)
+	
+	# 内层纹路
+	var inner = Polygon2D.new()
+	inner.polygon = PackedVector2Array([
+		Vector2(-15, -18),
+		Vector2(15, -18),
+		Vector2(18, -15),
+		Vector2(18, 15),
+		Vector2(15, 18),
+		Vector2(-15, 18),
+		Vector2(-18, 15),
+		Vector2(-18, -15),
+	])
+	inner.color = Color(0.5, 0.7, 1.0, 0.4)
+	container.add_child(inner)
+	
+	# 中心符文
+	var rune = Polygon2D.new()
+	rune.polygon = PackedVector2Array([
+		Vector2(0, -10),
+		Vector2(5, 0),
+		Vector2(0, 10),
+		Vector2(-5, 0),
+	])
+	rune.color = Color(0.8, 0.9, 1.0, 0.8)
+	container.add_child(rune)
+	
+	return container
 
 func _create_generic_silhouette() -> Polygon2D:
 	var generic = Polygon2D.new()

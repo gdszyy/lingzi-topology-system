@@ -251,13 +251,55 @@ func _update_decoy_behavior(instance: SummonInstance, delta: float) -> void:
 	var summon = instance.summon_node
 	var data = instance.data
 
+	# 视觉闪烁效果
 	var visual = summon.get_node_or_null("Visual")
 	if visual != null:
 		var flash = sin(Time.get_ticks_msec() * 0.005) * 0.3 + 0.7
 		visual.modulate.a = flash
+	
+	# 仇恨吸引：让范围内敌人将目标设为诱饵
+	var enemies = _find_enemies_in_range(summon.global_position, data.aggro_radius)
+	for enemy in enemies:
+		if enemy.has_method("set_target"):
+			enemy.set_target(summon)
+		elif enemy.has_method("set_aggro_target"):
+			enemy.set_aggro_target(summon)
+		elif "current_target" in enemy:
+			enemy.current_target = summon
 
 func _update_barrier_behavior(instance: SummonInstance, delta: float) -> void:
-	pass
+	var summon = instance.summon_node
+	var data = instance.data
+	
+	# 屏障阻挡逻辑：检测并阻挡进入区域的敌方弹道
+	var projectiles = get_tree().get_nodes_in_group("enemy_projectiles")
+	for proj in projectiles:
+		if not is_instance_valid(proj):
+			continue
+		
+		# 检查弹道是否在屏障范围内
+		var distance = proj.global_position.distance_to(summon.global_position)
+		if distance < 35.0:  # 屏障的有效阻挡范围
+			# 尝试反弹
+			if proj.has_method("reflect"):
+				var reflect_dir = (proj.global_position - summon.global_position).normalized()
+				proj.reflect(reflect_dir)
+			else:
+				# 直接销毁弹道
+				proj.queue_free()
+			
+			# 屏障受到伤害
+			var proj_damage = 10.0  # 默认弹道伤害
+			if "damage" in proj:
+				proj_damage = proj.damage
+			instance.current_health -= proj_damage * 0.5  # 屏障只受一半伤害
+	
+	# 屏障也可以阻挡敌人移动（推开效果）
+	var enemies = _find_enemies_in_range(summon.global_position, 40.0)
+	for enemy in enemies:
+		if enemy.has_method("apply_knockback"):
+			var push_dir = (enemy.global_position - summon.global_position).normalized()
+			enemy.apply_knockback(push_dir * 50.0 * delta)
 
 func _update_totem_behavior(instance: SummonInstance, delta: float) -> void:
 	var summon = instance.summon_node
@@ -315,10 +357,78 @@ func _expire_summon(instance: SummonInstance) -> void:
 	summon_expired.emit(summon)
 
 func _play_death_effect(position: Vector2) -> void:
-	pass
+	# 死亡爆炸特效
+	var death_vfx = _create_death_vfx(position)
+	if death_vfx:
+		get_tree().current_scene.add_child(death_vfx)
 
 func _play_expire_effect(position: Vector2) -> void:
-	pass
+	# 过期消散特效
+	var expire_vfx = _create_expire_vfx(position)
+	if expire_vfx:
+		get_tree().current_scene.add_child(expire_vfx)
+
+func _create_death_vfx(position: Vector2) -> Node2D:
+	var container = Node2D.new()
+	container.global_position = position
+	
+	# 爆炸粒子
+	var particles = GPUParticles2D.new()
+	particles.amount = 20
+	particles.lifetime = 0.5
+	particles.one_shot = true
+	particles.explosiveness = 1.0
+	
+	var material = ParticleProcessMaterial.new()
+	material.direction = Vector3(0, -1, 0)
+	material.spread = 180.0
+	material.initial_velocity_min = 80.0
+	material.initial_velocity_max = 150.0
+	material.gravity = Vector3(0, 200, 0)
+	material.scale_min = 0.3
+	material.scale_max = 0.6
+	material.color = Color(1.0, 0.4, 0.2, 1.0)  # 橙红色爆炸
+	
+	particles.process_material = material
+	particles.emitting = true
+	container.add_child(particles)
+	
+	# 自动清理
+	var timer = get_tree().create_timer(1.0)
+	timer.timeout.connect(func(): container.queue_free())
+	
+	return container
+
+func _create_expire_vfx(position: Vector2) -> Node2D:
+	var container = Node2D.new()
+	container.global_position = position
+	
+	# 消散粒子（更柔和）
+	var particles = GPUParticles2D.new()
+	particles.amount = 15
+	particles.lifetime = 0.8
+	particles.one_shot = true
+	particles.explosiveness = 0.8
+	
+	var material = ParticleProcessMaterial.new()
+	material.direction = Vector3(0, -1, 0)
+	material.spread = 60.0
+	material.initial_velocity_min = 30.0
+	material.initial_velocity_max = 60.0
+	material.gravity = Vector3(0, -30, 0)  # 向上飘散
+	material.scale_min = 0.2
+	material.scale_max = 0.4
+	material.color = Color(0.6, 0.8, 1.0, 0.8)  # 淡蓝色消散
+	
+	particles.process_material = material
+	particles.emitting = true
+	container.add_child(particles)
+	
+	# 自动清理
+	var timer = get_tree().create_timer(1.5)
+	timer.timeout.connect(func(): container.queue_free())
+	
+	return container
 
 func _find_nearest_enemy(position: Vector2, max_range: float) -> Node:
 	var nearest: Node = null
