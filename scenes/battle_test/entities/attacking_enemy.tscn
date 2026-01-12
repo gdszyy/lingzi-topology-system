@@ -1,6 +1,9 @@
-[gd_scene load_steps=2 format=3 uid="uid://attacking_enemy"]
+[gd_scene load_steps=3 format=3 uid="uid://attacking_enemy"]
 
 [ext_resource type="Script" path="res://scenes/battle_test/entities/attacking_enemy.gd" id="1_script"]
+
+[sub_resource type="CircleShape2D" id="CircleShape2D_enemy"]
+radius = 15.0
 
 [node name="AttackingEnemy" type="Area2D"]
 collision_layer = 2
@@ -24,6 +27,3 @@ offset_right = 20.0
 offset_bottom = -18.0
 show_percentage = false
 value = 100.0
-
-[sub_resource type="CircleShape2D" id="CircleShape2D_enemy"]
-radius = 15.0
