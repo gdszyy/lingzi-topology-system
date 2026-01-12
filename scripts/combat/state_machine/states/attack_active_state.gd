@@ -24,7 +24,7 @@ func initialize(_owner: Node) -> void:
 	player = _owner as PlayerController
 
 func enter(params: Dictionary = {}) -> void:
-	player.can_move = false
+	player.can_move = true  ## 【修改】允许攻击时移动
 	player.can_rotate = false
 	player.is_attacking = true
 

@@ -222,6 +222,11 @@ func _apply_movement(delta: float) -> void:
 	# 应用肢体损伤导致的移动惩罚
 	max_speed *= movement_penalty
 	acceleration *= movement_penalty
+	
+	## 【新增】攻击时移动速度惩罚
+	if is_attacking:
+		max_speed *= 0.6  # 攻击时移动速度降低40%
+		acceleration *= 0.7  # 攻击时加速度降低30%
 
 	if input_direction.length_squared() > 0.01:
 		var directional_modifier = movement_config.get_directional_speed_modifier(
