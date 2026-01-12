@@ -40,7 +40,8 @@ static func create_greatsword() -> WeaponData:
 	slash2.swing_end_angle = -60.0
 	slash2.impulse_multiplier = 1.2
 
-	weapon.primary_attacks = [slash1, slash2]
+	weapon.primary_attacks.append(slash1)
+	weapon.primary_attacks.append(slash2)
 
 	var smash = AttackData.new()
 	smash.attack_name = "重劈"
@@ -55,7 +56,7 @@ static func create_greatsword() -> WeaponData:
 	smash.impulse_multiplier = 2.0
 	smash.knockback_multiplier = 2.0
 
-	weapon.secondary_attacks = [smash]
+	weapon.secondary_attacks.append(smash)
 
 	return weapon
 
@@ -97,7 +98,8 @@ static func create_dual_blade() -> WeaponData:
 	slash2.swing_start_angle = 45.0
 	slash2.swing_end_angle = -45.0
 
-	weapon.primary_attacks = [slash1, slash2]
+	weapon.primary_attacks.append(slash1)
+	weapon.primary_attacks.append(slash2)
 
 	var thrust = AttackData.new()
 	thrust.attack_name = "短刺"
@@ -111,7 +113,7 @@ static func create_dual_blade() -> WeaponData:
 	thrust.swing_end_angle = 0.0
 	thrust.impulse_multiplier = 1.5
 
-	weapon.secondary_attacks = [thrust]
+	weapon.secondary_attacks.append(thrust)
 
 	return weapon
 
@@ -161,7 +163,9 @@ static func create_spear() -> WeaponData:
 	thrust3.can_combo = false
 	thrust3.impulse_multiplier = 1.8
 
-	weapon.primary_attacks = [thrust1, thrust2, thrust3]
+	weapon.primary_attacks.append(thrust1)
+	weapon.primary_attacks.append(thrust2)
+	weapon.primary_attacks.append(thrust3)
 
 	var spin = AttackData.new()
 	spin.attack_name = "舞枪"
@@ -176,7 +180,7 @@ static func create_spear() -> WeaponData:
 	spin.impulse_multiplier = 0.5
 	spin.knockback_multiplier = 1.5
 
-	weapon.secondary_attacks = [spin]
+	weapon.secondary_attacks.append(spin)
 
 	return weapon
 
@@ -207,7 +211,7 @@ static func create_dagger() -> WeaponData:
 	slash.swing_start_angle = -30.0
 	slash.swing_end_angle = 30.0
 
-	weapon.primary_attacks = [slash]
+	weapon.primary_attacks.append(slash)
 
 	var backstab = AttackData.new()
 	backstab.attack_name = "背刺"
@@ -221,7 +225,7 @@ static func create_dagger() -> WeaponData:
 	backstab.can_combo = false
 	backstab.impulse_multiplier = 1.5
 
-	weapon.secondary_attacks = [backstab]
+	weapon.secondary_attacks.append(backstab)
 
 	return weapon
 
@@ -252,7 +256,7 @@ static func create_staff() -> WeaponData:
 	strike.swing_start_angle = -45.0
 	strike.swing_end_angle = 45.0
 
-	weapon.primary_attacks = [strike]
+	weapon.primary_attacks.append(strike)
 
 	var sweep = AttackData.new()
 	sweep.attack_name = "横扫"
@@ -266,7 +270,7 @@ static func create_staff() -> WeaponData:
 	sweep.swing_end_angle = 90.0
 	sweep.knockback_multiplier = 1.5
 
-	weapon.secondary_attacks = [sweep]
+	weapon.secondary_attacks.append(sweep)
 
 	return weapon
 

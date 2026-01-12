@@ -28,7 +28,9 @@ func _update_all_effects(delta: float) -> void:
 
 	for target_id in active_effects:
 		var target_effects = active_effects[target_id]
-		var target_node = instance_from_id(target_id) if target_id is int else null
+		var target_node: Object = null
+		if target_id is int:
+			target_node = instance_from_id(target_id)
 
 		if target_node == null or not is_instance_valid(target_node):
 			to_remove.append(target_id)
