@@ -6,6 +6,7 @@ extends RefCounted
 # 特效场景路径
 const SCENE_PATHS = {
 	"projectile": "res://scenes/vfx/phase_projectile_vfx.tscn",
+	"weapon_projectile": "res://scenes/vfx/weapon_engraved_projectile_vfx.tscn",
 	"impact": "res://scenes/vfx/impact_vfx.tscn",
 	"trail": "res://scenes/vfx/trail_vfx.tscn",
 	"fission": "res://scenes/vfx/fission_vfx.tscn",
@@ -63,6 +64,50 @@ static func create_projectile_vfx_enhanced(spell_data: SpellCoreData, nesting_le
 	var vfx = scene.instantiate() as PhaseProjectileVFX
 	vfx.initialize_enhanced(spell_data, nesting_level, velocity)
 	return vfx
+
+## 创建武器刻录投掷物特效
+static func create_weapon_engraved_projectile_vfx(
+	spell_data: SpellCoreData,
+	weapon_type: int,
+	trigger_type: int,
+	nesting_level: int = 0,
+	velocity: Vector2 = Vector2.ZERO,
+	is_critical: bool = false
+) -> WeaponEngravedProjectileVFX:
+	var scene = _get_scene("weapon_projectile")
+	if scene == null:
+		# 如果场景不存在，动态创建
+		var vfx = WeaponEngravedProjectileVFX.new()
+		vfx.initialize_weapon_engraved(spell_data, weapon_type, trigger_type, nesting_level, velocity, is_critical)
+		return vfx
+	
+	var vfx = scene.instantiate() as WeaponEngravedProjectileVFX
+	vfx.initialize_weapon_engraved(spell_data, weapon_type, trigger_type, nesting_level, velocity, is_critical)
+	return vfx
+
+## 创建武器刻录投掷物特效（简化版，自动检测是否为刻录法术）
+static func create_projectile_vfx_auto(
+	spell_data: SpellCoreData,
+	nesting_level: int = 0,
+	velocity: Vector2 = Vector2.ZERO,
+	context: Dictionary = {}
+) -> Node2D:
+	# 检查是否为武器刻录触发
+	var is_engraved = context.get("is_engraved", false) or spell_data.is_engraved
+	var weapon_type = context.get("weapon_type", 0)
+	var trigger_type = context.get("trigger_type", 0)
+	var is_critical = context.get("is_critical", false)
+	
+	# 判断是否使用武器刻录样式
+	# 条件：是刻录法术 且 触发类型是武器相关的（ON_WEAPON_HIT 到 ON_CRITICAL_HIT）
+	var is_weapon_trigger = trigger_type >= 17 and trigger_type <= 22  # TriggerData.TriggerType.ON_WEAPON_HIT 到 ON_CRITICAL_HIT
+	
+	if is_engraved and is_weapon_trigger:
+		return create_weapon_engraved_projectile_vfx(
+			spell_data, weapon_type, trigger_type, nesting_level, velocity, is_critical
+		)
+	else:
+		return create_projectile_vfx_enhanced(spell_data, nesting_level, velocity)
 
 ## 创建命中特效
 static func create_impact_vfx(phase: CarrierConfigData.Phase, scale: float = 1.0) -> ImpactVFX:
