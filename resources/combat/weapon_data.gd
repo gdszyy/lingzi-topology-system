@@ -41,6 +41,12 @@ enum GripType {
 @export var attack_range: float = 50.0
 @export var knockback_force: float = 50.0
 
+@export_group("Attack Movement")
+## 攻击时移动速度修正（0.0-1.0，1.0表示无惩罚）
+@export_range(0.0, 1.0) var attack_move_speed_modifier: float = 0.6
+## 攻击时加速度修正（0.0-1.0，1.0表示无惩罚）
+@export_range(0.0, 1.0) var attack_acceleration_modifier: float = 0.7
+
 @export_group("Attack Actions")
 @export var primary_attacks: Array[AttackData] = []
 @export var secondary_attacks: Array[AttackData] = []

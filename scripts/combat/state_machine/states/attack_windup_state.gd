@@ -34,6 +34,7 @@ func enter(params: Dictionary = {}) -> void:
 	player.can_move = true  ## 【修改】允许攻击时移动
 	player.can_rotate = false
 	player.is_attacking = true
+	player.current_attack_phase = "windup"  ## 【优化】设置政击阶段
 
 	var input = params.get("input", null)
 	if input != null:
@@ -49,6 +50,7 @@ func enter(params: Dictionary = {}) -> void:
 	from_fly = params.get("from_fly", false)
 
 	current_attack = _get_attack_data()
+	player.current_attack = current_attack  ## 【优化】设置玩家当前攻击
 
 	if current_attack == null:
 		transition_to("Idle")
@@ -72,6 +74,7 @@ func exit() -> void:
 	reposition_timer = 0.0
 	current_attack = null
 	current_phase = Phase.REPOSITIONING
+	player.current_attack_phase = ""  ## 【优化】清除攻击阶段
 
 func physics_update(delta: float) -> void:
 	match current_phase:

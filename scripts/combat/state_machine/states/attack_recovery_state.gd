@@ -29,8 +29,10 @@ func enter(params: Dictionary = {}) -> void:
 	player.can_move = true  ## 【修改】允许攻击时移动
 	player.can_rotate = true  ## 恢复阶段允许旋转
 	player.is_attacking = true
+	player.current_attack_phase = "recovery"  ## 【优化】设置政击阶段
 
 	current_attack = params.get("attack", null)
+	player.current_attack = current_attack  ## 【优化】设置玩家当前攻击
 	input_type = params.get("input_type", 0)
 	combo_index = params.get("combo_index", 0)
 	from_fly = params.get("from_fly", false)
@@ -53,6 +55,8 @@ func exit() -> void:
 	next_input = null
 	weapon_recovery_started = false
 	player.is_attacking = false
+	player.current_attack = null  ## 【优化】清除当前攻击
+	player.current_attack_phase = ""  ## 【优化】清除攻击阶段
 
 func physics_update(delta: float) -> void:
 	recovery_timer += delta

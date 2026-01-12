@@ -48,6 +48,14 @@ enum AttackDirection {
 @export var movement_lock: bool = false
 @export var rotation_lock: bool = false
 
+@export_group("Attack Movement Modifiers")
+## 前摇阶段移动速度修正（0.0-1.0，-1表示使用武器默认值）
+@export_range(-1.0, 1.0) var windup_move_speed_modifier: float = -1.0
+## 激活阶段移动速度修正（0.0-1.0，-1表示使用武器默认值）
+@export_range(-1.0, 1.0) var active_move_speed_modifier: float = -1.0
+## 恢复阶段移动速度修正（0.0-1.0，-1表示使用武器默认值）
+@export_range(-1.0, 1.0) var recovery_move_speed_modifier: float = -1.0
+
 @export_group("Weapon Positioning")
 @export var windup_start_position: Vector2 = Vector2(20, 0)  ## 前摇开始时武器的位置
 @export var windup_start_rotation: float = -45.0            ## 前摇开始时武器的旋转角度（度）
@@ -259,3 +267,23 @@ func _interpolate_trajectory(trajectory: Array[Vector2], timing: Array[float], p
 ## 检查是否有自定义手部轨迹
 func has_hand_trajectory() -> bool:
 	return main_hand_trajectory.size() > 0
+
+## ==================== 攻击移动修正方法 ====================
+
+## 获取前摇阶段的移动速度修正（如果为-1则返回武器默认值）
+func get_windup_move_speed_modifier(weapon_default: float) -> float:
+	if windup_move_speed_modifier >= 0.0:
+		return windup_move_speed_modifier
+	return weapon_default
+
+## 获取激活阶段的移动速度修正（如果为-1则返回武器默认值）
+func get_active_move_speed_modifier(weapon_default: float) -> float:
+	if active_move_speed_modifier >= 0.0:
+		return active_move_speed_modifier
+	return weapon_default
+
+## 获取恢复阶段的移动速度修正（如果为-1则返回武器默认值）
+func get_recovery_move_speed_modifier(weapon_default: float) -> float:
+	if recovery_move_speed_modifier >= 0.0:
+		return recovery_move_speed_modifier
+	return weapon_default

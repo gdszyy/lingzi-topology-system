@@ -27,6 +27,12 @@ class_name MovementConfig extends Resource
 @export var perpendicular_turn_bonus: float = 1.2   ## 垂直移动时的转身加成
 @export var moving_turn_penalty: float = 0.8        ## 移动时的转身惩罚
 
+@export_group("Attack Movement")
+## 攻击时移动速度默认修正（0.0-1.0，1.0表示无惩罚）
+@export_range(0.0, 1.0) var default_attack_move_speed_modifier: float = 0.6
+## 攻击时加速度默认修正（0.0-1.0，1.0表示无惩罚）
+@export_range(0.0, 1.0) var default_attack_acceleration_modifier: float = 0.7
+
 @export_group("Turn Gating")
 ## 攻击/施法角度阈值
 @export var attack_angle_threshold: float = 30.0    ## 攻击允许的最大角度偏差（度）

@@ -41,11 +41,14 @@ signal vital_part_destroyed(part: BodyPartData)  # 关键部位被摧毁（导�
 var is_flying: bool = false
 var was_flying: bool = false
 var is_attacking: bool = false
+var is_attacking_while_moving: bool = false  ## 【优化】攻击移动状态标记
 var is_casting: bool = false
 var can_move: bool = true
 var can_rotate: bool = true
 
 var current_weapon: WeaponData = null
+var current_attack: AttackData = null  ## 当前执行的攻击
+var current_attack_phase: String = ""  ## 当前攻击阶段："windup", "active", "recovery"
 
 var current_spell: SpellCoreData = null
 
@@ -143,6 +146,9 @@ func _physics_process(delta: float) -> void:
 	if state_machine != null:
 		state_machine.physics_update(delta)
 
+	## 【优化】更新攻击移动状态
+	is_attacking_while_moving = is_attacking and input_direction.length_squared() > 0.01
+
 	_apply_movement(delta)
 
 	_apply_rotation(delta)
@@ -223,10 +229,12 @@ func _apply_movement(delta: float) -> void:
 	max_speed *= movement_penalty
 	acceleration *= movement_penalty
 	
-	## 【新增】攻击时移动速度惩罚
+	## 【优化】攻击时移动速度惩罚（根据武器、攻击和阶段）
 	if is_attacking:
-		max_speed *= 0.6  # 攻击时移动速度降低40%
-		acceleration *= 0.7  # 攻击时加速度降低30%
+		var attack_move_modifier = _get_attack_move_speed_modifier()
+		var attack_accel_modifier = _get_attack_acceleration_modifier()
+		max_speed *= attack_move_modifier
+		acceleration *= attack_accel_modifier
 
 	if input_direction.length_squared() > 0.01:
 		var directional_modifier = movement_config.get_directional_speed_modifier(
@@ -595,3 +603,54 @@ func get_attack_damage_modifier() -> float:
 		return right_arm.efficiency
 	
 	return 0.5  # 右臂被摧毁，攻击伤害降低50%
+
+
+## ==================== 攻击移动系统方法 ====================
+
+## 获取当前攻击时的移动速度修正
+func _get_attack_move_speed_modifier() -> float:
+	# 如果没有攻击数据，使用配置默认值
+	if current_attack == null:
+		if current_weapon != null:
+			return current_weapon.attack_move_speed_modifier
+		return movement_config.default_attack_move_speed_modifier if movement_config != null else 0.6
+	
+	# 获取武器的默认值
+	var weapon_default = movement_config.default_attack_move_speed_modifier if movement_config != null else 0.6
+	if current_weapon != null:
+		weapon_default = current_weapon.attack_move_speed_modifier
+	
+	# 根据攻击阶段获取修正值
+	match current_attack_phase:
+		"windup":
+			return current_attack.get_windup_move_speed_modifier(weapon_default)
+		"active":
+			return current_attack.get_active_move_speed_modifier(weapon_default)
+		"recovery":
+			return current_attack.get_recovery_move_speed_modifier(weapon_default)
+		_:
+			return weapon_default
+
+## 获取当前攻击时的加速度修正
+func _get_attack_acceleration_modifier() -> float:
+	# 加速度修正与速度修正保持一致的比例
+	var speed_modifier = _get_attack_move_speed_modifier()
+	
+	# 如果有武器，使用武器的加速度修正
+	if current_weapon != null:
+		var base_accel_modifier = current_weapon.attack_acceleration_modifier
+		# 根据速度修正调整加速度修正
+		return base_accel_modifier
+	
+	# 否则使用配置默认值
+	return movement_config.default_attack_acceleration_modifier if movement_config != null else 0.7
+
+## 设置当前攻击和阶段（由攻击状态机调用）
+func set_current_attack_phase(attack: AttackData, phase: String) -> void:
+	current_attack = attack
+	current_attack_phase = phase
+
+## 清除当前攻击信息
+func clear_current_attack() -> void:
+	current_attack = null
+	current_attack_phase = ""
