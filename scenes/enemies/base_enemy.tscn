@@ -1,0 +1,86 @@
+[gd_scene load_steps=14 format=3 uid="uid://base_enemy_scene"]
+
+[ext_resource type="Script" path="res://scripts/ai/enemy_ai_controller.gd" id="1_controller"]
+[ext_resource type="Script" path="res://scripts/ai/perception_system.gd" id="2_perception"]
+[ext_resource type="Script" path="res://scripts/ai/target_selector.gd" id="3_selector"]
+[ext_resource type="Script" path="res://scripts/combat/state_machine/state_machine.gd" id="4_state_machine"]
+[ext_resource type="Script" path="res://scripts/ai/states/ai_idle_state.gd" id="5_idle"]
+[ext_resource type="Script" path="res://scripts/ai/states/ai_patrol_state.gd" id="6_patrol"]
+[ext_resource type="Script" path="res://scripts/ai/states/ai_chase_state.gd" id="7_chase"]
+[ext_resource type="Script" path="res://scripts/ai/states/ai_attack_state.gd" id="8_attack"]
+[ext_resource type="Script" path="res://scripts/ai/states/ai_flee_state.gd" id="9_flee"]
+[ext_resource type="Script" path="res://scripts/ai/states/ai_use_skill_state.gd" id="10_skill"]
+
+[sub_resource type="CircleShape2D" id="CircleShape2D_collision"]
+radius = 20.0
+
+[sub_resource type="CircleShape2D" id="CircleShape2D_perception"]
+radius = 500.0
+
+[sub_resource type="CircleShape2D" id="CircleShape2D_hitbox"]
+radius = 25.0
+
+[node name="BaseEnemy" type="CharacterBody2D"]
+collision_layer = 4
+collision_mask = 3
+script = ExtResource("1_controller")
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="."]
+shape = SubResource("CircleShape2D_collision")
+
+[node name="Visuals" type="Node2D" parent="."]
+
+[node name="Body" type="Polygon2D" parent="Visuals"]
+color = Color(0.8, 0.2, 0.2, 1)
+polygon = PackedVector2Array(-15, -20, 15, -20, 20, 0, 15, 20, -15, 20, -20, 0)
+
+[node name="DirectionIndicator" type="Polygon2D" parent="Visuals"]
+color = Color(1, 0.5, 0.5, 1)
+polygon = PackedVector2Array(20, 0, 30, -5, 30, 5)
+
+[node name="StateMachine" type="Node" parent="."]
+script = ExtResource("4_state_machine")
+
+[node name="AIIdle" type="Node" parent="StateMachine"]
+script = ExtResource("5_idle")
+
+[node name="AIPatrol" type="Node" parent="StateMachine"]
+script = ExtResource("6_patrol")
+
+[node name="AIChase" type="Node" parent="StateMachine"]
+script = ExtResource("7_chase")
+
+[node name="AIAttack" type="Node" parent="StateMachine"]
+script = ExtResource("8_attack")
+
+[node name="AIFlee" type="Node" parent="StateMachine"]
+script = ExtResource("9_flee")
+
+[node name="AIUseSkill" type="Node" parent="StateMachine"]
+script = ExtResource("10_skill")
+
+[node name="Perception" type="Area2D" parent="."]
+collision_layer = 0
+collision_mask = 1
+script = ExtResource("2_perception")
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Perception"]
+shape = SubResource("CircleShape2D_perception")
+
+[node name="TargetSelector" type="Node" parent="."]
+script = ExtResource("3_selector")
+
+[node name="Hitbox" type="Area2D" parent="."]
+collision_layer = 4
+collision_mask = 1
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Hitbox"]
+shape = SubResource("CircleShape2D_hitbox")
+
+[node name="HealthBar" type="ProgressBar" parent="."]
+offset_left = -25.0
+offset_top = -35.0
+offset_right = 25.0
+offset_bottom = -28.0
+value = 100.0
+show_percentage = false
