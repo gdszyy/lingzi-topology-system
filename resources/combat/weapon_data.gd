@@ -106,7 +106,7 @@ func initialize_engraving_slots(slot_count: int = 2) -> void:
 			"%s刻录槽%d" % [weapon_name, i + 1],
 			capacity / slot_count
 		)
-		slot.allowed_triggers = [
+		slot.allowed_triggers.assign([
 			TriggerData.TriggerType.ON_WEAPON_HIT,
 			TriggerData.TriggerType.ON_ATTACK_START,
 			TriggerData.TriggerType.ON_ATTACK_ACTIVE,
@@ -115,7 +115,7 @@ func initialize_engraving_slots(slot_count: int = 2) -> void:
 			TriggerData.TriggerType.ON_CRITICAL_HIT,
 			TriggerData.TriggerType.ON_DEAL_DAMAGE,
 			TriggerData.TriggerType.ON_KILL_ENEMY
-		]
+		])
 		engraving_slots.append(slot)
 
 func get_engraved_spells() -> Array[SpellCoreData]:
