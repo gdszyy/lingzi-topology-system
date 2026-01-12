@@ -1,4 +1,4 @@
-[gd_scene load_steps=18 format=3 uid="uid://dqw8r5k2m1xvh"]
+[gd_scene load_steps=19 format=3 uid="uid://dqw8r5k2m1xvh"]
 
 [ext_resource type="Script" path="res://scripts/combat/player_controller.gd" id="1_player"]
 [ext_resource type="Script" path="res://scripts/combat/state_machine/state_machine.gd" id="2_statemachine"]
@@ -15,6 +15,7 @@
 [ext_resource type="Script" path="res://scripts/combat/engraving_manager.gd" id="13_engravingmanager"]
 [ext_resource type="Script" path="res://scripts/combat/player_visuals.gd" id="14_visuals"]
 [ext_resource type="Script" path="res://scripts/combat/weapon_physics.gd" id="15_weaponphysics"]
+[ext_resource type="Script" path="res://scripts/combat/arm_ik_controller.gd" id="16_armik"]
 
 [sub_resource type="CircleShape2D" id="CircleShape2D_collision"]
 radius = 16.0
@@ -48,6 +49,19 @@ modulate = Color(0.3, 0.5, 0.8, 1)
 position = Vector2(0, -8)
 modulate = Color(0.9, 0.75, 0.6, 1)
 scale = Vector2(0.6, 0.6)
+
+[node name="ArmIKController" type="Node2D" parent="Visuals/TorsoPivot"]
+script = ExtResource("16_armik")
+upper_arm_length = 18.0
+forearm_length = 16.0
+arm_color = Color(0.9, 0.75, 0.6, 1)
+arm_width = 6.0
+left_shoulder_offset = Vector2(-12, 0)
+right_shoulder_offset = Vector2(12, 0)
+ik_smoothing = 15.0
+elbow_bend_direction = 1.0
+min_reach_ratio = 0.1
+max_reach_ratio = 0.98
 
 [node name="WeaponRig" type="Node2D" parent="Visuals/TorsoPivot"]
 

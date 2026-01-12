@@ -9,6 +9,7 @@ class_name PlayerVisuals extends Node2D
 @onready var weapon_physics: WeaponPhysics = $TorsoPivot/WeaponRig/WeaponPhysics
 @onready var main_hand_weapon: Sprite2D = $TorsoPivot/WeaponRig/WeaponPhysics/MainHandWeapon
 @onready var off_hand_weapon: Sprite2D = $TorsoPivot/WeaponRig/WeaponPhysics/OffHandWeapon
+@onready var arm_ik_controller: ArmIKController = $TorsoPivot/ArmIKController
 
 var player: PlayerController = null
 
@@ -30,11 +31,19 @@ func _ready() -> void:
 	_connect_player_signals()
 	_initialize_weapon_appearance()
 	_setup_weapon_physics()
+	_setup_arm_ik()
 
 func _setup_weapon_physics() -> void:
 	if weapon_physics != null:
 		weapon_physics.weapon_settled.connect(_on_weapon_settled)
 		weapon_physics.weapon_position_changed.connect(_on_weapon_position_changed)
+
+func _setup_arm_ik() -> void:
+	## 初始化手臂 IK 控制器
+	if arm_ik_controller != null:
+		## 根据当前武器配置手臂
+		if player != null and player.current_weapon != null:
+			arm_ik_controller.configure_for_weapon(player.current_weapon)
 
 func _connect_player_signals() -> void:
 	if player != null:
@@ -48,6 +57,9 @@ func _on_weapon_changed(weapon: WeaponData) -> void:
 	update_weapon_appearance(weapon)
 	if weapon_physics != null:
 		weapon_physics.update_physics_from_weapon(weapon)
+	## 更新手臂 IK 配置
+	if arm_ik_controller != null:
+		arm_ik_controller.configure_for_weapon(weapon)
 
 func _on_weapon_settled() -> void:
 	## 武器稳定后的回调，可用于通知状态机
@@ -266,3 +278,17 @@ func apply_weapon_impulse(_impulse: Vector2) -> void:
 func apply_weapon_angular_impulse(angular_impulse: float) -> void:
 	if weapon_physics != null:
 		weapon_physics.apply_angular_impulse(angular_impulse)
+
+## 获取手臂 IK 控制器
+func get_arm_ik_controller() -> ArmIKController:
+	return arm_ik_controller
+
+## 设置手臂可见性
+func set_arms_visible(visible_flag: bool) -> void:
+	if arm_ik_controller != null:
+		arm_ik_controller.set_arm_visible(visible_flag)
+
+## 设置手臂颜色
+func set_arms_color(color: Color) -> void:
+	if arm_ik_controller != null:
+		arm_ik_controller.set_arm_color(color)
