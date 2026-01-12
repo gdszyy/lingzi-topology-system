@@ -1,38 +1,34 @@
-# chain_action_data.gd
-# 链式动作数据 - 伤害在多个目标间传导
 class_name ChainActionData
 extends ActionData
 
-## 链式类型
 enum ChainType {
-	LIGHTNING,       # 闪电链（快速跳跃）
-	FIRE,            # 火焰链（点燃传播）
-	ICE,             # 冰霜链（冰冻传播）
-	VOID             # 虚空链（标记传播）
+	LIGHTNING,
+	FIRE,
+	ICE,
+	VOID
 }
 
-## 目标选择策略
 enum TargetSelection {
-	NEAREST,         # 最近目标
-	RANDOM,          # 随机目标
-	LOWEST_HEALTH,   # 最低生命值
-	HIGHEST_HEALTH   # 最高生命值
+	NEAREST,
+	RANDOM,
+	LOWEST_HEALTH,
+	HIGHEST_HEALTH
 }
 
 @export var chain_type: ChainType = ChainType.LIGHTNING
-@export var chain_count: int = 3                 # 最大跳跃次数
-@export var chain_range: float = 200.0           # 跳跃范围
-@export var chain_damage: float = 30.0           # 每次跳跃伤害
-@export var chain_damage_decay: float = 0.8      # 伤害衰减（每跳）
-@export var chain_delay: float = 0.1             # 跳跃间隔（秒）
-@export var chain_can_return: bool = false       # 是否可以返回已击中目标
+@export var chain_count: int = 3
+@export var chain_range: float = 200.0
+@export var chain_damage: float = 30.0
+@export var chain_damage_decay: float = 0.8
+@export var chain_delay: float = 0.1
+@export var chain_can_return: bool = false
 @export var target_selection: TargetSelection = TargetSelection.NEAREST
-@export var apply_status_type: int = -1          # 附带状态类型（-1表示无）
-@export var apply_status_duration: float = 2.0   # 状态持续时间
-@export var apply_status_value: float = 5.0      # 状态效果值
-@export var chain_visual_width: float = 3.0      # 链条视觉宽度
-@export var fork_chance: float = 0.0             # 分叉概率（0-1）
-@export var fork_count: int = 1                  # 分叉数量
+@export var apply_status_type: int = -1
+@export var apply_status_duration: float = 2.0
+@export var apply_status_value: float = 5.0
+@export var chain_visual_width: float = 3.0
+@export var fork_chance: float = 0.0
+@export var fork_count: int = 1
 
 func _init():
 	action_type = ActionType.CHAIN

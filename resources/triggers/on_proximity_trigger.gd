@@ -1,10 +1,8 @@
-# on_proximity_trigger.gd
-# 接近触发器 - 当目标进入指定范围时触发
 class_name OnProximityTrigger
 extends TriggerData
 
-@export var detection_radius: float = 100.0  # 检测半径
-@export var target_type: String = "enemy"    # 目标类型
+@export var detection_radius: float = 100.0
+@export var target_type: String = "enemy"
 
 func _init():
 	trigger_type = TriggerType.ON_PROXIMITY

@@ -1,10 +1,8 @@
-# on_timer_trigger.gd
-# 定时触发器 - 在指定时间后触发效果
 class_name OnTimerTrigger
 extends TriggerData
 
-@export var delay: float = 1.0           # 延迟时间（秒）
-@export var repeat_interval: float = 0.0  # 重复间隔（0 = 不重复）
+@export var delay: float = 1.0
+@export var repeat_interval: float = 0.0
 
 func _init():
 	trigger_type = TriggerType.ON_TIMER

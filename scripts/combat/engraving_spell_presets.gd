@@ -1,8 +1,5 @@
-# engraving_spell_presets.gd
-# 预设刻录法术工厂 - 创建各种适合刻录的法术
 class_name EngravingSpellPresets
 
-## 创建命中时闪电链法术
 static func create_lightning_chain_on_hit() -> SpellCoreData:
 	var spell = SpellCoreData.new()
 	spell.generate_id()
@@ -13,32 +10,28 @@ static func create_lightning_chain_on_hit() -> SpellCoreData:
 	spell.cooldown = 2.0
 	spell.base_windup_time = 0.3
 	spell.cost_windup_ratio = 0.01
-	
-	# 创建触发器
+
 	var trigger = TriggerData.new()
 	trigger.trigger_type = TriggerData.TriggerType.ON_WEAPON_HIT
 	trigger.trigger_once = false
-	
-	# 创建链式动作
+
 	var chain_action = ChainActionData.new()
 	chain_action.chain_damage = 15.0
 	chain_action.chain_count = 3
 	chain_action.chain_range = 150.0
 	chain_action.chain_damage_decay = 0.8
-	
-	# 创建规则
+
 	var rule = TopologyRuleData.new()
 	rule.rule_name = "闪电链"
 	rule.trigger = trigger
 	var actions: Array[ActionData] = [chain_action]
 	rule.actions = actions
-	
+
 	var rules: Array[TopologyRuleData] = [rule]
 	spell.topology_rules = rules
-	
+
 	return spell
 
-## 创建攻击时火焰附魔
 static func create_fire_enchant_on_attack() -> SpellCoreData:
 	var spell = SpellCoreData.new()
 	spell.generate_id()
@@ -49,27 +42,26 @@ static func create_fire_enchant_on_attack() -> SpellCoreData:
 	spell.cooldown = 0.5
 	spell.base_windup_time = 0.1
 	spell.cost_windup_ratio = 0.005
-	
+
 	var trigger = TriggerData.new()
 	trigger.trigger_type = TriggerData.TriggerType.ON_ATTACK_START
 	trigger.trigger_once = false
-	
+
 	var damage_action = DamageActionData.new()
 	damage_action.damage_value = 10.0
-	damage_action.damage_type = CarrierConfigData.DamageType.ENTROPY_BURST  # 使用熵能爆发代替火焰
-	
+	damage_action.damage_type = CarrierConfigData.DamageType.ENTROPY_BURST
+
 	var rule = TopologyRuleData.new()
 	rule.rule_name = "火焰附魔"
 	rule.trigger = trigger
 	var actions: Array[ActionData] = [damage_action]
 	rule.actions = actions
-	
+
 	var rules: Array[TopologyRuleData] = [rule]
 	spell.topology_rules = rules
-	
+
 	return spell
 
-## 创建受伤时护盾
 static func create_shield_on_damage() -> SpellCoreData:
 	var spell = SpellCoreData.new()
 	spell.generate_id()
@@ -80,27 +72,26 @@ static func create_shield_on_damage() -> SpellCoreData:
 	spell.cooldown = 5.0
 	spell.base_windup_time = 0.2
 	spell.cost_windup_ratio = 0.01
-	
+
 	var trigger = TriggerData.new()
 	trigger.trigger_type = TriggerData.TriggerType.ON_TAKE_DAMAGE
 	trigger.trigger_once = false
-	
+
 	var shield_action = ShieldActionData.new()
 	shield_action.shield_amount = 20.0
 	shield_action.shield_duration = 3.0
-	
+
 	var rule = TopologyRuleData.new()
 	rule.rule_name = "反伤护盾"
 	rule.trigger = trigger
 	var actions: Array[ActionData] = [shield_action]
 	rule.actions = actions
-	
+
 	var rules: Array[TopologyRuleData] = [rule]
 	spell.topology_rules = rules
-	
+
 	return spell
 
-## 创建飞行时生命恢复
 static func create_heal_while_flying() -> SpellCoreData:
 	var spell = SpellCoreData.new()
 	spell.generate_id()
@@ -109,30 +100,29 @@ static func create_heal_while_flying() -> SpellCoreData:
 	spell.spell_type = SpellCoreData.SpellType.ENGRAVING
 	spell.resource_cost = 5.0
 	spell.cooldown = 1.0
-	spell.base_windup_time = 0.0  # 被动效果无前摇
+	spell.base_windup_time = 0.0
 	spell.cost_windup_ratio = 0.0
-	
+
 	var trigger = TriggerData.new()
 	trigger.trigger_type = TriggerData.TriggerType.ON_TICK
 	trigger.trigger_once = false
-	
+
 	var status_action = ApplyStatusActionData.new()
-	status_action.status_type = ApplyStatusActionData.StatusType.SPIRITON_SURGE  # 使用灵潮代替恢复
+	status_action.status_type = ApplyStatusActionData.StatusType.SPIRITON_SURGE
 	status_action.duration = 0.5
 	status_action.effect_value = 2.0
-	
+
 	var rule = TopologyRuleData.new()
 	rule.rule_name = "风之祝福"
 	rule.trigger = trigger
 	var actions: Array[ActionData] = [status_action]
 	rule.actions = actions
-	
+
 	var rules: Array[TopologyRuleData] = [rule]
 	spell.topology_rules = rules
-	
+
 	return spell
 
-## 创建击杀时爆炸
 static func create_explosion_on_kill() -> SpellCoreData:
 	var spell = SpellCoreData.new()
 	spell.generate_id()
@@ -143,61 +133,59 @@ static func create_explosion_on_kill() -> SpellCoreData:
 	spell.cooldown = 3.0
 	spell.base_windup_time = 0.4
 	spell.cost_windup_ratio = 0.015
-	
+
 	var trigger = TriggerData.new()
 	trigger.trigger_type = TriggerData.TriggerType.ON_KILL_ENEMY
 	trigger.trigger_once = false
-	
+
 	var explosion_action = SpawnExplosionActionData.new()
 	explosion_action.damage = 25.0
 	explosion_action.radius = 100.0
 	explosion_action.knockback_force = 200.0
 	explosion_action.damage_falloff = 0.5
-	
+
 	var rule = TopologyRuleData.new()
 	rule.rule_name = "死亡爆破"
 	rule.trigger = trigger
 	var actions: Array[ActionData] = [explosion_action]
 	rule.actions = actions
-	
+
 	var rules: Array[TopologyRuleData] = [rule]
 	spell.topology_rules = rules
-	
+
 	return spell
 
-## 创建低生命时狂暴
 static func create_berserk_on_low_health() -> SpellCoreData:
 	var spell = SpellCoreData.new()
 	spell.generate_id()
 	spell.spell_name = "狂暴本能"
 	spell.description = "生命值低于30%时，大幅提升攻击力"
 	spell.spell_type = SpellCoreData.SpellType.ENGRAVING
-	spell.resource_cost = 0.0  # 被动技能无消耗
+	spell.resource_cost = 0.0
 	spell.cooldown = 10.0
-	spell.base_windup_time = 0.0  # 被动效果无前摇
+	spell.base_windup_time = 0.0
 	spell.cost_windup_ratio = 0.0
-	
+
 	var trigger = TriggerData.new()
 	trigger.trigger_type = TriggerData.TriggerType.ON_HEALTH_LOW
 	trigger.trigger_once = false
-	
+
 	var status_action = ApplyStatusActionData.new()
-	status_action.status_type = ApplyStatusActionData.StatusType.SPIRITON_SURGE  # 使用灵潮代替狂暴
+	status_action.status_type = ApplyStatusActionData.StatusType.SPIRITON_SURGE
 	status_action.duration = 5.0
-	status_action.effect_value = 1.5  # 50%伤害提升
-	
+	status_action.effect_value = 1.5
+
 	var rule = TopologyRuleData.new()
 	rule.rule_name = "狂暴本能"
 	rule.trigger = trigger
 	var actions: Array[ActionData] = [status_action]
 	rule.actions = actions
-	
+
 	var rules: Array[TopologyRuleData] = [rule]
 	spell.topology_rules = rules
-	
+
 	return spell
 
-## 创建施法时裂变
 static func create_fission_on_spell_cast() -> SpellCoreData:
 	var spell = SpellCoreData.new()
 	spell.generate_id()
@@ -208,12 +196,11 @@ static func create_fission_on_spell_cast() -> SpellCoreData:
 	spell.cooldown = 4.0
 	spell.base_windup_time = 0.5
 	spell.cost_windup_ratio = 0.02
-	
+
 	var trigger = TriggerData.new()
 	trigger.trigger_type = TriggerData.TriggerType.ON_SPELL_CAST
 	trigger.trigger_once = false
-	
-	# 创建子法术
+
 	var child_spell = SpellCoreData.new()
 	child_spell.generate_id()
 	child_spell.spell_name = "分裂弹"
@@ -222,7 +209,7 @@ static func create_fission_on_spell_cast() -> SpellCoreData:
 	child_spell.carrier.velocity = 300.0
 	child_spell.carrier.lifetime = 2.0
 	child_spell.carrier.size = 0.5
-	
+
 	var child_rule = TopologyRuleData.new()
 	child_rule.rule_name = "碰撞伤害"
 	var child_trigger = TriggerData.new()
@@ -234,24 +221,23 @@ static func create_fission_on_spell_cast() -> SpellCoreData:
 	child_rule.actions = child_actions
 	var child_rules: Array[TopologyRuleData] = [child_rule]
 	child_spell.topology_rules = child_rules
-	
+
 	var fission_action = FissionActionData.new()
 	fission_action.spawn_count = 3
 	fission_action.spread_angle = 45.0
 	fission_action.child_spell_data = child_spell
-	
+
 	var rule = TopologyRuleData.new()
 	rule.rule_name = "法术分裂"
 	rule.trigger = trigger
 	var actions: Array[ActionData] = [fission_action]
 	rule.actions = actions
-	
+
 	var rules: Array[TopologyRuleData] = [rule]
 	spell.topology_rules = rules
-	
+
 	return spell
 
-## 创建移动时留下伤害区域
 static func create_damage_trail_on_move() -> SpellCoreData:
 	var spell = SpellCoreData.new()
 	spell.generate_id()
@@ -262,29 +248,28 @@ static func create_damage_trail_on_move() -> SpellCoreData:
 	spell.cooldown = 2.0
 	spell.base_windup_time = 0.2
 	spell.cost_windup_ratio = 0.01
-	
+
 	var trigger = TriggerData.new()
 	trigger.trigger_type = TriggerData.TriggerType.ON_MOVE_START
 	trigger.trigger_once = false
-	
+
 	var zone_action = SpawnDamageZoneActionData.new()
 	zone_action.damage_per_tick = 5.0
 	zone_action.tick_interval = 0.5
 	zone_action.duration = 3.0
 	zone_action.radius = 50.0
-	
+
 	var rule = TopologyRuleData.new()
 	rule.rule_name = "毒雾轨迹"
 	rule.trigger = trigger
 	var actions: Array[ActionData] = [zone_action]
 	rule.actions = actions
-	
+
 	var rules: Array[TopologyRuleData] = [rule]
 	spell.topology_rules = rules
-	
+
 	return spell
 
-## 获取所有预设刻录法术
 static func get_all_presets() -> Array[SpellCoreData]:
 	return [
 		create_lightning_chain_on_hit(),
@@ -297,7 +282,6 @@ static func get_all_presets() -> Array[SpellCoreData]:
 		create_damage_trail_on_move()
 	]
 
-## 获取按类别分组的预设法术
 static func get_presets_by_category() -> Dictionary:
 	return {
 		"攻击增强": [
@@ -318,11 +302,10 @@ static func get_presets_by_category() -> Dictionary:
 		]
 	}
 
-## 获取法术前摇信息
 static func get_spell_windup_info(spell: SpellCoreData, proficiency: float = 0.0) -> Dictionary:
 	var normal_windup = spell.calculate_windup_time(proficiency, false)
 	var engraved_windup = spell.calculate_windup_time(proficiency, true)
-	
+
 	return {
 		"spell_name": spell.spell_name,
 		"spell_type": spell.get_type_name(),

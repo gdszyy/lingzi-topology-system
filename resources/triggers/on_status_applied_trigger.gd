@@ -1,18 +1,12 @@
-# on_status_applied_trigger.gd
-# 状态触发器 - 目标被施加特定状态时触发
 class_name OnStatusAppliedTrigger
 extends TriggerData
 
-## 触发的状态类型（使用 ApplyStatusActionData.StatusType）
-@export var required_status_type: int = 0  # 对应 ApplyStatusActionData.StatusType
+@export var required_status_type: int = 0
 
-## 是否需要达到特定层数
 @export var required_stacks: int = 1
 
-## 是否在状态结束时也触发
 @export var trigger_on_expire: bool = false
 
-## 是否只在状态首次施加时触发（不包括刷新）
 @export var trigger_on_first_apply_only: bool = false
 
 func _init():

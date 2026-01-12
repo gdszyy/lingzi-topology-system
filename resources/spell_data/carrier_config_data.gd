@@ -1,45 +1,39 @@
-# carrier_config_data.gd
-# 载体配置数据 - 定义法术载体的物理属性
 class_name CarrierConfigData
 extends Resource
 
-## 相态枚举 - 对应修仙世界观中的灵子聚合形态
 enum Phase {
-	SOLID,    # 固态 - 高动能，低热能
-	LIQUID,   # 液态 - 中等属性，可流动
-	PLASMA    # 等离子态 - 高热能，高不稳定性
+	SOLID,
+	LIQUID,
+	PLASMA
 }
 
-## 载体类型枚举 - 定义载体的行为模式
 enum CarrierType {
-	PROJECTILE,   # 投射物 - 正常飞行的子弹
-	MINE,         # 地雷 - 速度为0，寿命翻倍，等待触发
-	SLOW_ORB      # 慢速球 - 低速飞行，适合接近触发
+	PROJECTILE,
+	MINE,
+	SLOW_ORB
 }
 
-## 伤害类型枚举
 enum DamageType {
-	KINETIC_IMPACT,   # 动能冲击 - 物理伤害
-	ENTROPY_BURST,    # 熵能爆发 - 热能伤害
-	VOID_EROSION,     # 虚空侵蚀 - 持续伤害
-	CRYO_SHATTER      # 冰晶碎裂 - 冰冻伤害
+	KINETIC_IMPACT,
+	ENTROPY_BURST,
+	VOID_EROSION,
+	CRYO_SHATTER
 }
 
 @export var phase: Phase = Phase.SOLID
-@export var carrier_type: CarrierType = CarrierType.PROJECTILE  # 载体类型
-@export var mass: float = 1.0                    # 质量，影响动能伤害
-@export var velocity: float = 500.0              # 初始速度（地雷类型时强制为0）
-@export var instability_cost: float = 0.0        # 不稳定性成本
-@export var lifetime: float = 5.0                # 存活时间（秒）
-@export var size: float = 1.0                    # 碰撞体大小
-@export var piercing: int = 0                    # 穿透次数
-@export var base_damage: float = 10.0            # 基础伤害（最小为1）
-@export var homing_strength: float = 0.0         # 追踪强度 (0 = 不追踪)
-@export var homing_range: float = 300.0          # 追踪范围
-@export var homing_turn_rate: float = 5.0        # 追踪转向速率
-@export var homing_delay: float = 0.0            # 追踪延迟（秒）
+@export var carrier_type: CarrierType = CarrierType.PROJECTILE
+@export var mass: float = 1.0
+@export var velocity: float = 500.0
+@export var instability_cost: float = 0.0
+@export var lifetime: float = 5.0
+@export var size: float = 1.0
+@export var piercing: int = 0
+@export var base_damage: float = 10.0
+@export var homing_strength: float = 0.0
+@export var homing_range: float = 300.0
+@export var homing_turn_rate: float = 5.0
+@export var homing_delay: float = 0.0
 
-## 根据相态获取默认伤害类型
 func get_default_damage_type() -> DamageType:
 	match phase:
 		Phase.SOLID:
@@ -50,30 +44,26 @@ func get_default_damage_type() -> DamageType:
 			return DamageType.ENTROPY_BURST
 	return DamageType.KINETIC_IMPACT
 
-## 获取实际速度（根据载体类型调整）
 func get_effective_velocity() -> float:
 	match carrier_type:
 		CarrierType.MINE:
-			return 0.0  # 地雷速度强制为0
+			return 0.0
 		CarrierType.SLOW_ORB:
-			return minf(velocity, 150.0)  # 慢速球最高150
+			return minf(velocity, 150.0)
 		_:
 			return velocity
 
-## 获取实际寿命（根据载体类型调整）
 func get_effective_lifetime() -> float:
 	match carrier_type:
 		CarrierType.MINE:
-			return lifetime * 2.0  # 地雷寿命翻倍
+			return lifetime * 2.0
 		_:
 			return lifetime
 
-## 计算基础动能伤害
 func calculate_kinetic_damage() -> float:
 	var effective_vel = get_effective_velocity()
-	return 0.5 * mass * effective_vel * effective_vel * 0.001  # 简化的动能公式
+	return 0.5 * mass * effective_vel * effective_vel * 0.001
 
-## 深拷贝
 func clone_deep() -> CarrierConfigData:
 	var copy = CarrierConfigData.new()
 	copy.phase = phase
@@ -91,7 +81,6 @@ func clone_deep() -> CarrierConfigData:
 	copy.homing_delay = homing_delay
 	return copy
 
-## 转换为字典（用于序列化）
 func to_dict() -> Dictionary:
 	return {
 		"phase": phase,
@@ -109,7 +98,6 @@ func to_dict() -> Dictionary:
 		"homing_delay": homing_delay
 	}
 
-## 从字典加载
 static func from_dict(data: Dictionary) -> CarrierConfigData:
 	var config = CarrierConfigData.new()
 	config.phase = data.get("phase", Phase.SOLID)
@@ -120,7 +108,7 @@ static func from_dict(data: Dictionary) -> CarrierConfigData:
 	config.lifetime = data.get("lifetime", 5.0)
 	config.size = data.get("size", 1.0)
 	config.piercing = data.get("piercing", 0)
-	config.base_damage = maxf(data.get("base_damage", 10.0), 1.0)  # 确保伤害不为0
+	config.base_damage = maxf(data.get("base_damage", 10.0), 1.0)
 	config.homing_strength = data.get("homing_strength", 0.0)
 	config.homing_range = data.get("homing_range", 300.0)
 	config.homing_turn_rate = data.get("homing_turn_rate", 5.0)

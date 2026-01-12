@@ -1,12 +1,10 @@
-# spawn_explosion_action_data.gd
-# 生成爆炸动作数据 - 在指定位置创建爆炸效果
 class_name SpawnExplosionActionData
 extends ActionData
 
-@export var explosion_damage: float = 50.0           # 爆炸伤害
-@export var explosion_radius: float = 100.0          # 爆炸半径
-@export var damage_falloff: float = 0.5              # 边缘伤害衰减 (0-1)
-@export var explosion_damage_type: int = 0           # 伤害类型
+@export var explosion_damage: float = 50.0
+@export var explosion_radius: float = 100.0
+@export var damage_falloff: float = 0.5
+@export var explosion_damage_type: int = 0
 
 func _init():
 	action_type = ActionType.SPAWN_ENTITY

@@ -1,12 +1,10 @@
-# damage_action_data.gd
-# 伤害动作数据 - 对目标造成伤害
 class_name DamageActionData
 extends ActionData
 
 @export var damage_value: float = 10.0
 @export var damage_type: CarrierConfigData.DamageType = CarrierConfigData.DamageType.KINETIC_IMPACT
-@export var use_carrier_kinetic: bool = true  # 是否使用载体动能计算伤害
-@export var damage_multiplier: float = 1.0    # 伤害倍率
+@export var use_carrier_kinetic: bool = true
+@export var damage_multiplier: float = 1.0
 
 func _init():
 	action_type = ActionType.DAMAGE

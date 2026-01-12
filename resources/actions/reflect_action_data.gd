@@ -1,23 +1,20 @@
-# reflect_action_data.gd
-# 反弹动作数据 - 反弹投射物或伤害
 class_name ReflectActionData
 extends ActionData
 
-## 反弹类型
 enum ReflectType {
-	PROJECTILE,      # 反弹投射物
-	DAMAGE,          # 反弹伤害（对攻击者造成伤害）
-	BOTH             # 两者都反弹
+	PROJECTILE,
+	DAMAGE,
+	BOTH
 }
 
 @export var reflect_type: ReflectType = ReflectType.PROJECTILE
-@export var reflect_damage_ratio: float = 0.5    # 反弹伤害比例
-@export var reflect_projectile: bool = true      # 是否反弹投射物
-@export var reflect_angle: float = 180.0         # 反弹角度范围（度）
-@export var reflect_radius: float = 60.0         # 反弹检测范围
-@export var reflect_duration: float = 2.0        # 反弹持续时间
-@export var max_reflects: int = 3                # 最大反弹次数
-@export var reflect_speed_multiplier: float = 1.2 # 反弹后速度倍率
+@export var reflect_damage_ratio: float = 0.5
+@export var reflect_projectile: bool = true
+@export var reflect_angle: float = 180.0
+@export var reflect_radius: float = 60.0
+@export var reflect_duration: float = 2.0
+@export var max_reflects: int = 3
+@export var reflect_speed_multiplier: float = 1.2
 
 func _init():
 	action_type = ActionType.REFLECT

@@ -1,42 +1,34 @@
-# enemy.gd
-# 测试用敌人实体
 extends Area2D
 class_name Enemy
 
-## 信号
 signal enemy_died(enemy: Enemy)
 signal damage_taken(amount: float)
 
-## 属性
 @export var max_health: float = 100.0
 @export var move_speed: float = 0.0
 @export var move_pattern: MovePattern = MovePattern.STATIC
 
-## 移动模式
 enum MovePattern {
-	STATIC,         # 静止
-	HORIZONTAL,     # 水平移动
-	VERTICAL,       # 垂直移动
-	CIRCULAR,       # 圆周移动
-	RANDOM,         # 随机移动
-	APPROACH,       # 接近玩家（新增）
-	APPROACH_ZIGZAG # 之字形接近（新增）
+	STATIC,
+	HORIZONTAL,
+	VERTICAL,
+	CIRCULAR,
+	RANDOM,
+	APPROACH,
+	APPROACH_ZIGZAG
 }
 
-## 运行时状态
 var current_health: float
-var status_effects: Dictionary = {}  # {status_type: {duration, value}}
+var status_effects: Dictionary = {}
 var move_time: float = 0.0
 var start_position: Vector2
 var move_direction: Vector2 = Vector2.RIGHT
-var target_position: Vector2 = Vector2.ZERO  # 目标位置（玩家位置）
-var zigzag_offset: float = 0.0  # 之字形偏移
+var target_position: Vector2 = Vector2.ZERO
+var zigzag_offset: float = 0.0
 
-## 视觉组件
 @onready var health_bar: ProgressBar = $HealthBar
 @onready var sprite: Polygon2D = $Visual
 
-## 颜色
 const NORMAL_COLOR = Color(0.8, 0.2, 0.2)
 const DAMAGED_COLOR = Color(1.0, 0.5, 0.5)
 
@@ -45,105 +37,84 @@ func _ready():
 	current_health = max_health
 	start_position = global_position
 	_update_health_bar()
-	
-	# 设置随机移动方向
+
 	if move_pattern == MovePattern.RANDOM:
 		move_direction = Vector2(randf_range(-1, 1), randf_range(-1, 1)).normalized()
-	
-	# 之字形偏移随机化
+
 	zigzag_offset = randf() * TAU
 
 func _physics_process(delta: float) -> void:
-	# 更新移动
 	_update_movement(delta)
-	
-	# 更新状态效果
+
 	_update_status_effects(delta)
 
-## 设置目标位置（玩家位置）
 func set_target_position(pos: Vector2) -> void:
 	target_position = pos
 
-## 更新移动
 func _update_movement(delta: float) -> void:
 	if move_speed <= 0:
 		return
-	
+
 	move_time += delta
-	
-	# 计算实际移动速度（考虑减速效果 - 使用结构锁代替减速）
+
 	var actual_speed = move_speed
 	if status_effects.has(ApplyStatusActionData.StatusType.STRUCTURE_LOCK):
 		actual_speed *= 0.5
-	
-	# 冷脆化时完全停止（代替冰冻）
+
 	if status_effects.has(ApplyStatusActionData.StatusType.CRYO_CRYSTAL):
 		return
-	
+
 	match move_pattern:
 		MovePattern.HORIZONTAL:
 			position.x = start_position.x + sin(move_time * 2.0) * 100.0
-		
+
 		MovePattern.VERTICAL:
 			position.y = start_position.y + sin(move_time * 2.0) * 100.0
-		
+
 		MovePattern.CIRCULAR:
 			position.x = start_position.x + cos(move_time * 1.5) * 80.0
 			position.y = start_position.y + sin(move_time * 1.5) * 80.0
-		
+
 		MovePattern.RANDOM:
 			position += move_direction * actual_speed * delta
-			# 边界反弹
 			var viewport = get_viewport_rect()
 			if position.x < 50 or position.x > viewport.size.x - 50:
 				move_direction.x *= -1
 			if position.y < 50 or position.y > viewport.size.y - 50:
 				move_direction.y *= -1
-			# 随机改变方向
 			if randf() < 0.01:
 				move_direction = move_direction.rotated(randf_range(-0.5, 0.5))
-		
+
 		MovePattern.APPROACH:
-			# 直线接近目标
 			var direction = (target_position - global_position).normalized()
 			global_position += direction * actual_speed * delta
-		
+
 		MovePattern.APPROACH_ZIGZAG:
-			# 之字形接近目标
 			var direction = (target_position - global_position).normalized()
-			# 添加垂直于前进方向的摆动
 			var perpendicular = Vector2(-direction.y, direction.x)
 			var zigzag = sin(move_time * 3.0 + zigzag_offset) * 0.5
 			var final_direction = (direction + perpendicular * zigzag).normalized()
 			global_position += final_direction * actual_speed * delta
 
-## 受到伤害
 func take_damage(amount: float, _damage_type: int = 0) -> void:
-	# 应用状态效果修正
 	var final_damage = amount
-	
-	# 熵燃增伤（代替燃烧）
+
 	if status_effects.has(ApplyStatusActionData.StatusType.ENTROPY_BURN):
 		final_damage *= 1.2
-	
-	# 冷脆化减伤（代替冰冻）
+
 	if status_effects.has(ApplyStatusActionData.StatusType.CRYO_CRYSTAL):
 		final_damage *= 0.8
-	
+
 	current_health -= final_damage
 	damage_taken.emit(final_damage)
-	
-	# 闪烁效果
+
 	_flash_damage()
-	
-	# 更新血条
+
 	_update_health_bar()
-	
-	# 死亡检查
+
 	if current_health <= 0:
 		_die()
 
-## 应用状态效果
 func apply_status(status_type: int, duration: float, value: float) -> void:
 	status_effects[status_type] = {
 		"duration": duration,
@@ -151,66 +122,58 @@ func apply_status(status_type: int, duration: float, value: float) -> void:
 	}
 	_update_status_visual()
 
-## 更新状态效果
 func _update_status_effects(delta: float) -> void:
 	var to_remove = []
-	
+
 	for status_type in status_effects:
 		var effect = status_effects[status_type]
 		effect.duration -= delta
-		
-		# 持续伤害效果
-		if status_type == ApplyStatusActionData.StatusType.ENTROPY_BURN:  # 熵燃（代替燃烧）
+
+		if status_type == ApplyStatusActionData.StatusType.ENTROPY_BURN:
 			take_damage(effect.value * delta, 0)
-		elif status_type == ApplyStatusActionData.StatusType.SPIRITON_EROSION:  # 灵蚀（代替中毒）
+		elif status_type == ApplyStatusActionData.StatusType.SPIRITON_EROSION:
 			take_damage(effect.value * delta * 0.5, 0)
-		
+
 		if effect.duration <= 0:
 			to_remove.append(status_type)
-	
+
 	for status_type in to_remove:
 		status_effects.erase(status_type)
-	
+
 	if to_remove.size() > 0:
 		_update_status_visual()
 
-## 更新状态视觉
 func _update_status_visual() -> void:
 	var color = NORMAL_COLOR
-	
-	if status_effects.has(ApplyStatusActionData.StatusType.ENTROPY_BURN):  # 熵燃
-		color = Color(1.0, 0.5, 0.0)  # 橙色
-	elif status_effects.has(ApplyStatusActionData.StatusType.CRYO_CRYSTAL):  # 冷脆化
-		color = Color(0.5, 0.8, 1.0)  # 冰蓝色
-	elif status_effects.has(ApplyStatusActionData.StatusType.SPIRITON_EROSION):  # 灵蚀
-		color = Color(0.5, 0.8, 0.2)  # 绿色
-	elif status_effects.has(ApplyStatusActionData.StatusType.STRUCTURE_LOCK):  # 结构锁
-		color = Color(0.6, 0.6, 0.8)  # 灰蓝色
-	
+
+	if status_effects.has(ApplyStatusActionData.StatusType.ENTROPY_BURN):
+		color = Color(1.0, 0.5, 0.0)
+	elif status_effects.has(ApplyStatusActionData.StatusType.CRYO_CRYSTAL):
+		color = Color(0.5, 0.8, 1.0)
+	elif status_effects.has(ApplyStatusActionData.StatusType.SPIRITON_EROSION):
+		color = Color(0.5, 0.8, 0.2)
+	elif status_effects.has(ApplyStatusActionData.StatusType.STRUCTURE_LOCK):
+		color = Color(0.6, 0.6, 0.8)
+
 	if sprite:
 		sprite.color = color
 
-## 闪烁伤害效果
 func _flash_damage() -> void:
 	if sprite:
 		sprite.color = DAMAGED_COLOR
 		var tween = create_tween()
 		tween.tween_property(sprite, "color", NORMAL_COLOR, 0.2)
 
-## 更新血条
 func _update_health_bar() -> void:
 	if health_bar:
 		health_bar.value = (current_health / max_health) * 100.0
 
-## 死亡
 func _die() -> void:
 	enemy_died.emit(self)
-	# 使用 call_deferred 避免在物理查询期间修改状态
 	set_deferred("monitoring", false)
 	set_deferred("monitorable", false)
 	call_deferred("queue_free")
 
-## 重置
 func reset() -> void:
 	current_health = max_health
 	status_effects.clear()
@@ -219,10 +182,8 @@ func reset() -> void:
 	_update_health_bar()
 	_update_status_visual()
 
-## 获取当前生命值百分比
 func get_health_percent() -> float:
 	return current_health / max_health
 
-## 获取到目标的距离
 func get_distance_to_target() -> float:
 	return global_position.distance_to(target_position)

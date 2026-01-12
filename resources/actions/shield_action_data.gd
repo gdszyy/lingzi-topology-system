@@ -1,23 +1,20 @@
-# shield_action_data.gd
-# 护盾动作数据 - 生成护盾吸收伤害
 class_name ShieldActionData
 extends ActionData
 
-## 护盾类型
 enum ShieldType {
-	PERSONAL,        # 个人护盾（仅自身）
-	AREA,            # 范围护盾（范围内友方）
-	PROJECTILE       # 弹幕护盾（阻挡投射物）
+	PERSONAL,
+	AREA,
+	PROJECTILE
 }
 
 @export var shield_type: ShieldType = ShieldType.PERSONAL
-@export var shield_amount: float = 50.0          # 护盾值
-@export var shield_duration: float = 5.0         # 持续时间
-@export var shield_radius: float = 80.0          # 护盾范围（AREA类型使用）
-@export var shield_regen: float = 0.0            # 护盾回复速度（每秒）
-@export var damage_reduction: float = 0.0        # 额外伤害减免（0-1）
-@export var on_break_explode: bool = false       # 护盾破碎时是否爆炸
-@export var break_explosion_damage: float = 30.0 # 破碎爆炸伤害
+@export var shield_amount: float = 50.0
+@export var shield_duration: float = 5.0
+@export var shield_radius: float = 80.0
+@export var shield_regen: float = 0.0
+@export var damage_reduction: float = 0.0
+@export var on_break_explode: bool = false
+@export var break_explosion_damage: float = 30.0
 
 func _init():
 	action_type = ActionType.SHIELD

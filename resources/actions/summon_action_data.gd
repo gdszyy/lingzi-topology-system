@@ -1,42 +1,38 @@
-# summon_action_data.gd
-# 召唤动作数据 - 召唤独立实体
 class_name SummonActionData
 extends ActionData
 
-## 召唤物类型
 enum SummonType {
-	TURRET,          # 炮塔（固定位置，自动攻击）
-	MINION,          # 仆从（追踪敌人，近战攻击）
-	ORBITER,         # 环绕体（围绕玩家旋转）
-	DECOY,           # 诱饵（吸引敌人注意）
-	BARRIER,         # 屏障（阻挡投射物）
-	TOTEM            # 图腾（持续释放效果）
+	TURRET,
+	MINION,
+	ORBITER,
+	DECOY,
+	BARRIER,
+	TOTEM
 }
 
-## 召唤物行为模式
 enum BehaviorMode {
-	AGGRESSIVE,      # 主动攻击（追击敌人）
-	DEFENSIVE,       # 防御模式（守护区域）
-	PASSIVE,         # 被动模式（不主动攻击）
-	FOLLOW           # 跟随模式（跟随施法者）
+	AGGRESSIVE,
+	DEFENSIVE,
+	PASSIVE,
+	FOLLOW
 }
 
 @export var summon_type: SummonType = SummonType.TURRET
 @export var behavior_mode: BehaviorMode = BehaviorMode.AGGRESSIVE
-@export var summon_count: int = 1                # 召唤数量
-@export var summon_duration: float = 10.0        # 召唤物持续时间
-@export var summon_health: float = 50.0          # 召唤物生命值
-@export var summon_damage: float = 15.0          # 召唤物伤害
-@export var summon_attack_interval: float = 1.0  # 攻击间隔
-@export var summon_attack_range: float = 200.0   # 攻击范围
-@export var summon_move_speed: float = 100.0     # 移动速度（MINION/FOLLOW使用）
-@export var orbit_radius: float = 80.0           # 环绕半径（ORBITER使用）
-@export var orbit_speed: float = 2.0             # 环绕速度（ORBITER使用）
-@export var aggro_radius: float = 150.0          # 嘲讽范围（DECOY使用）
-@export var totem_effect_radius: float = 120.0   # 图腾效果范围（TOTEM使用）
-@export var totem_effect_interval: float = 1.0   # 图腾效果间隔（TOTEM使用）
-@export var inherit_spell: bool = false          # 是否继承父法术
-@export var custom_spell_data: Resource = null   # 自定义法术数据（SpellCoreData）
+@export var summon_count: int = 1
+@export var summon_duration: float = 10.0
+@export var summon_health: float = 50.0
+@export var summon_damage: float = 15.0
+@export var summon_attack_interval: float = 1.0
+@export var summon_attack_range: float = 200.0
+@export var summon_move_speed: float = 100.0
+@export var orbit_radius: float = 80.0
+@export var orbit_speed: float = 2.0
+@export var aggro_radius: float = 150.0
+@export var totem_effect_radius: float = 120.0
+@export var totem_effect_interval: float = 1.0
+@export var inherit_spell: bool = false
+@export var custom_spell_data: Resource = null
 
 func _init():
 	action_type = ActionType.SUMMON
@@ -117,5 +113,4 @@ static func from_dict(data: Dictionary) -> SummonActionData:
 	action.totem_effect_radius = data.get("totem_effect_radius", 120.0)
 	action.totem_effect_interval = data.get("totem_effect_interval", 1.0)
 	action.inherit_spell = data.get("inherit_spell", false)
-	# custom_spell_data 需要在运行时通过 SpellCoreData.from_dict 加载
 	return action

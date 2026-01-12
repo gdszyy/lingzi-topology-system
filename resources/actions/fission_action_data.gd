@@ -1,25 +1,22 @@
-# fission_action_data.gd
-# 裂变动作数据 - 生成子法术实体（核心递归机制）
 class_name FissionActionData
 extends ActionData
 
-## 裂变方向模式
 enum DirectionMode {
-	INHERIT_PARENT,      # 继承父实体方向（以父实体飞行方向为基准扩散）
-	FIXED_WORLD,         # 固定世界坐标（以右方向为基准）
-	TOWARD_NEAREST,      # 朝向最近敌人
-	RANDOM               # 完全随机
+	INHERIT_PARENT,
+	FIXED_WORLD,
+	TOWARD_NEAREST,
+	RANDOM
 }
 
-@export var spawn_count: int = 3                    # 生成数量
-@export var spread_angle: float = 360.0             # 扩散角度（度）
-@export var inherit_velocity: float = 0.5           # 继承父载体速度的比例
-@export var spawn_offset: float = 10.0              # 生成位置偏移
-@export var child_spell_id: String = ""             # 子法术ID（用于引用）
-@export var child_spell_data: Resource = null       # 子法术数据（SpellCoreData）
-@export var max_recursion_depth: int = 3            # 最大递归深度
-@export var destroy_parent: bool = false            # 裂变后是否销毁父实体
-@export var direction_mode: DirectionMode = DirectionMode.INHERIT_PARENT  # 裂变方向模式
+@export var spawn_count: int = 3
+@export var spread_angle: float = 360.0
+@export var inherit_velocity: float = 0.5
+@export var spawn_offset: float = 10.0
+@export var child_spell_id: String = ""
+@export var child_spell_data: Resource = null
+@export var max_recursion_depth: int = 3
+@export var destroy_parent: bool = false
+@export var direction_mode: DirectionMode = DirectionMode.INHERIT_PARENT
 
 func _init():
 	action_type = ActionType.FISSION
@@ -35,7 +32,6 @@ func clone_deep() -> ActionData:
 	copy.max_recursion_depth = max_recursion_depth
 	copy.destroy_parent = destroy_parent
 	copy.direction_mode = direction_mode
-	# 深拷贝子法术数据
 	if child_spell_data != null and child_spell_data.has_method("clone_deep"):
 		copy.child_spell_data = child_spell_data.clone_deep()
 	return copy
@@ -64,5 +60,4 @@ static func from_dict(data: Dictionary) -> FissionActionData:
 	action.max_recursion_depth = data.get("max_recursion_depth", 3)
 	action.destroy_parent = data.get("destroy_parent", false)
 	action.direction_mode = data.get("direction_mode", DirectionMode.INHERIT_PARENT)
-	# 子法术数据需要在外部处理，避免循环引用
 	return action

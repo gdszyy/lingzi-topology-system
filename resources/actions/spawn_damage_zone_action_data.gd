@@ -1,14 +1,12 @@
-# spawn_damage_zone_action_data.gd
-# 生成持续伤害区域动作数据 - 创建持续伤害区域
 class_name SpawnDamageZoneActionData
 extends ActionData
 
-@export var zone_damage: float = 10.0                # 每次伤害
-@export var zone_radius: float = 80.0                # 区域半径
-@export var zone_duration: float = 5.0               # 持续时间
-@export var tick_interval: float = 0.5               # 伤害间隔
-@export var zone_damage_type: int = 0                # 伤害类型
-@export var slow_amount: float = 0.0                 # 减速效果 (0-1)
+@export var zone_damage: float = 10.0
+@export var zone_radius: float = 80.0
+@export var zone_duration: float = 5.0
+@export var tick_interval: float = 0.5
+@export var zone_damage_type: int = 0
+@export var slow_amount: float = 0.0
 
 func _init():
 	action_type = ActionType.SPAWN_ENTITY
