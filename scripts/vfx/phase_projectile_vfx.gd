@@ -419,6 +419,17 @@ func _animate_plasma(delta: float) -> void:
 	if core_visual:
 		core_visual.position = Vector2(randf_range(-2, 2), randf_range(-2, 2)) * size_scale
 
+## 更新速度向量（用于调整拖尾方向等）
+func update_velocity(new_velocity: Vector2) -> void:
+	velocity = new_velocity
+	
+	# 更新拖尾粒子方向
+	if trail_particles and trail_particles.process_material:
+		var material = trail_particles.process_material as ParticleProcessMaterial
+		if material and velocity.length() > 0:
+			var dir = -velocity.normalized()
+			material.direction = Vector3(dir.x, dir.y, 0)
+
 ## 停止特效
 func stop() -> void:
 	if trail_particles:
