@@ -175,16 +175,16 @@ func _generate_random_trigger() -> TriggerData:
 	match type:
 		0:
 			trigger = OnTimerTrigger.new()
-			trigger.trigger_type = TriggerData.TriggerType.TIMER
+			trigger.trigger_type = TriggerData.TriggerType.ON_TIMER
 			trigger.interval = randf_range(0.5, 3.0)
 		1:
 			trigger = OnProximityTrigger.new()
-			trigger.trigger_type = TriggerData.TriggerType.PROXIMITY
+			trigger.trigger_type = TriggerData.TriggerType.ON_PROXIMITY
 			trigger.radius = randf_range(50.0, 150.0)
 			trigger.target_group = "enemy"
 		2:
 			trigger = TriggerData.new()
-			trigger.trigger_type = TriggerData.TriggerType.ON_HIT
+			trigger.trigger_type = TriggerData.TriggerType.ON_CONTACT
 		3:
 			trigger = TriggerData.new()
 			trigger.trigger_type = TriggerData.TriggerType.ON_DEATH
