@@ -311,7 +311,7 @@ func _update_ui() -> void:
 	weapon_label.text = "武器: %s" % weapon_name
 
 	var stats = player.get_stats()
-	health_label.text = "HP: %.0f/%.0f" % [player.current_health, player.max_health]
+	health_label.text = "HP: %.0f/%.0f" % [player.get_current_health(), player.get_max_health()]
 	damage_label.text = "伤害: %.0f" % stats.total_damage_dealt
 	hits_label.text = "命中: %d" % stats.total_hits
 
