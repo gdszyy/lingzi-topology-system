@@ -45,6 +45,7 @@ var child_editor: SpellEditor = null
 
 @onready var save_button: Button = $MainPanel/ScrollContainer/VBox/ButtonContainer/SaveButton
 @onready var cancel_button: Button = $MainPanel/ScrollContainer/VBox/ButtonContainer/CancelButton
+@onready var view_nesting_button: Button = $MainPanel/ScrollContainer/VBox/ButtonContainer/ViewNestingButton
 
 var base_damage: float = 10.0
 
@@ -95,6 +96,8 @@ func _setup_ui() -> void:
 func _connect_signals() -> void:
 	save_button.pressed.connect(_on_save_pressed)
 	cancel_button.pressed.connect(_on_cancel_pressed)
+	if view_nesting_button:
+		view_nesting_button.pressed.connect(_on_view_nesting_pressed)
 
 	add_rule_button.pressed.connect(_on_add_rule_pressed)
 	delete_rule_button.pressed.connect(_on_delete_rule_pressed)
@@ -194,6 +197,22 @@ func _on_save_pressed() -> void:
 func _on_cancel_pressed() -> void:
 	editor_closed.emit()
 	visible = false
+
+func _on_view_nesting_pressed() -> void:
+	if current_spell == null:
+		return
+	
+	# 保存当前UI状态到法术
+	_save_ui_to_spell()
+	
+	# 创建或获取嵌套查看器窗口
+	var viewer_scene = preload("res://scenes/player/ui/spell_nesting_viewer.tscn")
+	var viewer = viewer_scene.instantiate()
+	get_tree().root.add_child(viewer)
+	viewer.show_spell(current_spell)
+	
+	# 连接关闭信号以清理窗口
+	viewer.viewer_closed.connect(func(): viewer.queue_free())
 
 func _on_add_rule_pressed() -> void:
 	var rule = TopologyRuleData.new()

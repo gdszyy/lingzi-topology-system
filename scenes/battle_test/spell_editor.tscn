@@ -387,3 +387,8 @@ text = "关闭"
 [connection signal="pressed" from="RuleEditPanel/ScrollContainer/VBox/RuleButtonContainer/CloseRuleButton" to="." method="close_rule_edit"]
 [connection signal="pressed" from="ActionEditPanel/ScrollContainer/VBox/ActionButtonContainer/SaveActionButton" to="." method="save_action_edit"]
 [connection signal="pressed" from="ActionEditPanel/ScrollContainer/VBox/ActionButtonContainer/CloseActionButton" to="." method="close_action_edit"]
+
+[node name="ViewNestingButton" type="Button" parent="MainPanel/ScrollContainer/VBox/ButtonContainer"]
+custom_minimum_size = Vector2(120, 40)
+layout_mode = 2
+text = "查看嵌套结构"
