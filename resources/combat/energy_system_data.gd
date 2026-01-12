@@ -97,6 +97,10 @@ func cultivate(delta: float, intensity: float = 1.0) -> float:
 	
 	return actual_recovery
 
+## 检查是否有足够能量消耗
+func can_consume(amount: float) -> bool:
+	return current_energy >= amount
+
 ## 消耗能量（用于施法等）
 ## 返回是否成功消耗
 func consume_energy(amount: float) -> bool:
