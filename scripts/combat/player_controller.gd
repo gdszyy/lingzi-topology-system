@@ -56,6 +56,16 @@ var current_spell: SpellCoreData = null
 var current_shield: float = 0.0
 var shield_duration: float = 0.0
 
+# 状态效果修饰符
+var defense_modifier: float = 0.0
+var accuracy_modifier: float = 0.0
+var evasion_modifier: float = 0.0
+var damage_taken_modifier: float = 1.0
+var damage_output_modifier: float = 1.0
+var speed_modifier: float = 1.0
+var is_frozen: bool = false
+var is_movement_locked: bool = false
+
 var input_direction: Vector2 = Vector2.ZERO
 var mouse_position: Vector2 = Vector2.ZERO
 var target_angle: float = 0.0
@@ -203,7 +213,7 @@ func _update_energy_system(delta: float) -> void:
 		stats.energy_cap_recovered += recovered
 
 func _apply_movement(delta: float) -> void:
-	if not can_move:
+	if not can_move or is_frozen or is_movement_locked:
 		var stop_friction = movement_config.friction_ground if not is_flying else movement_config.friction_flight
 		velocity = velocity.move_toward(Vector2.ZERO, stop_friction * delta)
 		return
@@ -226,8 +236,8 @@ func _apply_movement(delta: float) -> void:
 		acceleration *= current_weapon.get_acceleration_modifier()
 
 	# 应用肢体损伤导致的移动惩罚
-	max_speed *= movement_penalty
-	acceleration *= movement_penalty
+	max_speed *= movement_penalty * speed_modifier
+	acceleration *= movement_penalty * speed_modifier
 	
 	## 【优化】攻击时移动速度惩罚（根据武器、攻击和阶段）
 	if is_attacking:
@@ -309,7 +319,7 @@ func set_spell(spell: SpellCoreData) -> void:
 ## 承受伤害（二维体素战斗系统核心方法）
 ## 支持指定目标肢体
 func take_damage(damage: float, source: Node2D = null, target_part_type: int = BodyPartData.PartType.TORSO) -> void:
-	var actual_damage = damage
+	var actual_damage = damage * damage_taken_modifier
 
 	# 护盾优先吸收伤害
 	if current_shield > 0:
@@ -319,8 +329,10 @@ func take_damage(damage: float, source: Node2D = null, target_part_type: int = B
 
 	# 剩余伤害由肢体系统处理
 	if actual_damage > 0 and engraving_manager != null:
-		# 对目标肢体造成伤害，并获取传递到核心的伤害值
-		var core_damage = engraving_manager.damage_body_part(target_part_type, actual_damage)
+		# 应用防御修饰符
+		var final_part_damage = actual_damage * (1.0 / (1.0 + max(0, defense_modifier / 100.0)))
+			# 对目标肢体造成伤害，并获取传递到核心的伤害值
+			var core_damage = engraving_manager.damage_body_part(target_part_type, final_part_damage)
 		
 		# 记录统计
 		var part_key = BodyPartData.PartType.keys()[target_part_type]
@@ -420,6 +432,49 @@ func _on_depleted() -> void:
 func _on_death() -> void:
 	print("[玩家死亡] 能量上限耗尽")
 	# 可以在这里添加死亡处理逻辑
+
+# ==================== 状态效果 API ====================
+
+func set_frozen(frozen: bool) -> void:
+	is_frozen = frozen
+	if is_frozen:
+		can_move = false
+	else:
+		can_move = true
+
+func set_movement_locked(locked: bool) -> void:
+	is_movement_locked = locked
+
+func modify_defense(amount: float) -> void:
+	defense_modifier += amount
+
+func modify_accuracy(amount: float) -> void:
+	accuracy_modifier += amount
+
+func modify_evasion(amount: float) -> void:
+	evasion_modifier += amount
+
+func modify_damage_taken(amount: float) -> void:
+	damage_taken_modifier += amount
+
+func modify_damage_output(amount: float) -> void:
+	damage_output_modifier += amount
+
+func modify_move_speed(amount: float) -> void:
+	speed_modifier += amount
+
+func add_shield(amount: float) -> void:
+	current_shield += amount
+
+func apply_status(status_type: int, duration: float, effect_value: float = 0.0) -> void:
+	var runtime_manager = get_tree().get_first_node_in_group("runtime_systems_manager")
+	if runtime_manager != null:
+		var status_data = ApplyStatusActionData.new()
+		status_data.status_type = status_type
+		status_data.duration = duration
+		status_data.effect_value = effect_value
+		status_data._sync_phase_from_status()
+		runtime_manager.apply_status(self, status_data)
 
 func _on_state_changed(_old_state: State, new_state: State) -> void:
 	state_changed.emit(new_state.name if new_state else "")

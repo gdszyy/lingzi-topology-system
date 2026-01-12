@@ -266,8 +266,11 @@ func _apply_status_to_target(target: Node, status_type: ApplyStatusActionData.St
 		var status_data = ApplyStatusActionData.new()
 		status_data.status_type = status_type
 		status_data.duration = duration
+		# 确保同步相态
+		status_data._sync_phase_from_status()
 		status_manager.apply_status(target, status_data)
 	elif target.has_method("apply_status"):
+		# 回退方案：如果目标自己实现了 apply_status
 		target.apply_status(status_type, duration)
 
 ## 播放单段链式视觉效果

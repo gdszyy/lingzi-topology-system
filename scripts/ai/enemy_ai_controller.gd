@@ -46,6 +46,17 @@ var can_attack: bool = true
 var attack_cooldown_timer: float = 0.0
 var last_attack_time: float = 0.0
 
+# 状态效果修饰符
+var defense_modifier: float = 0.0
+var accuracy_modifier: float = 0.0
+var evasion_modifier: float = 0.0
+var damage_taken_modifier: float = 1.0
+var damage_output_modifier: float = 1.0
+var speed_modifier: float = 1.0
+var is_frozen: bool = false
+var is_movement_locked: bool = false
+var current_shield: float = 0.0
+
 # 技能系统
 var skill_cooldowns: Dictionary = {}
 
@@ -239,13 +250,18 @@ func _update_health_bar() -> void:
 
 ## 移动到目标位置
 func move_to(target: Vector2, delta: float) -> void:
+	if is_frozen or is_movement_locked:
+		velocity = Vector2.ZERO
+		return
+		
 	var direction = (target - global_position).normalized()
-	var speed = behavior_profile.move_speed * movement_penalty
+	var speed = behavior_profile.move_speed * movement_penalty * speed_modifier
 	velocity = direction * speed
 
 ## 移动到目标附近的最佳距离
 func move_to_engagement_distance(target: Node2D, delta: float) -> void:
-	if target == null:
+	if target == null or is_frozen or is_movement_locked:
+		velocity = Vector2.ZERO
 		return
 	
 	var distance = global_position.distance_to(target.global_position)
@@ -266,7 +282,7 @@ func move_to_engagement_distance(target: Node2D, delta: float) -> void:
 		else:
 			direction = Vector2.ZERO
 	
-	var speed = behavior_profile.move_speed * movement_penalty
+	var speed = behavior_profile.move_speed * movement_penalty * speed_modifier
 	velocity = direction * speed
 
 ## 逃离目标
@@ -319,6 +335,9 @@ func _get_attack_data() -> Dictionary:
 		base_damage = weapon_data.base_damage
 		attack_range = weapon_data.attack_range
 	
+	# 应用伤害输出修饰符
+	base_damage *= damage_output_modifier
+	
 	return {
 		"damage": base_damage,
 		"range": attack_range,
@@ -327,10 +346,18 @@ func _get_attack_data() -> Dictionary:
 
 ## 应用攻击伤害
 func _apply_attack_damage(target: Node2D, attack: Dictionary, part_type: int) -> void:
-	if target == null:
+	if target == null or is_frozen:
+		is_attacking = false
 		return
 	
 	var damage = attack.damage
+	
+	# 应用命中率修饰符（简单模拟）
+	if randf() < -accuracy_modifier:
+		# 命中率降低
+		if randf() < 0.5:
+			is_attacking = false
+			return
 	
 	# 检查距离
 	var distance = global_position.distance_to(target.global_position)
@@ -421,11 +448,22 @@ func _cast_spell(spell: SpellCoreData) -> void:
 
 ## 承受伤害
 func take_damage(damage: float, source: Node2D = null, target_part_type: int = -1) -> void:
-	var final_damage = damage
+	var final_damage = damage * damage_taken_modifier
 	
+	# 护盾优先吸收
+	if current_shield > 0:
+		var shield_absorb = min(current_shield, final_damage)
+		current_shield -= shield_absorb
+		final_damage -= shield_absorb
+	
+	if final_damage <= 0:
+		return
+
 	# 二维体素战斗系统处理
 	if use_voxel_system and body_parts.size() > 0:
-		var core_damage = _damage_body_part(target_part_type, final_damage)
+		# 应用防御修饰符到肢体伤害
+		var part_damage = final_damage * (1.0 / (1.0 + max(0, defense_modifier / 100.0)))
+		var core_damage = _damage_body_part(target_part_type, part_damage)
 		
 		# 核心伤害传递到能量系统
 		if energy_system != null and core_damage > 0:
@@ -438,11 +476,50 @@ func take_damage(damage: float, source: Node2D = null, target_part_type: int = -
 	stats.total_damage_taken += final_damage
 	damage_taken.emit(final_damage, source)
 	_update_health_bar()
-	
-	# 检查是否应该反击
-	if source != null and behavior_profile.should_counter_attack():
-		# 触发反击逻辑
-		pass
+
+# ==================== 状态效果 API ====================
+
+func set_frozen(frozen: bool) -> void:
+	is_frozen = frozen
+	if is_frozen:
+		stop_movement()
+
+func set_movement_locked(locked: bool) -> void:
+	is_movement_locked = locked
+	if is_movement_locked:
+		stop_movement()
+
+func modify_defense(amount: float) -> void:
+	defense_modifier += amount
+
+func modify_accuracy(amount: float) -> void:
+	accuracy_modifier += amount
+
+func modify_evasion(amount: float) -> void:
+	evasion_modifier += amount
+
+func modify_damage_taken(amount: float) -> void:
+	# amount 是增加的百分比，例如 0.25 表示增加 25% 受到伤害
+	damage_taken_modifier += amount
+
+func modify_damage_output(amount: float) -> void:
+	damage_output_modifier += amount
+
+func modify_move_speed(amount: float) -> void:
+	speed_modifier += amount
+
+func add_shield(amount: float) -> void:
+	current_shield += amount
+
+func apply_status(status_type: int, duration: float, effect_value: float = 0.0) -> void:
+	var runtime_manager = get_tree().get_first_node_in_group("runtime_systems_manager")
+	if runtime_manager != null:
+		var status_data = ApplyStatusActionData.new()
+		status_data.status_type = status_type
+		status_data.duration = duration
+		status_data.effect_value = effect_value
+		status_data._sync_phase_from_status()
+		runtime_manager.apply_status(self, status_data)
 
 ## 对特定肢体造成伤害
 func _damage_body_part(part_type: int, damage: float) -> float:

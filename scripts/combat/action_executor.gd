@@ -136,11 +136,18 @@ func _execute_status_action(action: ApplyStatusActionData, context: Dictionary) 
 	if target == null:
 		return
 
-	if target.has_method("apply_status"):
-		target.apply_status(action.status_type, duration, action.effect_value)
+	# 获取 RuntimeSystemsManager 并应用状态效果
+	var runtime_manager = get_tree().get_first_node_in_group("runtime_systems_manager")
+	if runtime_manager != null and runtime_manager.has_method("apply_status"):
+		runtime_manager.apply_status(target, action)
 		status_applied.emit(target, action.get_status_name(), duration)
 		
 		# 播放状态效果特效
+		_spawn_status_vfx(target, action.status_type, duration, action.effect_value)
+	elif target.has_method("apply_status"):
+		# 回退方案：如果目标自己实现了 apply_status
+		target.apply_status(action.status_type, duration, action.effect_value)
+		status_applied.emit(target, action.get_status_name(), duration)
 		_spawn_status_vfx(target, action.status_type, duration, action.effect_value)
 
 ## 生成状态效果特效
