@@ -44,7 +44,16 @@ var is_settled: bool = true
 var physics_enabled: bool = true
 
 func _ready() -> void:
-	player = get_parent().get_parent().get_parent()  # Visuals/TorsoPivot/WeaponRig -> Player
+	## 节点层级: Player/Visuals/TorsoPivot/WeaponRig/WeaponPhysics
+	## 需要向上查找4层才能到达Player
+	var parent = get_parent()  # WeaponRig
+	if parent:
+		parent = parent.get_parent()  # TorsoPivot
+	if parent:
+		parent = parent.get_parent()  # Visuals
+	if parent:
+		parent = parent.get_parent()  # Player
+	player = parent
 	
 	# 初始化位置
 	position = rest_position
@@ -64,10 +73,13 @@ func _physics_process(delta: float) -> void:
 	weapon_position_changed.emit(position, rotation)
 
 func _update_weapon_mass() -> void:
-	if player != null and player.has_method("get") and player.current_weapon != null:
-		current_weapon_mass = max(0.1, player.current_weapon.weight)
-	else:
-		current_weapon_mass = 1.0
+	## 安全地获取武器重量
+	if player != null and player is CharacterBody2D:
+		var player_controller = player as PlayerController
+		if player_controller != null and player_controller.current_weapon != null:
+			current_weapon_mass = max(0.1, player_controller.current_weapon.weight)
+			return
+	current_weapon_mass = 1.0
 
 func _apply_spring_damper_physics(delta: float) -> void:
 	## 位置物理 - 弹簧阻尼模型
