@@ -84,6 +84,12 @@ var difficulty_multipliers = {
 }
 
 func _ready() -> void:
+	# 创建运行时系统管理器（用于处理链式、护盾、状态等效果）
+	var runtime_manager = RuntimeSystemsManager.new()
+	runtime_manager.name = "RuntimeSystemsManager"
+	add_child(runtime_manager)
+	print("[AIArenaScene] RuntimeSystemsManager 已创建并添加到场景")
+	
 	_initialize_enemy_presets()
 	_generate_wave_configs()
 	_setup_ui()

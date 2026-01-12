@@ -53,7 +53,14 @@ func _update_all_chains(delta: float) -> void:
 
 ## 启动链式效果（统一入口）
 func start_chain(first_target: Node, chain_data: ChainActionData, source_position: Vector2) -> void:
+	print("[ChainSystem] start_chain 被调用！目标=%s, 类型=%s, 链接数=%d" % [
+		first_target.name if first_target else "null",
+		chain_data.get_type_name(),
+		chain_data.chain_count
+	])
+	
 	if first_target == null or not is_instance_valid(first_target):
+		print("[ChainSystem] 目标无效，取消链式效果")
 		return
 
 	var chain = ChainInstance.new(chain_data, first_target, source_position)
@@ -218,10 +225,14 @@ func _get_target_health(target: Node) -> float:
 
 func _apply_chain_damage(chain: ChainInstance, target: Node) -> void:
 	var damage = chain.data.chain_damage * pow(chain.data.chain_damage_decay, chain.jump_count)
+	print("[ChainSystem] 对目标 %s 造成链式伤害: %.1f (跳跃次数=%d)" % [target.name, damage, chain.jump_count])
 
 	if target.has_method("take_damage"):
 		target.take_damage(damage)
 		chain.total_damage += damage
+		print("[ChainSystem] 伤害已应用，总伤害=%.1f" % chain.total_damage)
+	else:
+		print("[ChainSystem] 警告：目标 %s 没有 take_damage 方法！" % target.name)
 
 	_apply_chain_status(chain, target)
 
@@ -261,6 +272,7 @@ func _apply_status_to_target(target: Node, status_type: ApplyStatusActionData.St
 
 ## 播放单段链式视觉效果
 func _play_chain_visual_segment(from_pos: Vector2, to_pos: Vector2, chain_data: ChainActionData) -> void:
+	print("[ChainSystem] 播放链式视觉效果: 从 %s 到 %s" % [from_pos, to_pos])
 	var chain_line = Line2D.new()
 	chain_line.name = "ChainSegment"
 	chain_line.width = chain_data.chain_visual_width

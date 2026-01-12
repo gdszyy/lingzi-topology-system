@@ -68,6 +68,12 @@ var shield_test_timer: Timer = null
 var shield_test_player: Node2D = null
 
 func _ready():
+	# 创建运行时系统管理器（用于处理链式、护盾、状态等效果）
+	var runtime_manager = RuntimeSystemsManager.new()
+	runtime_manager.name = "RuntimeSystemsManager"
+	add_child(runtime_manager)
+	print("[BattleTestScene] RuntimeSystemsManager 已创建并添加到场景")
+	
 	enemy_scene = preload("res://scenes/battle_test/entities/enemy.tscn")
 	dummy_enemy_scene = preload("res://scenes/battle_test/entities/dummy_enemy.tscn")
 	attacking_enemy_scene = preload("res://scenes/battle_test/entities/attacking_enemy.tscn")

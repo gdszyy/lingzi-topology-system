@@ -27,6 +27,12 @@ var available_spells: Array[SpellCoreData] = []
 var available_engraving_spells: Array[SpellCoreData] = []
 
 func _ready() -> void:
+	# 创建运行时系统管理器（用于处理链式、护盾、状态等效果）
+	var runtime_manager = RuntimeSystemsManager.new()
+	runtime_manager.name = "RuntimeSystemsManager"
+	add_child(runtime_manager)
+	print("[CombatTestScene] RuntimeSystemsManager 已创建并添加到场景")
+	
 	dummy_enemy_scene = preload("res://scenes/battle_test/entities/dummy_enemy.tscn")
 	engraving_panel_scene = preload("res://scenes/player/ui/engraving_panel.tscn")
 
