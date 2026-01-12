@@ -331,8 +331,8 @@ func take_damage(damage: float, source: Node2D = null, target_part_type: int = B
 	if actual_damage > 0 and engraving_manager != null:
 		# 应用防御修饰符
 		var final_part_damage = actual_damage * (1.0 / (1.0 + max(0, defense_modifier / 100.0)))
-			# 对目标肢体造成伤害，并获取传递到核心的伤害值
-			var core_damage = engraving_manager.damage_body_part(target_part_type, final_part_damage)
+		# 对目标肢体造成伤害，并获取传递到核心的伤害值
+		var core_damage = engraving_manager.damage_body_part(target_part_type, final_part_damage)
 		
 		# 记录统计
 		var part_key = BodyPartData.PartType.keys()[target_part_type]
