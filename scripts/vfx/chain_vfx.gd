@@ -20,8 +20,13 @@ var _is_active: bool = false
 var chain_lines: Array[Line2D] = []
 var impact_effects: Array[Node2D] = []
 
+var _pending_start: bool = false
+
 func _ready() -> void:
-	pass
+	# 如果在进入场景树前已调用 initialize，则在此启动链式序列
+	if _pending_start:
+		_pending_start = false
+		_start_chain_sequence()
 
 func initialize(p_type: ChainActionData.ChainType, targets: Array[Node2D], p_damage: float = 30.0, p_delay: float = 0.1) -> void:
 	chain_type = p_type
@@ -33,7 +38,12 @@ func initialize(p_type: ChainActionData.ChainType, targets: Array[Node2D], p_dam
 	_colors = VFXManager.CHAIN_TYPE_COLORS.get(chain_type, VFXManager.CHAIN_TYPE_COLORS[ChainActionData.ChainType.LIGHTNING])
 	
 	_is_active = true
-	_start_chain_sequence()
+	
+	# 检查是否已在场景树中，如果不在则延迟启动
+	if is_inside_tree():
+		_start_chain_sequence()
+	else:
+		_pending_start = true
 
 func _start_chain_sequence() -> void:
 	if _chain_targets.size() < 2:
