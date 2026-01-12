@@ -46,7 +46,6 @@ func _ready() -> void:
 	
 	## WeaponPhysics节点本身不移动，保持在原点
 	## 武器精灵是子节点，已经有自己的位置
-	target_local_position = rest_position
 	target_local_rotation = rest_rotation
 
 func _physics_process(delta: float) -> void:
@@ -58,7 +57,7 @@ func _physics_process(delta: float) -> void:
 	_apply_constraints()
 	_check_settled_state()
 	
-	weapon_position_changed.emit(position, rotation)
+	weapon_position_changed.emit(Vector2.ZERO, rotation)
 
 func _update_weapon_mass() -> void:
 	## 安全地获取武器重量
