@@ -25,6 +25,10 @@ var rule_triggered: Array[bool] = []
 @onready var visual_circle: Polygon2D = $VisualCircle
 @onready var trail: Line2D = $Trail
 
+# VFX组件
+var phase_vfx: PhaseProjectileVFX = null
+var trail_vfx: TrailVFX = null
+
 const PHASE_COLORS = {
 	CarrierConfigData.Phase.SOLID: Color(0.8, 0.4, 0.2),
 	CarrierConfigData.Phase.LIQUID: Color(0.2, 0.6, 0.9),
@@ -57,6 +61,7 @@ func initialize(data: SpellCoreData, direction: Vector2, start_pos: Vector2) -> 
 		rule_triggered.append(false)
 
 	_setup_visuals()
+	_setup_vfx()
 
 func _setup_visuals() -> void:
 	if carrier == null:
@@ -83,6 +88,28 @@ func _setup_visuals() -> void:
 
 	print("[子弹] 视觉设置: 颜色=%s, 缩放=%.2f, 位置=%s" % [color, base_scale, global_position])
 
+## 设置VFX特效
+func _setup_vfx() -> void:
+	if carrier == null:
+		return
+	
+	# 创建相态弹体特效
+	phase_vfx = VFXFactory.create_projectile_vfx(carrier.phase, carrier.size, velocity)
+	if phase_vfx:
+		add_child(phase_vfx)
+		phase_vfx.position = Vector2.ZERO
+	
+	# 创建拖尾特效（添加到场景根节点以保持世界坐标）
+	trail_vfx = VFXFactory.create_trail_vfx(carrier.phase, self, carrier.size * 6.0)
+	if trail_vfx:
+		get_tree().current_scene.add_child(trail_vfx)
+	
+	# 隐藏原有的简单视觉效果
+	if visual_circle:
+		visual_circle.visible = false
+	if trail:
+		trail.visible = false
+
 func _physics_process(delta: float) -> void:
 	if carrier == null:
 		return
@@ -99,6 +126,10 @@ func _physics_process(delta: float) -> void:
 
 	position += velocity * delta
 	rotation = velocity.angle()
+	
+	# 更新VFX速度
+	if phase_vfx:
+		phase_vfx.update_velocity(velocity)
 
 	_update_rule_timers(delta)
 
@@ -168,6 +199,12 @@ func _execute_action(action: ActionData) -> void:
 
 func _execute_fission(fission: FissionActionData) -> void:
 	print("[子弹] 执行裂变: 数量=%d, 角度=%.1f°, 方向模式=%d" % [fission.spawn_count, fission.spread_angle, fission.direction_mode])
+	
+	# 播放裂变特效
+	var fission_vfx = VFXFactory.create_fission_vfx(carrier.phase, fission.spawn_count, fission.spread_angle, carrier.size)
+	if fission_vfx:
+		VFXFactory.spawn_at(fission_vfx, global_position, get_tree().current_scene)
+	
 	var parent_direction = velocity.normalized() if velocity.length() > 0 else Vector2.RIGHT
 	fission_triggered.emit(global_position, fission.child_spell_data, fission.spawn_count, fission.spread_angle, parent_direction, fission.direction_mode)
 
@@ -217,12 +254,21 @@ func _handle_enemy_collision(enemy: Node2D) -> void:
 		enemy.take_damage(total_damage, 0)
 
 	hit_enemy.emit(enemy, total_damage)
+	
+	# 播放命中特效
+	_spawn_impact_vfx(enemy.global_position)
 
 	if piercing_remaining > 0:
 		piercing_remaining -= 1
 	else:
 		call_deferred("_trigger_death_rules")
 		_die()
+
+## 生成命中特效
+func _spawn_impact_vfx(pos: Vector2) -> void:
+	var impact_vfx = VFXFactory.create_impact_vfx(carrier.phase, carrier.size)
+	if impact_vfx:
+		VFXFactory.spawn_at(impact_vfx, pos, get_tree().current_scene)
 
 func _execute_contact_rule(rule: TopologyRuleData, enemy: Node2D) -> void:
 	for action in rule.actions:
@@ -234,6 +280,14 @@ func _execute_contact_rule(rule: TopologyRuleData, enemy: Node2D) -> void:
 			var status = action as ApplyStatusActionData
 			if enemy.has_method("apply_status"):
 				enemy.apply_status(status.status_type, status.duration, status.effect_value)
+				# 播放状态效果特效
+				_spawn_status_vfx(enemy, status)
+
+## 生成状态效果特效
+func _spawn_status_vfx(target: Node2D, status: ApplyStatusActionData) -> void:
+	var status_vfx = VFXFactory.create_status_effect_vfx(status.status_type, status.duration, status.effect_value, target)
+	if status_vfx:
+		get_tree().current_scene.add_child(status_vfx)
 
 func _calculate_damage() -> float:
 	var total = 0.0
@@ -275,6 +329,10 @@ func _check_bounds() -> void:
 		_die()
 
 func _die() -> void:
+	# 停止拖尾特效
+	if trail_vfx and is_instance_valid(trail_vfx):
+		trail_vfx.stop()
+	
 	projectile_died.emit(self)
 	set_deferred("monitoring", false)
 	set_deferred("monitorable", false)

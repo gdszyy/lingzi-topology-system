@@ -20,6 +20,7 @@ enum MovePattern {
 
 var current_health: float
 var status_effects: Dictionary = {}
+var status_vfx_instances: Dictionary = {}  # 存储状态效果VFX实例
 var move_time: float = 0.0
 var start_position: Vector2
 var move_direction: Vector2 = Vector2.RIGHT
@@ -116,11 +117,49 @@ func take_damage(amount: float, _damage_type: int = 0) -> void:
 		_die()
 
 func apply_status(status_type: int, duration: float, value: float) -> void:
+	var is_new_status = not status_effects.has(status_type)
+	
 	status_effects[status_type] = {
 		"duration": duration,
 		"value": value
 	}
 	_update_status_visual()
+	
+	# 如果是新状态，创建VFX
+	if is_new_status:
+		_spawn_status_vfx(status_type, duration, value)
+	else:
+		# 刷新现有VFX的持续时间
+		_refresh_status_vfx(status_type, duration)
+
+## 生成状态效果VFX
+func _spawn_status_vfx(status_type: int, duration: float, value: float) -> void:
+	# 先移除旧的VFX（如果有）
+	_remove_status_vfx(status_type)
+	
+	# 创建新的状态效果VFX
+	var status_vfx = VFXFactory.create_status_effect_vfx(status_type, duration, value, self)
+	if status_vfx:
+		get_tree().current_scene.add_child(status_vfx)
+		status_vfx_instances[status_type] = status_vfx
+
+## 刷新状态效果VFX持续时间
+func _refresh_status_vfx(status_type: int, duration: float) -> void:
+	if status_vfx_instances.has(status_type):
+		var vfx = status_vfx_instances[status_type]
+		if is_instance_valid(vfx) and vfx.has_method("refresh_duration"):
+			vfx.refresh_duration(duration)
+
+## 移除状态效果VFX
+func _remove_status_vfx(status_type: int) -> void:
+	if status_vfx_instances.has(status_type):
+		var vfx = status_vfx_instances[status_type]
+		if is_instance_valid(vfx):
+			if vfx.has_method("stop"):
+				vfx.stop()
+			else:
+				vfx.queue_free()
+		status_vfx_instances.erase(status_type)
 
 func _update_status_effects(delta: float) -> void:
 	var to_remove = []
@@ -139,6 +178,7 @@ func _update_status_effects(delta: float) -> void:
 
 	for status_type in to_remove:
 		status_effects.erase(status_type)
+		_remove_status_vfx(status_type)
 
 	if to_remove.size() > 0:
 		_update_status_visual()
@@ -169,6 +209,10 @@ func _update_health_bar() -> void:
 		health_bar.value = (current_health / max_health) * 100.0
 
 func _die() -> void:
+	# 清理所有状态效果VFX
+	for status_type in status_vfx_instances.keys():
+		_remove_status_vfx(status_type)
+	
 	enemy_died.emit(self)
 	set_deferred("monitoring", false)
 	set_deferred("monitorable", false)
@@ -177,6 +221,12 @@ func _die() -> void:
 func reset() -> void:
 	current_health = max_health
 	status_effects.clear()
+	
+	# 清理所有状态效果VFX
+	for status_type in status_vfx_instances.keys():
+		_remove_status_vfx(status_type)
+	status_vfx_instances.clear()
+	
 	position = start_position
 	move_time = 0.0
 	_update_health_bar()

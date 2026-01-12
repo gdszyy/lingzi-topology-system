@@ -18,6 +18,9 @@ var time_elapsed: float = 0.0
 var tick_timer: float = 0.0
 var enemies_in_zone: Array[Node2D] = []
 
+# VFX组件
+var zone_vfx: DamageZoneVFX = null
+
 func _ready():
 	var shape = CircleShape2D.new()
 	shape.radius = radius
@@ -29,6 +32,7 @@ func _ready():
 	area_exited.connect(_on_area_exited)
 
 	_setup_visual()
+	_setup_vfx()
 
 func _process(delta: float) -> void:
 	time_elapsed += delta
@@ -41,6 +45,7 @@ func _process(delta: float) -> void:
 	_update_visual(delta)
 
 	if time_elapsed >= duration:
+		_cleanup_vfx()
 		zone_expired.emit(self)
 		queue_free()
 
@@ -74,17 +79,41 @@ func _setup_visual() -> void:
 		Color(0.3, 0.8, 0.2, 0.4)
 	]
 	visual.color = colors[damage_type % colors.size()]
+	
+	# 隐藏原有视觉效果，使用VFX代替
+	visual.visible = false
+
+## 设置VFX特效
+func _setup_vfx() -> void:
+	# 根据伤害类型映射到相态
+	var phase = _damage_type_to_phase(damage_type)
+	
+	# 创建伤害区域特效
+	zone_vfx = VFXFactory.create_damage_zone_vfx(phase, radius, duration, tick_interval)
+	if zone_vfx:
+		add_child(zone_vfx)
+		zone_vfx.position = Vector2.ZERO
+
+## 将伤害类型映射到相态
+func _damage_type_to_phase(dmg_type: int) -> CarrierConfigData.Phase:
+	match dmg_type:
+		CarrierConfigData.DamageType.ENTROPY_BURST:
+			return CarrierConfigData.Phase.PLASMA
+		CarrierConfigData.DamageType.CRYO_SHATTER:
+			return CarrierConfigData.Phase.LIQUID
+		CarrierConfigData.DamageType.KINETIC_IMPACT:
+			return CarrierConfigData.Phase.SOLID
+		_:
+			return CarrierConfigData.Phase.PLASMA
+
+## 清理VFX
+func _cleanup_vfx() -> void:
+	if zone_vfx and is_instance_valid(zone_vfx):
+		zone_vfx.stop()
 
 func _update_visual(_delta: float) -> void:
-	if visual == null:
-		return
-
-	var pulse = sin(time_elapsed * 3.0) * 0.1 + 0.9
-	visual.scale = Vector2(pulse, pulse)
-
-	if time_elapsed > duration - 1.0:
-		var fade = (duration - time_elapsed) / 1.0
-		visual.modulate.a = fade
+	# 原有视觉效果已禁用，由VFX接管
+	pass
 
 func _deal_tick_damage() -> void:
 	enemies_in_zone = enemies_in_zone.filter(func(e): return is_instance_valid(e))

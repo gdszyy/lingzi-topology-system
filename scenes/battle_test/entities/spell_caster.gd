@@ -102,6 +102,12 @@ func _on_fission_triggered(pos: Vector2, child_spell: SpellCoreData, count: int,
 		spell_to_use.carrier.lifetime,
 		spell_to_use.carrier.size
 	])
+	
+	# 播放裂变特效
+	var phase = spell_to_use.carrier.phase if spell_to_use.carrier else CarrierConfigData.Phase.PLASMA
+	var fission_vfx = VFXFactory.create_fission_vfx(phase, count, spread_angle, 1.0)
+	if fission_vfx:
+		VFXFactory.spawn_at(fission_vfx, pos, get_tree().current_scene)
 
 	var base_direction: Vector2
 	match direction_mode:
@@ -240,8 +246,8 @@ func _on_explosion_requested(pos: Vector2, damage: float, radius: float, falloff
 	call_deferred("_spawn_explosion", pos, damage, radius, falloff, damage_type)
 
 func _spawn_explosion(pos: Vector2, damage: float, radius: float, falloff: float, damage_type: int) -> void:
-	var explosion_scene = preload("res://scenes/battle_test/entities/explosion.tscn")
-	var explosion = explosion_scene.instantiate() as Explosion
+	var explosion_scene_res = preload("res://scenes/battle_test/entities/explosion.tscn")
+	var explosion = explosion_scene_res.instantiate() as Explosion
 	get_tree().current_scene.add_child(explosion)
 	explosion.initialize(pos, damage, radius, falloff, damage_type)
 

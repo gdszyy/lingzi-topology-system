@@ -15,6 +15,7 @@ class ShieldInstance:
 	var remaining_duration: float
 	var target: Node
 	var shield_node: Node2D
+	var shield_vfx: ShieldVFX  # VFX组件
 	var reflect_count: int = 0
 
 	func _init(shield_data: ShieldActionData, target_node: Node):
@@ -62,14 +63,39 @@ func create_shield(target: Node, shield_data: ShieldActionData) -> void:
 		existing.current_amount = minf(existing.current_amount + shield_data.shield_amount * 0.5, max_shield)
 
 		existing.remaining_duration = maxf(existing.remaining_duration, shield_data.shield_duration)
+		
+		# 刷新VFX
+		if existing.shield_vfx and is_instance_valid(existing.shield_vfx):
+			existing.shield_vfx.refresh(existing.current_amount, existing.remaining_duration)
 
 		return
 
 	var instance = ShieldInstance.new(shield_data, target)
 	instance.shield_node = _create_shield_visual(target, shield_data)
+	
+	# 创建护盾VFX
+	instance.shield_vfx = _create_shield_vfx(target, shield_data)
+	
 	active_shields[target_id] = instance
 
 	shield_created.emit(target, instance)
+
+## 创建护盾VFX
+func _create_shield_vfx(target: Node, shield_data: ShieldActionData) -> ShieldVFX:
+	var radius = 30.0 if shield_data.shield_type == ShieldActionData.ShieldType.PERSONAL else shield_data.shield_radius
+	
+	var shield_vfx = VFXFactory.create_shield_vfx(
+		shield_data.shield_type,
+		shield_data.shield_amount,
+		shield_data.shield_duration,
+		radius,
+		target
+	)
+	
+	if shield_vfx:
+		get_tree().current_scene.add_child(shield_vfx)
+	
+	return shield_vfx
 
 func damage_shield(target: Node, damage: float) -> float:
 	var target_id = target.get_instance_id()
@@ -84,6 +110,10 @@ func damage_shield(target: Node, damage: float) -> float:
 	var remaining_damage = damage - absorbed
 
 	shield_damaged.emit(target, absorbed, instance.current_amount)
+	
+	# 更新VFX受击效果
+	if instance.shield_vfx and is_instance_valid(instance.shield_vfx):
+		instance.shield_vfx.on_hit(absorbed)
 
 	if instance.current_amount <= 0:
 		_break_shield(target, remaining_damage)
@@ -108,6 +138,10 @@ func try_reflect_projectile(target: Node, projectile: Node) -> bool:
 	instance.reflect_count += 1
 	_reflect_projectile(projectile, target)
 	shield_reflected.emit(target, projectile)
+	
+	# 播放反弹VFX
+	if instance.shield_vfx and is_instance_valid(instance.shield_vfx):
+		instance.shield_vfx.on_reflect()
 
 	return true
 
@@ -137,6 +171,10 @@ func _break_shield(target: Node, overkill_damage: float) -> void:
 	if instance.shield_node != null and is_instance_valid(instance.shield_node):
 		_play_break_effect(instance.shield_node.global_position)
 		instance.shield_node.queue_free()
+	
+	# 播放护盾破碎VFX
+	if instance.shield_vfx and is_instance_valid(instance.shield_vfx):
+		instance.shield_vfx.on_break()
 
 	if instance.data.on_break_explode:
 		_trigger_break_explosion(target, instance.data)
@@ -153,6 +191,10 @@ func _expire_shield(target: Node) -> void:
 
 	if instance.shield_node != null and is_instance_valid(instance.shield_node):
 		instance.shield_node.queue_free()
+	
+	# 停止护盾VFX
+	if instance.shield_vfx and is_instance_valid(instance.shield_vfx):
+		instance.shield_vfx.stop()
 
 	shield_expired.emit(target)
 
@@ -195,31 +237,29 @@ func _create_shield_visual(target: Node, shield_data: ShieldActionData) -> Node2
 	shield_shape.polygon = points
 
 	shield_visual.add_child(shield_shape)
+	
+	# 隐藏原有视觉效果，使用VFX代替
+	shield_visual.visible = false
+	
 	target.add_child(shield_visual)
 
 	return shield_visual
 
 func _update_shield_visual(instance: ShieldInstance) -> void:
-	if instance.shield_node == null or not is_instance_valid(instance.shield_node):
-		return
-
-	var shield_shape = instance.shield_node.get_node_or_null("ShieldShape")
-	if shield_shape == null:
-		return
-
-	var health_ratio = instance.current_amount / instance.data.shield_amount
-	var base_alpha = 0.4
-	shield_shape.color.a = base_alpha * health_ratio
-
-	if health_ratio < 0.3:
-		var flash = sin(Time.get_ticks_msec() * 0.01) * 0.5 + 0.5
-		shield_shape.color.a = base_alpha * health_ratio * (0.5 + flash * 0.5)
+	# 原有视觉效果已禁用，由VFX接管
+	pass
 
 func _play_break_effect(position: Vector2) -> void:
-	pass
+	# 播放护盾破碎爆炸特效
+	var explosion_vfx = VFXFactory.create_explosion_vfx(CarrierConfigData.Phase.PLASMA, 50.0, 0.5)
+	if explosion_vfx:
+		VFXFactory.spawn_at(explosion_vfx, position, get_tree().current_scene)
 
 func _play_explosion_effect(position: Vector2, radius: float) -> void:
-	pass
+	# 播放护盾破碎后的爆炸特效
+	var explosion_vfx = VFXFactory.create_explosion_vfx(CarrierConfigData.Phase.PLASMA, radius, 0.3)
+	if explosion_vfx:
+		VFXFactory.spawn_at(explosion_vfx, position, get_tree().current_scene)
 
 func _find_enemies_in_range(position: Vector2, radius: float) -> Array:
 	var enemies: Array = []

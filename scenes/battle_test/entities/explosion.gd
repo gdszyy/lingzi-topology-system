@@ -16,12 +16,16 @@ var duration: float = 0.3
 var time_elapsed: float = 0.0
 var has_dealt_damage: bool = false
 
+# VFX组件
+var explosion_vfx: ExplosionVFX = null
+
 func _ready():
 	var shape = CircleShape2D.new()
 	shape.radius = radius
 	collision_shape.shape = shape
 
 	_setup_visual()
+	_setup_vfx()
 
 func _process(delta: float) -> void:
 	time_elapsed += delta
@@ -64,16 +68,36 @@ func _setup_visual() -> void:
 		Color(0.5, 0.8, 0.2, 0.8)
 	]
 	visual.color = colors[damage_type % colors.size()]
+	
+	# 隐藏原有视觉效果，使用VFX代替
+	visual.visible = false
+
+## 设置VFX特效
+func _setup_vfx() -> void:
+	# 根据伤害类型映射到相态
+	var phase = _damage_type_to_phase(damage_type)
+	
+	# 创建爆炸特效
+	explosion_vfx = VFXFactory.create_explosion_vfx(phase, radius, damage_falloff)
+	if explosion_vfx:
+		add_child(explosion_vfx)
+		explosion_vfx.position = Vector2.ZERO
+
+## 将伤害类型映射到相态
+func _damage_type_to_phase(dmg_type: int) -> CarrierConfigData.Phase:
+	match dmg_type:
+		CarrierConfigData.DamageType.ENTROPY_BURST:
+			return CarrierConfigData.Phase.PLASMA
+		CarrierConfigData.DamageType.CRYO_SHATTER:
+			return CarrierConfigData.Phase.LIQUID
+		CarrierConfigData.DamageType.KINETIC_IMPACT:
+			return CarrierConfigData.Phase.SOLID
+		_:
+			return CarrierConfigData.Phase.PLASMA
 
 func _update_visual(_delta: float) -> void:
-	if visual == null:
-		return
-
-	var progress = time_elapsed / duration
-	visual.modulate.a = 1.0 - progress
-
-	var scale_factor = 1.0 + progress * 0.3
-	visual.scale = Vector2(scale_factor, scale_factor)
+	# 原有视觉效果已禁用，由VFX接管
+	pass
 
 func _deal_damage() -> void:
 	var enemies = get_tree().get_nodes_in_group("enemies")

@@ -245,7 +245,54 @@ const PHASE_COLORS = {
 
 四种链式类型的颜色定义在 `VFXManager.CHAIN_TYPE_COLORS` 中。
 
-## 六、扩展开发
+## 六、系统集成
+
+### 6.1 已集成的组件
+
+VFX系统已与以下法术系统组件完成集成：
+
+| 组件 | 集成的特效 | 触发时机 |
+|------|-----------|----------|
+| **Projectile (弹体实体)** | 相态弹体、拖尾、命中、裂变、状态效果 | 初始化、碰撞、死亡 |
+| **Explosion (爆炸实体)** | 爆炸特效 | 初始化 |
+| **DamageZone (伤害区域)** | 伤害区域特效 | 初始化 |
+| **SpellCaster (法术施放器)** | 裂变特效 | 裂变触发 |
+| **ActionExecutor (动作执行器)** | 命中、状态、位移、护盾、爆炸、裂变、链式、召唤 | 动作执行 |
+| **Enemy (敌人实体)** | 状态效果特效 | 状态施加/移除 |
+| **ShieldSystem (护盾系统)** | 护盾特效 | 创建、受击、破碎、反弹 |
+
+### 6.2 集成代码示例
+
+**在弹体中集成相态特效：**
+```gdscript
+# projectile.gd
+func _setup_vfx() -> void:
+    # 创建相态弹体特效
+    phase_vfx = VFXFactory.create_projectile_vfx(carrier.phase, carrier.size, velocity)
+    if phase_vfx:
+        add_child(phase_vfx)
+    
+    # 创建拖尾特效
+    trail_vfx = VFXFactory.create_trail_vfx(carrier.phase, self, carrier.size * 6.0)
+    if trail_vfx:
+        get_tree().current_scene.add_child(trail_vfx)
+```
+
+**在敌人中集成状态效果特效：**
+```gdscript
+# enemy.gd
+func apply_status(status_type: int, duration: float, value: float) -> void:
+    var is_new_status = not status_effects.has(status_type)
+    status_effects[status_type] = {"duration": duration, "value": value}
+    
+    if is_new_status:
+        var status_vfx = VFXFactory.create_status_effect_vfx(status_type, duration, value, self)
+        if status_vfx:
+            get_tree().current_scene.add_child(status_vfx)
+            status_vfx_instances[status_type] = status_vfx
+```
+
+## 七、扩展开发
 
 ### 6.1 添加新的特效类型
 
