@@ -667,6 +667,18 @@ func _create_enemy_instance(preset: Dictionary, multiplier: Dictionary) -> Enemy
 	target_selector.name = "TargetSelector"
 	enemy.add_child(target_selector)
 	
+	# 添加Hitbox（受击区域）
+	var hitbox = Area2D.new()
+	hitbox.name = "Hitbox"
+	hitbox.collision_layer = 4  # 敌人层
+	hitbox.collision_mask = 2   # 玩家攻击层
+	var hitbox_collision = CollisionShape2D.new()
+	var hitbox_shape = CircleShape2D.new()
+	hitbox_shape.radius = 25.0 * size_mult
+	hitbox_collision.shape = hitbox_shape
+	hitbox.add_child(hitbox_collision)
+	enemy.add_child(hitbox)
+	
 	# 添加血条
 	var health_bar = ProgressBar.new()
 	health_bar.name = "HealthBar"
