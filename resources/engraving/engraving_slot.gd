@@ -6,6 +6,8 @@ class_name EngravingSlot extends Resource
 signal spell_engraved(spell: SpellCoreData)
 signal spell_removed(spell: SpellCoreData)
 signal spell_triggered(spell: SpellCoreData, trigger_type: int)
+signal windup_started(spell: SpellCoreData, windup_time: float)
+signal windup_completed(spell: SpellCoreData)
 
 ## 槽位ID
 @export var slot_id: String = ""
@@ -37,8 +39,23 @@ signal spell_triggered(spell: SpellCoreData, trigger_type: int)
 ## 冷却时间（触发后的冷却）
 @export var cooldown: float = 0.0
 
+## 刻录前摇减少倍率（刻录法术的前摇会乘以这个值）
+@export var engraving_windup_multiplier: float = 0.2
+
 ## 当前冷却计时器
 var cooldown_timer: float = 0.0
+
+## 当前前摇计时器
+var windup_timer: float = 0.0
+
+## 是否正在前摇
+var is_winding_up: bool = false
+
+## 待执行的触发类型（前摇完成后执行）
+var pending_trigger_type: int = -1
+
+## 待执行的上下文
+var pending_context: Dictionary = {}
 
 ## 触发次数统计
 var trigger_count: int = 0
@@ -81,8 +98,11 @@ func engrave_spell(spell: SpellCoreData) -> bool:
 	if old_spell != null:
 		spell_removed.emit(old_spell)
 	
-	# 刻录新法术
+	# 刻录新法术（深拷贝并标记为已刻录）
 	engraved_spell = spell.clone_deep()
+	engraved_spell.is_engraved = true
+	engraved_spell.engraving_slot_id = slot_id
+	
 	spell_engraved.emit(engraved_spell)
 	
 	return true
@@ -95,6 +115,8 @@ func remove_spell() -> SpellCoreData:
 	
 	var removed = engraved_spell
 	if removed != null:
+		removed.is_engraved = false
+		removed.engraving_slot_id = ""
 		engraved_spell = null
 		spell_removed.emit(removed)
 	
@@ -111,13 +133,66 @@ func can_trigger() -> bool:
 	if cooldown_timer > 0:
 		return false
 	
+	if is_winding_up:
+		return false
+	
 	return true
 
-## 触发法术
+## 计算刻录法术的前摇时间
+func calculate_engraved_windup(proficiency: float = 0.0) -> float:
+	if engraved_spell == null:
+		return 0.0
+	
+	# 刻录法术使用极大减少的前摇
+	return engraved_spell.calculate_windup_time(proficiency, true)
+
+## 开始触发（带前摇）
+func start_trigger(trigger_type: int, context: Dictionary = {}, proficiency: float = 0.0) -> bool:
+	if not can_trigger():
+		return false
+	
+	# 检查触发器类型是否匹配
+	var has_matching_rule = false
+	for rule in engraved_spell.topology_rules:
+		if rule.trigger != null and rule.trigger.trigger_type == trigger_type:
+			if rule.enabled:
+				has_matching_rule = true
+				break
+	
+	if not has_matching_rule:
+		return false
+	
+	# 计算前摇时间
+	var windup_time = calculate_engraved_windup(proficiency)
+	
+	# 如果前摇时间极短，直接触发
+	if windup_time < 0.05:
+		return _execute_trigger(trigger_type, context)
+	
+	# 开始前摇
+	is_winding_up = true
+	windup_timer = windup_time
+	pending_trigger_type = trigger_type
+	pending_context = context.duplicate()
+	
+	windup_started.emit(engraved_spell, windup_time)
+	
+	return true
+
+## 立即触发（跳过前摇，用于特殊情况）
 func trigger(trigger_type: int, context: Dictionary = {}) -> Array[TopologyRuleData]:
 	if not can_trigger():
 		return []
 	
+	return _execute_trigger_internal(trigger_type, context)
+
+## 执行触发
+func _execute_trigger(trigger_type: int, context: Dictionary) -> bool:
+	var rules = _execute_trigger_internal(trigger_type, context)
+	return rules.size() > 0
+
+## 内部触发执行
+func _execute_trigger_internal(trigger_type: int, context: Dictionary) -> Array[TopologyRuleData]:
 	var triggered_rules: Array[TopologyRuleData] = []
 	
 	for rule in engraved_spell.topology_rules:
@@ -132,10 +207,45 @@ func trigger(trigger_type: int, context: Dictionary = {}) -> Array[TopologyRuleD
 	
 	return triggered_rules
 
-## 更新冷却
-func update_cooldown(delta: float) -> void:
+## 更新（处理冷却和前摇）
+func update(delta: float) -> void:
+	# 更新冷却
 	if cooldown_timer > 0:
 		cooldown_timer = max(0, cooldown_timer - delta)
+	
+	# 更新前摇
+	if is_winding_up:
+		windup_timer -= delta
+		if windup_timer <= 0:
+			# 前摇完成，执行触发
+			is_winding_up = false
+			windup_completed.emit(engraved_spell)
+			_execute_trigger(pending_trigger_type, pending_context)
+			pending_trigger_type = -1
+			pending_context.clear()
+
+## 更新冷却（兼容旧接口）
+func update_cooldown(delta: float) -> void:
+	update(delta)
+
+## 取消前摇
+func cancel_windup() -> void:
+	if is_winding_up:
+		is_winding_up = false
+		windup_timer = 0.0
+		pending_trigger_type = -1
+		pending_context.clear()
+
+## 获取前摇进度 (0.0 - 1.0)
+func get_windup_progress() -> float:
+	if not is_winding_up or engraved_spell == null:
+		return 1.0
+	
+	var total_windup = calculate_engraved_windup()
+	if total_windup <= 0:
+		return 1.0
+	
+	return 1.0 - (windup_timer / total_windup)
 
 ## 检查触发器是否允许
 func _check_triggers_allowed(spell: SpellCoreData) -> bool:
@@ -158,6 +268,8 @@ func get_info() -> String:
 	var status = "启用" if is_enabled else "禁用"
 	if is_locked:
 		status = "锁定"
+	if is_winding_up:
+		status = "蓄能中"
 	
 	return "[%s] %s - 法术: %s (%s)" % [slot_id, slot_name, spell_info, status]
 
@@ -173,6 +285,7 @@ func clone_deep() -> EngravingSlot:
 	copy.slot_level = slot_level
 	copy.slot_capacity = slot_capacity
 	copy.cooldown = cooldown
+	copy.engraving_windup_multiplier = engraving_windup_multiplier
 	
 	if engraved_spell != null:
 		copy.engraved_spell = engraved_spell.clone_deep()
@@ -191,6 +304,7 @@ func to_dict() -> Dictionary:
 		"slot_level": slot_level,
 		"slot_capacity": slot_capacity,
 		"cooldown": cooldown,
+		"engraving_windup_multiplier": engraving_windup_multiplier,
 		"engraved_spell": engraved_spell.to_dict() if engraved_spell != null else null
 	}
 
@@ -206,6 +320,7 @@ static func from_dict(data: Dictionary) -> EngravingSlot:
 	slot.slot_level = data.get("slot_level", 1)
 	slot.slot_capacity = data.get("slot_capacity", 100.0)
 	slot.cooldown = data.get("cooldown", 0.0)
+	slot.engraving_windup_multiplier = data.get("engraving_windup_multiplier", 0.2)
 	
 	var spell_data = data.get("engraved_spell", null)
 	if spell_data != null:

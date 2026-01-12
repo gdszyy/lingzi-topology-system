@@ -1,5 +1,5 @@
 # combat_test_scene.gd
-# 战斗测试场景 - 用于测试角色战斗系统和法术刻录系统
+# 战斗测试场景 - 用于测试角色战斗系统、法术刻录系统和熟练度系统
 extends Node2D
 
 ## 节点引用
@@ -100,15 +100,27 @@ func _init_spells() -> void:
 	available_spells = _create_test_spells()
 	
 	# 更新法术列表UI
-	spell_list.clear()
-	for i in range(available_spells.size()):
-		var spell = available_spells[i]
-		spell_list.add_item("%d. %s" % [i + 1, spell.spell_name])
+	_refresh_spell_list()
 	
 	# 选择第一个法术
 	if available_spells.size() > 0:
 		spell_list.select(0)
 		_on_spell_selected(0)
+
+## 刷新法术列表（包含熟练度信息）
+func _refresh_spell_list() -> void:
+	spell_list.clear()
+	for i in range(available_spells.size()):
+		var spell = available_spells[i]
+		var proficiency = _get_spell_proficiency(spell.spell_id)
+		var prof_text = " (%.0f%%)" % (proficiency * 100) if proficiency > 0 else ""
+		spell_list.add_item("%d. %s%s" % [i + 1, spell.spell_name, prof_text])
+
+## 获取法术熟练度
+func _get_spell_proficiency(spell_id: String) -> float:
+	if player == null or player.engraving_manager == null:
+		return 0.0
+	return player.engraving_manager.get_spell_proficiency(spell_id)
 
 ## 初始化刻录法术
 func _init_engraving_spells() -> void:
@@ -124,6 +136,10 @@ func _create_test_spells() -> Array[SpellCoreData]:
 	fireball.generate_id()
 	fireball.spell_name = "火球术"
 	fireball.description = "发射一枚火球，造成范围伤害"
+	fireball.spell_type = SpellCoreData.SpellType.PROJECTILE
+	fireball.resource_cost = 25.0
+	fireball.base_windup_time = 0.6
+	fireball.cost_windup_ratio = 0.02
 	fireball.carrier = CarrierConfigData.new()
 	fireball.carrier.phase = CarrierConfigData.Phase.PLASMA
 	fireball.carrier.velocity = 400.0
@@ -151,6 +167,10 @@ func _create_test_spells() -> Array[SpellCoreData]:
 	ice_arrow.generate_id()
 	ice_arrow.spell_name = "冰箭"
 	ice_arrow.description = "发射穿透性冰箭"
+	ice_arrow.spell_type = SpellCoreData.SpellType.PROJECTILE
+	ice_arrow.resource_cost = 15.0
+	ice_arrow.base_windup_time = 0.3
+	ice_arrow.cost_windup_ratio = 0.015
 	ice_arrow.carrier = CarrierConfigData.new()
 	ice_arrow.carrier.phase = CarrierConfigData.Phase.SOLID
 	ice_arrow.carrier.velocity = 600.0
@@ -179,6 +199,10 @@ func _create_test_spells() -> Array[SpellCoreData]:
 	homing.generate_id()
 	homing.spell_name = "追踪弹"
 	homing.description = "自动追踪最近敌人的魔法弹"
+	homing.spell_type = SpellCoreData.SpellType.PROJECTILE
+	homing.resource_cost = 20.0
+	homing.base_windup_time = 0.4
+	homing.cost_windup_ratio = 0.02
 	homing.carrier = CarrierConfigData.new()
 	homing.carrier.phase = CarrierConfigData.Phase.LIQUID
 	homing.carrier.velocity = 300.0
@@ -201,6 +225,68 @@ func _create_test_spells() -> Array[SpellCoreData]:
 	homing.topology_rules = homing_rules
 	
 	spells.append(homing)
+	
+	# 陨石术（高cost高前摇）
+	var meteor = SpellCoreData.new()
+	meteor.generate_id()
+	meteor.spell_name = "陨石术"
+	meteor.description = "召唤巨大陨石，造成毁灭性伤害（需要较长蓄能）"
+	meteor.spell_type = SpellCoreData.SpellType.PROJECTILE
+	meteor.resource_cost = 80.0
+	meteor.base_windup_time = 1.5
+	meteor.cost_windup_ratio = 0.025
+	meteor.carrier = CarrierConfigData.new()
+	meteor.carrier.phase = CarrierConfigData.Phase.SOLID
+	meteor.carrier.velocity = 250.0
+	meteor.carrier.lifetime = 4.0
+	meteor.carrier.mass = 10.0
+	meteor.carrier.size = 3.0
+	
+	var meteor_rule = TopologyRuleData.new()
+	meteor_rule.rule_name = "陨石撞击"
+	meteor_rule.trigger = TriggerData.new()
+	meteor_rule.trigger.trigger_type = TriggerData.TriggerType.ON_CONTACT
+	
+	var meteor_damage = DamageActionData.new()
+	meteor_damage.damage_value = 100.0
+	var meteor_actions: Array[ActionData] = [meteor_damage]
+	meteor_rule.actions = meteor_actions
+	
+	var meteor_rules: Array[TopologyRuleData] = [meteor_rule]
+	meteor.topology_rules = meteor_rules
+	
+	spells.append(meteor)
+	
+	# 快速魔弹（低cost低前摇）
+	var magic_bolt = SpellCoreData.new()
+	magic_bolt.generate_id()
+	magic_bolt.spell_name = "魔法弹"
+	magic_bolt.description = "快速发射的基础魔法弹"
+	magic_bolt.spell_type = SpellCoreData.SpellType.PROJECTILE
+	magic_bolt.resource_cost = 5.0
+	magic_bolt.base_windup_time = 0.1
+	magic_bolt.cost_windup_ratio = 0.01
+	magic_bolt.carrier = CarrierConfigData.new()
+	magic_bolt.carrier.phase = CarrierConfigData.Phase.PLASMA
+	magic_bolt.carrier.velocity = 500.0
+	magic_bolt.carrier.lifetime = 2.0
+	magic_bolt.carrier.mass = 0.3
+	magic_bolt.carrier.size = 0.5
+	
+	var bolt_rule = TopologyRuleData.new()
+	bolt_rule.rule_name = "魔弹伤害"
+	bolt_rule.trigger = TriggerData.new()
+	bolt_rule.trigger.trigger_type = TriggerData.TriggerType.ON_CONTACT
+	
+	var bolt_damage = DamageActionData.new()
+	bolt_damage.damage_value = 8.0
+	var bolt_actions: Array[ActionData] = [bolt_damage]
+	bolt_rule.actions = bolt_actions
+	
+	var bolt_rules: Array[TopologyRuleData] = [bolt_rule]
+	magic_bolt.topology_rules = bolt_rules
+	
+	spells.append(magic_bolt)
 	
 	return spells
 
@@ -228,6 +314,8 @@ func _connect_player_signals() -> void:
 	# 连接刻录管理器信号
 	if player.engraving_manager != null:
 		player.engraving_manager.engraving_triggered.connect(_on_engraving_triggered)
+		player.engraving_manager.proficiency_updated.connect(_on_proficiency_updated)
+		player.engraving_manager.engraving_windup_started.connect(_on_engraving_windup_started)
 
 ## 生成初始敌人
 func _spawn_initial_enemies() -> void:
@@ -249,10 +337,17 @@ func _update_ui() -> void:
 	if player == null:
 		return
 	
-	# 更新状态标签
+	# 更新状态标签（包含施法阶段）
 	var state_name = "Unknown"
 	if player.state_machine != null:
 		state_name = player.state_machine.get_current_state_name()
+		
+		# 如果在施法状态，显示施法阶段
+		var current_state = player.state_machine.current_state
+		if current_state is SpellCastState:
+			var cast_state = current_state as SpellCastState
+			state_name += " (%s %.0f%%)" % [cast_state.get_phase_name(), cast_state.get_cast_progress() * 100]
+	
 	state_label.text = "状态: %s" % state_name
 	
 	# 更新武器标签
@@ -269,7 +364,10 @@ func _update_ui() -> void:
 	
 	# 更新刻录统计
 	if engravings_label != null:
-		engravings_label.text = "刻录触发: %d" % stats.engravings_triggered
+		var trigger_count = 0
+		if player.engraving_manager != null:
+			trigger_count = player.engraving_manager.get_trigger_count()
+		engravings_label.text = "刻录触发: %d" % trigger_count
 
 ## 处理输入
 func _input(event: InputEvent) -> void:
@@ -290,6 +388,32 @@ func _input(event: InputEvent) -> void:
 		# ESC键关闭刻录面板
 		if key == KEY_ESCAPE and engraving_panel != null and engraving_panel.visible:
 			engraving_panel.hide_panel()
+		
+		# P键显示熟练度统计
+		if key == KEY_P:
+			_print_proficiency_stats()
+
+## 打印熟练度统计
+func _print_proficiency_stats() -> void:
+	if player == null or player.engraving_manager == null:
+		return
+	
+	print("\n=== 熟练度统计 ===")
+	var stats = player.engraving_manager.get_stats()
+	print(stats.proficiency_stats)
+	
+	print("\n--- 法术前摇信息 ---")
+	for spell in available_spells:
+		var proficiency = _get_spell_proficiency(spell.spell_id)
+		var normal_windup = spell.calculate_windup_time(proficiency, false)
+		var engraved_windup = spell.calculate_windup_time(proficiency, true)
+		print("%s: 熟练度 %.0f%% | 普通前摇 %.2fs | 刻录前摇 %.2fs" % [
+			spell.spell_name,
+			proficiency * 100,
+			normal_windup,
+			engraved_windup
+		])
+	print("==================\n")
 
 ## 切换刻录面板
 func _toggle_engraving_panel() -> void:
@@ -324,6 +448,16 @@ func _on_spell_selected(index: int) -> void:
 	var spell = available_spells[index]
 	if player != null:
 		player.set_spell(spell)
+		
+		# 显示法术前摇信息
+		var proficiency = _get_spell_proficiency(spell.spell_id)
+		var normal_windup = spell.calculate_windup_time(proficiency, false)
+		print("[选择法术] %s | 消耗: %.0f | 前摇: %.2fs | 熟练度: %.0f%%" % [
+			spell.spell_name,
+			spell.resource_cost,
+			normal_windup,
+			proficiency * 100
+		])
 
 ## 生成敌人按钮回调
 func _on_spawn_enemy_pressed() -> void:
@@ -359,12 +493,23 @@ func _on_player_attack_hit(target: Node2D, damage: float) -> void:
 ## 玩家施法回调
 func _on_player_spell_cast(spell: SpellCoreData) -> void:
 	print("施放法术: %s" % spell.spell_name)
+	# 刷新法术列表以更新熟练度显示
+	_refresh_spell_list()
 
 ## 刻录触发回调
 func _on_engraving_triggered(trigger_type: int, spell: SpellCoreData, source: String) -> void:
 	var trigger_name = TriggerData.new()
 	trigger_name.trigger_type = trigger_type
 	print("[刻录效果] %s 触发了 %s (来源: %s)" % [trigger_name.get_type_name(), spell.spell_name, source])
+
+## 熟练度更新回调
+func _on_proficiency_updated(spell_id: String, proficiency: float) -> void:
+	# 刷新法术列表以更新熟练度显示
+	_refresh_spell_list()
+
+## 刻录前摇开始回调
+func _on_engraving_windup_started(slot: EngravingSlot, windup_time: float) -> void:
+	print("[刻录蓄能] %s 开始蓄能 %.2fs" % [slot.slot_name, windup_time])
 
 ## 法术刻录回调
 func _on_spell_engraved(target_type: String, target_index: int, slot_index: int, spell: SpellCoreData) -> void:

@@ -1,11 +1,14 @@
 # engraving_manager.gd
-# 刻录管理器 - 管理角色和武器上的法术刻录，处理触发逻辑
+# 刻录管理器 - 管理角色和武器上的法术刻录，处理触发逻辑（支持前摇和熟练度）
 class_name EngravingManager extends Node
 
 ## 信号
 signal engraving_triggered(trigger_type: int, spell: SpellCoreData, source: String)
+signal engraving_windup_started(slot: EngravingSlot, windup_time: float)
+signal engraving_windup_completed(slot: EngravingSlot)
 signal action_executed(action: ActionData, context: Dictionary)
 signal engraving_effect_applied(effect_type: String, target: Node2D, value: float)
+signal proficiency_updated(spell_id: String, proficiency: float)
 
 ## 玩家控制器引用
 var player: PlayerController = null
@@ -19,11 +22,17 @@ var all_slots: Array[EngravingSlot] = []
 ## 效果执行器
 var action_executor: ActionExecutor = null
 
+## 熟练度管理器
+var proficiency_manager: ProficiencyManager = null
+
 ## 触发上下文
 var current_context: Dictionary = {}
 
 ## 触发统计
 var trigger_stats: Dictionary = {}
+
+## 刻录触发统计（用于UI显示）
+var engraving_trigger_count: int = 0
 
 ## 是否启用刻录系统
 var is_enabled: bool = true
@@ -33,9 +42,18 @@ func _ready() -> void:
 	action_executor = ActionExecutor.new()
 	action_executor.name = "ActionExecutor"
 	add_child(action_executor)
+	
+	# 创建熟练度管理器
+	proficiency_manager = ProficiencyManager.new()
+	proficiency_manager.name = "ProficiencyManager"
+	add_child(proficiency_manager)
+	
+	# 连接熟练度信号
+	proficiency_manager.proficiency_changed.connect(_on_proficiency_changed)
+	proficiency_manager.level_up.connect(_on_proficiency_level_up)
 
 func _process(delta: float) -> void:
-	_update_cooldowns(delta)
+	_update_slots(delta)
 	_process_periodic_triggers(delta)
 
 ## 初始化刻录管理器
@@ -62,11 +80,21 @@ func _register_all_slots() -> void:
 	for part in body_parts:
 		for slot in part.engraving_slots:
 			all_slots.append(slot)
+			# 连接槽位信号
+			if not slot.windup_started.is_connected(_on_slot_windup_started):
+				slot.windup_started.connect(_on_slot_windup_started.bind(slot))
+			if not slot.windup_completed.is_connected(_on_slot_windup_completed):
+				slot.windup_completed.connect(_on_slot_windup_completed.bind(slot))
 	
 	# 注册武器的槽位
 	if player != null and player.current_weapon != null:
 		for slot in player.current_weapon.engraving_slots:
 			all_slots.append(slot)
+			# 连接槽位信号
+			if not slot.windup_started.is_connected(_on_slot_windup_started):
+				slot.windup_started.connect(_on_slot_windup_started.bind(slot))
+			if not slot.windup_completed.is_connected(_on_slot_windup_completed):
+				slot.windup_completed.connect(_on_slot_windup_completed.bind(slot))
 
 ## 连接玩家信号
 func _connect_player_signals() -> void:
@@ -94,18 +122,17 @@ func _connect_player_signals() -> void:
 	# 施法相关
 	if player.has_signal("spell_cast"):
 		player.spell_cast.connect(_on_spell_cast)
+	if player.has_signal("spell_hit"):
+		player.spell_hit.connect(_on_spell_hit)
 	
 	# 武器相关
 	if player.has_signal("weapon_changed"):
 		player.weapon_changed.connect(_on_weapon_changed)
 
-## 更新所有槽位冷却
-func _update_cooldowns(delta: float) -> void:
-	for part in body_parts:
-		part.update_cooldowns(delta)
-	
-	if player != null and player.current_weapon != null:
-		player.current_weapon.update_engraving_cooldowns(delta)
+## 更新所有槽位（冷却和前摇）
+func _update_slots(delta: float) -> void:
+	for slot in all_slots:
+		slot.update(delta)
 
 ## 处理周期性触发器
 func _process_periodic_triggers(delta: float) -> void:
@@ -121,7 +148,7 @@ func _process_periodic_triggers(delta: float) -> void:
 	
 	distribute_trigger(TriggerData.TriggerType.ON_TICK, current_context)
 
-## 分发触发器到所有槽位
+## 分发触发器到所有槽位（带前摇）
 func distribute_trigger(trigger_type: int, context: Dictionary = {}) -> void:
 	if not is_enabled:
 		return
@@ -136,14 +163,64 @@ func distribute_trigger(trigger_type: int, context: Dictionary = {}) -> void:
 		if not slot.can_trigger():
 			continue
 		
+		if slot.engraved_spell == null:
+			continue
+		
+		# 获取法术熟练度
+		var proficiency = proficiency_manager.get_proficiency_value(slot.engraved_spell.spell_id)
+		
+		# 开始触发（带前摇）
+		var started = slot.start_trigger(trigger_type, context, proficiency)
+		
+		if started:
+			# 连接完成信号以执行动作
+			if not slot.spell_triggered.is_connected(_on_slot_spell_triggered):
+				slot.spell_triggered.connect(_on_slot_spell_triggered.bind(slot, context))
+
+## 立即分发触发器（跳过前摇，用于特殊情况）
+func distribute_trigger_immediate(trigger_type: int, context: Dictionary = {}) -> void:
+	if not is_enabled:
+		return
+	
+	for slot in all_slots:
+		if not slot.can_trigger():
+			continue
+		
 		var triggered_rules = slot.trigger(trigger_type, context)
 		
 		for rule in triggered_rules:
-			# 执行规则的所有动作
 			_execute_rule_actions(rule, context, slot)
-			
-			# 发送信号
 			engraving_triggered.emit(trigger_type, slot.engraved_spell, slot.slot_name)
+			engraving_trigger_count += 1
+
+## 槽位前摇开始回调
+func _on_slot_windup_started(spell: SpellCoreData, windup_time: float, slot: EngravingSlot) -> void:
+	engraving_windup_started.emit(slot, windup_time)
+	print("[刻录前摇] %s - %s: %.2fs" % [slot.slot_name, spell.spell_name, windup_time])
+
+## 槽位前摇完成回调
+func _on_slot_windup_completed(spell: SpellCoreData, slot: EngravingSlot) -> void:
+	engraving_windup_completed.emit(slot)
+	print("[刻录触发] %s - %s" % [slot.slot_name, spell.spell_name])
+
+## 槽位法术触发回调
+func _on_slot_spell_triggered(spell: SpellCoreData, trigger_type: int, slot: EngravingSlot, context: Dictionary) -> void:
+	# 执行法术规则
+	for rule in spell.topology_rules:
+		if rule.trigger != null and rule.trigger.trigger_type == trigger_type:
+			if rule.enabled:
+				_execute_rule_actions(rule, context, slot)
+	
+	# 发送信号
+	engraving_triggered.emit(trigger_type, spell, slot.slot_name)
+	engraving_trigger_count += 1
+	
+	# 记录使用
+	proficiency_manager.record_spell_use(spell.spell_id)
+	
+	# 断开临时连接
+	if slot.spell_triggered.is_connected(_on_slot_spell_triggered):
+		slot.spell_triggered.disconnect(_on_slot_spell_triggered)
 
 ## 执行规则的动作
 func _execute_rule_actions(rule: TopologyRuleData, context: Dictionary, slot: EngravingSlot) -> void:
@@ -154,6 +231,7 @@ func _execute_rule_actions(rule: TopologyRuleData, context: Dictionary, slot: En
 	var full_context = context.duplicate()
 	full_context["slot"] = slot
 	full_context["slot_level"] = slot.slot_level
+	full_context["is_engraved"] = true
 	
 	for action in rule.actions:
 		if action != null:
@@ -226,20 +304,48 @@ func get_all_engraved_spells() -> Array[SpellCoreData]:
 	
 	return spells
 
+## 获取法术熟练度
+func get_spell_proficiency(spell_id: String) -> float:
+	return proficiency_manager.get_proficiency_value(spell_id)
+
+## 获取法术熟练度数据
+func get_spell_proficiency_data(spell_id: String) -> SpellProficiency:
+	return proficiency_manager.get_proficiency(spell_id)
+
 ## 获取刻录统计信息
 func get_stats() -> Dictionary:
 	var total_slots = all_slots.size()
 	var used_slots = 0
+	var winding_up_count = 0
 	
 	for slot in all_slots:
 		if slot.engraved_spell != null:
 			used_slots += 1
+		if slot.is_winding_up:
+			winding_up_count += 1
 	
 	return {
 		"total_slots": total_slots,
 		"used_slots": used_slots,
-		"trigger_stats": trigger_stats.duplicate()
+		"winding_up_count": winding_up_count,
+		"trigger_count": engraving_trigger_count,
+		"trigger_stats": trigger_stats.duplicate(),
+		"proficiency_stats": proficiency_manager.get_stats_summary()
 	}
+
+## 获取刻录触发次数
+func get_trigger_count() -> int:
+	return engraving_trigger_count
+
+## 熟练度改变回调
+func _on_proficiency_changed(spell_id: String, proficiency: float) -> void:
+	proficiency_updated.emit(spell_id, proficiency)
+
+## 熟练度升级回调
+func _on_proficiency_level_up(spell_id: String, new_level: int) -> void:
+	var level_names = ["新手", "学徒", "熟练", "专家", "大师"]
+	var level_name = level_names[new_level] if new_level < level_names.size() else "未知"
+	print("[熟练度提升] %s 达到 %s 级别!" % [spell_id, level_name])
 
 # ========== 信号回调 ==========
 
@@ -271,6 +377,10 @@ func _on_attack_hit(target: Node2D, damage: float) -> void:
 	# 检查是否击杀
 	if target != null and target.has_method("is_dead") and target.is_dead():
 		distribute_trigger(TriggerData.TriggerType.ON_KILL_ENEMY, current_context)
+		
+		# 记录击杀（为所有已刻录的法术增加经验）
+		for spell in get_all_engraved_spells():
+			proficiency_manager.record_spell_kill(spell.spell_id)
 
 ## 攻击结束回调
 func _on_attack_ended(attack: AttackData) -> void:
@@ -338,6 +448,19 @@ func _on_spell_cast(spell: SpellCoreData) -> void:
 		"position": player.global_position
 	}
 	distribute_trigger(TriggerData.TriggerType.ON_SPELL_CAST, current_context)
+
+## 法术命中回调
+func _on_spell_hit(target: Node2D, damage: float) -> void:
+	current_context = {
+		"target": target,
+		"damage": damage,
+		"player": player,
+		"position": player.global_position
+	}
+	
+	# 记录命中（为当前法术增加经验）
+	if player.current_spell != null:
+		proficiency_manager.record_spell_hit(player.current_spell.spell_id)
 
 ## 武器改变回调
 func _on_weapon_changed(weapon: WeaponData) -> void:

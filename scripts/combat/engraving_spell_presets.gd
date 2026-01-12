@@ -8,8 +8,11 @@ static func create_lightning_chain_on_hit() -> SpellCoreData:
 	spell.generate_id()
 	spell.spell_name = "闪电链"
 	spell.description = "武器命中时，释放闪电链攻击周围敌人"
-	spell.resource_cost = 5.0
+	spell.spell_type = SpellCoreData.SpellType.ENGRAVING
+	spell.resource_cost = 15.0
 	spell.cooldown = 2.0
+	spell.base_windup_time = 0.3
+	spell.cost_windup_ratio = 0.01
 	
 	# 创建触发器
 	var trigger = TriggerData.new()
@@ -41,8 +44,11 @@ static func create_fire_enchant_on_attack() -> SpellCoreData:
 	spell.generate_id()
 	spell.spell_name = "火焰附魔"
 	spell.description = "攻击开始时，为武器附加火焰伤害"
-	spell.resource_cost = 3.0
+	spell.spell_type = SpellCoreData.SpellType.ENGRAVING
+	spell.resource_cost = 8.0
 	spell.cooldown = 0.5
+	spell.base_windup_time = 0.1
+	spell.cost_windup_ratio = 0.005
 	
 	var trigger = TriggerData.new()
 	trigger.trigger_type = TriggerData.TriggerType.ON_ATTACK_START
@@ -69,8 +75,11 @@ static func create_shield_on_damage() -> SpellCoreData:
 	spell.generate_id()
 	spell.spell_name = "反伤护盾"
 	spell.description = "受到伤害时，生成一个临时护盾"
-	spell.resource_cost = 8.0
+	spell.spell_type = SpellCoreData.SpellType.ENGRAVING
+	spell.resource_cost = 20.0
 	spell.cooldown = 5.0
+	spell.base_windup_time = 0.2
+	spell.cost_windup_ratio = 0.01
 	
 	var trigger = TriggerData.new()
 	trigger.trigger_type = TriggerData.TriggerType.ON_TAKE_DAMAGE
@@ -97,15 +106,16 @@ static func create_heal_while_flying() -> SpellCoreData:
 	spell.generate_id()
 	spell.spell_name = "风之祝福"
 	spell.description = "飞行时持续恢复生命值"
-	spell.resource_cost = 2.0
+	spell.spell_type = SpellCoreData.SpellType.ENGRAVING
+	spell.resource_cost = 5.0
 	spell.cooldown = 1.0
+	spell.base_windup_time = 0.0  # 被动效果无前摇
+	spell.cost_windup_ratio = 0.0
 	
 	var trigger = TriggerData.new()
 	trigger.trigger_type = TriggerData.TriggerType.ON_TICK
 	trigger.trigger_once = false
 	
-	# 注意：这需要一个自定义的治疗动作
-	# 这里用状态动作模拟
 	var status_action = ApplyStatusActionData.new()
 	status_action.status_type = ApplyStatusActionData.StatusType.REGENERATION
 	status_action.duration = 0.5
@@ -129,8 +139,11 @@ static func create_explosion_on_kill() -> SpellCoreData:
 	spell.generate_id()
 	spell.spell_name = "死亡爆破"
 	spell.description = "击杀敌人时，在其位置产生爆炸"
-	spell.resource_cost = 10.0
+	spell.spell_type = SpellCoreData.SpellType.ENGRAVING
+	spell.resource_cost = 25.0
 	spell.cooldown = 3.0
+	spell.base_windup_time = 0.4
+	spell.cost_windup_ratio = 0.015
 	
 	var trigger = TriggerData.new()
 	trigger.trigger_type = TriggerData.TriggerType.ON_KILL_ENEMY
@@ -159,8 +172,11 @@ static func create_berserk_on_low_health() -> SpellCoreData:
 	spell.generate_id()
 	spell.spell_name = "狂暴本能"
 	spell.description = "生命值低于30%时，大幅提升攻击力"
-	spell.resource_cost = 0.0
+	spell.spell_type = SpellCoreData.SpellType.ENGRAVING
+	spell.resource_cost = 0.0  # 被动技能无消耗
 	spell.cooldown = 10.0
+	spell.base_windup_time = 0.0  # 被动效果无前摇
+	spell.cost_windup_ratio = 0.0
 	
 	var trigger = TriggerData.new()
 	trigger.trigger_type = TriggerData.TriggerType.ON_HEALTH_LOW
@@ -189,8 +205,11 @@ static func create_fission_on_spell_cast() -> SpellCoreData:
 	spell.generate_id()
 	spell.spell_name = "法术分裂"
 	spell.description = "施放法术时，额外发射多个小型弹幕"
-	spell.resource_cost = 15.0
+	spell.spell_type = SpellCoreData.SpellType.ENGRAVING
+	spell.resource_cost = 30.0
 	spell.cooldown = 4.0
+	spell.base_windup_time = 0.5
+	spell.cost_windup_ratio = 0.02
 	
 	var trigger = TriggerData.new()
 	trigger.trigger_type = TriggerData.TriggerType.ON_SPELL_CAST
@@ -200,6 +219,7 @@ static func create_fission_on_spell_cast() -> SpellCoreData:
 	var child_spell = SpellCoreData.new()
 	child_spell.generate_id()
 	child_spell.spell_name = "分裂弹"
+	child_spell.spell_type = SpellCoreData.SpellType.PROJECTILE
 	child_spell.carrier = CarrierConfigData.new()
 	child_spell.carrier.velocity = 300.0
 	child_spell.carrier.lifetime = 2.0
@@ -239,8 +259,11 @@ static func create_damage_trail_on_move() -> SpellCoreData:
 	spell.generate_id()
 	spell.spell_name = "毒雾轨迹"
 	spell.description = "移动时在身后留下伤害区域"
-	spell.resource_cost = 5.0
+	spell.spell_type = SpellCoreData.SpellType.ENGRAVING
+	spell.resource_cost = 12.0
 	spell.cooldown = 2.0
+	spell.base_windup_time = 0.2
+	spell.cost_windup_ratio = 0.01
 	
 	var trigger = TriggerData.new()
 	trigger.trigger_type = TriggerData.TriggerType.ON_MOVE_START
@@ -295,4 +318,19 @@ static func get_presets_by_category() -> Dictionary:
 		"施法增强": [
 			create_fission_on_spell_cast()
 		]
+	}
+
+## 获取法术前摇信息
+static func get_spell_windup_info(spell: SpellCoreData, proficiency: float = 0.0) -> Dictionary:
+	var normal_windup = spell.calculate_windup_time(proficiency, false)
+	var engraved_windup = spell.calculate_windup_time(proficiency, true)
+	
+	return {
+		"spell_name": spell.spell_name,
+		"spell_type": spell.get_type_name(),
+		"cost": spell.resource_cost,
+		"normal_windup": normal_windup,
+		"engraved_windup": engraved_windup,
+		"windup_reduction": (1.0 - engraved_windup / normal_windup) * 100 if normal_windup > 0 else 0,
+		"proficiency": proficiency * 100
 	}
