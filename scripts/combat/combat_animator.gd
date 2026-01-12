@@ -8,6 +8,9 @@ signal animation_started(attack: AttackData)
 signal animation_finished(attack: AttackData)
 signal hit_frame_reached(attack: AttackData)
 
+## 【新增】用于与 BodyAnimationController 协作
+## 当攻击动画激活时，BodyAnimationController 会暂停移动/飞行动画
+
 ## 引用
 var left_arm: ArmRig = null
 var right_arm: ArmRig = null
@@ -48,11 +51,21 @@ func initialize(left: ArmRig, right: ArmRig, physics: WeaponPhysics) -> void:
 	if right_arm:
 		right_shoulder = right_arm.get_shoulder_position()
 
+## 【新增】引用 BodyAnimationController
+var body_animation_controller: BodyAnimationController = null
+
+## 设置 BodyAnimationController 引用
+func set_body_animation_controller(controller: BodyAnimationController) -> void:
+	body_animation_controller = controller
+
 func _process(delta: float) -> void:
 	if is_animating and current_attack != null:
 		_update_animation(delta)
 	else:
-		_update_idle()
+		## 【修改】如果 BodyAnimationController 正在播放移动/飞行动画，不更新 idle 状态
+		## 这样可以避免两个控制器冲突
+		if body_animation_controller == null or not body_animation_controller.is_movement_animation_active():
+			_update_idle()
 
 func _update_idle() -> void:
 	## 待机状态：手放在默认位置

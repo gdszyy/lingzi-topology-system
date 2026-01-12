@@ -2,6 +2,7 @@ class_name PlayerVisuals extends Node2D
 ## 玩家视觉系统
 ## 管理角色的视觉渲染，包括躯干、头部、手臂和武器
 ## 【修复】移除冗余的武器挥舞逻辑，统一由 CombatAnimator 驱动
+## 【新增】集成 BodyAnimationController 实现移动和飞行时的全身骨骼动画
 
 @onready var legs_pivot: Node2D = $LegsPivot
 @onready var legs_sprite: Sprite2D = $LegsPivot/LegsSprite
@@ -18,6 +19,9 @@ var right_arm: ArmRig = null
 ## 战斗动画控制器
 var combat_animator: CombatAnimator = null
 
+## 【新增】全身骨骼动画控制器
+var body_animation_controller: BodyAnimationController = null
+
 var player: PlayerController = null
 
 var is_walking: bool = false
@@ -29,6 +33,7 @@ func _ready() -> void:
 	_setup_default_visuals()
 	_create_arm_rigs()
 	_setup_combat_animator()
+	_setup_body_animation_controller()  ## 【新增】
 	_connect_player_signals()
 	_initialize_weapon_appearance()
 	_setup_weapon_physics()
@@ -59,6 +64,30 @@ func _setup_combat_animator() -> void:
 	## 连接信号
 	combat_animator.animation_finished.connect(_on_attack_animation_finished)
 	combat_animator.hit_frame_reached.connect(_on_hit_frame_reached)
+	combat_animator.animation_started.connect(_on_attack_animation_started)  ## 【新增】
+
+## 【新增】设置全身骨骼动画控制器
+func _setup_body_animation_controller() -> void:
+	body_animation_controller = BodyAnimationController.new()
+	body_animation_controller.name = "BodyAnimationController"
+	add_child(body_animation_controller)
+	
+	## 初始化控制器
+	body_animation_controller.initialize(
+		player,
+		left_arm,
+		right_arm,
+		torso_pivot,
+		head_sprite,
+		legs_pivot
+	)
+	
+	## 连接状态变化信号（可选，用于调试或其他用途）
+	body_animation_controller.animation_state_changed.connect(_on_body_animation_state_changed)
+	
+	## 【新增】让 CombatAnimator 知道 BodyAnimationController 的存在
+	if combat_animator != null:
+		combat_animator.set_body_animation_controller(body_animation_controller)
 
 func _setup_weapon_physics() -> void:
 	if weapon_physics != null:
@@ -87,17 +116,33 @@ func _on_weapon_settled() -> void:
 func _on_weapon_position_changed(_pos: Vector2, _rot: float) -> void:
 	pass
 
+## 【新增】攻击动画开始时的回调
+func _on_attack_animation_started(_attack: AttackData) -> void:
+	## 通知 BodyAnimationController 攻击动画开始
+	if body_animation_controller != null:
+		body_animation_controller.on_combat_animation_started()
+
 func _on_attack_animation_finished(_attack: AttackData) -> void:
 	## 【修复】动画结束后重置武器物理状态
 	if weapon_physics != null:
 		weapon_physics.set_to_rest()
+	
+	## 【新增】通知 BodyAnimationController 攻击动画结束
+	if body_animation_controller != null:
+		body_animation_controller.on_combat_animation_finished()
 
 func _on_hit_frame_reached(_attack: AttackData) -> void:
 	## 可以在这里触发命中检测
 	pass
 
+## 【新增】全身动画状态变化回调
+func _on_body_animation_state_changed(state: BodyAnimationController.AnimationState) -> void:
+	## 可以在这里添加状态变化时的特效或音效
+	pass
+
 func _process(delta: float) -> void:
 	_update_walk_animation(delta)
+	_update_legs_animation(delta)  ## 【新增】增强的腿部动画
 
 func _setup_default_visuals() -> void:
 	_create_placeholder_sprites()
@@ -155,21 +200,55 @@ func _create_rect_texture(width: int, height: int, color: Color) -> ImageTexture
 func _update_walk_animation(delta: float) -> void:
 	if player == null:
 		return
-
+	
+	## 【修改】简化躯干动画，主要动画由 BodyAnimationController 处理
+	## 这里只保留基础的躯干位置更新，避免与 BodyAnimationController 冲突
+	
 	var speed = player.velocity.length()
 	is_walking = speed > 10
-
-	if is_walking:
-		walk_cycle += delta * walk_speed * (speed / 300.0)
-
-		var bob = sin(walk_cycle) * 2
-		torso_pivot.position.y = bob
-
-		var leg_swing = sin(walk_cycle) * 0.1
-		legs_pivot.scale.y = 1.0 + leg_swing * 0.1
-	else:
+	
+	## 躯干的主要动画效果现在由 BodyAnimationController 处理
+	## 这里只做基础的重置
+	if not is_walking and not player.is_flying:
+		## 待机时平滑回到默认位置
 		torso_pivot.position.y = lerp(torso_pivot.position.y, 0.0, delta * 10)
-		legs_pivot.scale.y = lerp(legs_pivot.scale.y, 1.0, delta * 10)
+
+## 【新增】增强的腿部动画
+func _update_legs_animation(delta: float) -> void:
+	if player == null:
+		return
+	
+	var speed = player.velocity.length()
+	var is_moving = speed > 10
+	
+	if player.is_flying:
+		## 飞行时腿部收起
+		var target_scale = Vector2(0.8, 0.7)
+		legs_pivot.scale = legs_pivot.scale.lerp(target_scale, delta * 8)
+		
+		## 飞行时腿部略微向后
+		var velocity_dir = player.velocity.normalized() if speed > 10 else Vector2.ZERO
+		var face_dir = player.current_facing_direction
+		var relative_velocity = velocity_dir.rotated(-face_dir.angle())
+		
+		## 根据飞行方向调整腿部位置
+		var leg_offset = Vector2(0, 5 + relative_velocity.y * 3)
+		legs_pivot.position = legs_pivot.position.lerp(leg_offset, delta * 5)
+	elif is_moving:
+		## 移动时腿部动画
+		walk_cycle += delta * walk_speed * (speed / 300.0)
+		
+		## 腿部伸缩模拟行走
+		var leg_stretch = 1.0 + sin(walk_cycle * 2) * 0.08 * (speed / 300.0)
+		legs_pivot.scale.y = lerp(legs_pivot.scale.y, leg_stretch, delta * 15)
+		legs_pivot.scale.x = lerp(legs_pivot.scale.x, 1.0, delta * 10)
+		
+		## 腿部位置回到默认
+		legs_pivot.position = legs_pivot.position.lerp(Vector2.ZERO, delta * 10)
+	else:
+		## 待机时腿部恢复默认
+		legs_pivot.scale = legs_pivot.scale.lerp(Vector2.ONE, delta * 10)
+		legs_pivot.position = legs_pivot.position.lerp(Vector2.ZERO, delta * 10)
 
 ## 开始攻击动作的武器回正阶段
 func start_weapon_repositioning(_target_position: Vector2, target_rotation: float) -> void:
@@ -300,6 +379,10 @@ func get_right_arm() -> ArmRig:
 ## 获取战斗动画控制器
 func get_combat_animator() -> CombatAnimator:
 	return combat_animator
+
+## 【新增】获取全身动画控制器
+func get_body_animation_controller() -> BodyAnimationController:
+	return body_animation_controller
 
 ## 设置手臂可见性
 func set_arms_visible(visible_flag: bool) -> void:
