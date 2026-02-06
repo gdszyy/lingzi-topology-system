@@ -161,7 +161,7 @@ func _mutate_action(action: ActionData) -> void:
 			action.spawn_count = clampi(action.spawn_count + (randi() % 3 - 1), 2, 10)
 	elif action is ApplyStatusActionData:
 		if randf() < mutation_config.categorical_mutation_rate:
-			action.status_type = randi() % 6
+			action.status_type = randi() % 9
 
 func _generate_random_rule() -> TopologyRuleData:
 	var rule = TopologyRuleData.new()
@@ -215,7 +215,7 @@ func _generate_random_action(allow_fission: bool = true) -> ActionData:
 
 		ActionData.ActionType.APPLY_STATUS:
 			var status = ApplyStatusActionData.new()
-			status.status_type = randi() % 6
+			status.status_type = randi() % 9
 			status.duration = randf_range(1.0, 5.0)
 			status.effect_value = randf_range(2.0, 15.0)
 			return status

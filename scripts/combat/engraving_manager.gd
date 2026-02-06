@@ -123,8 +123,8 @@ func _connect_player_signals() -> void:
 
 	if player.has_signal("took_damage"):
 		player.took_damage.connect(_on_took_damage)
-	if player.has_signal("health_changed"):
-		player.health_changed.connect(_on_health_changed)
+	if player.has_signal("energy_cap_changed"):
+		player.energy_cap_changed.connect(_on_health_changed)
 
 	if player.has_signal("spell_cast"):
 		player.spell_cast.connect(_on_spell_cast)
@@ -256,7 +256,7 @@ func _can_use_weapon() -> bool:
 	var left_arm = get_body_part(BodyPartData.PartType.LEFT_ARM)
 	
 	# 双手武器需要两只手臂
-	if player.current_weapon != null and player.current_weapon.is_two_handed:
+	if player.current_weapon != null and player.current_weapon.is_two_handed():
 		return (right_arm != null and right_arm.is_functional) and (left_arm != null and left_arm.is_functional)
 	
 	# 单手武器只需要一只手臂
@@ -355,7 +355,7 @@ func damage_body_part(type: int, damage: float) -> float:
 		return part.take_damage(damage)
 	return damage # 如果找不到肢体，伤害直接传递给核心
 
-func _on_body_part_damage_taken(damage: float, part: BodyPartData) -> void:
+func _on_body_part_damage_taken(damage: float, _remaining_health: float, part: BodyPartData) -> void:
 	body_part_damaged.emit(part, damage, part.current_health)
 	
 	var part_name = BodyPartData.PartType.keys()[part.part_type]
@@ -393,6 +393,43 @@ func _on_body_part_restored(part: BodyPartData) -> void:
 func _on_body_part_health_changed(current: float, _max_val: float, part: BodyPartData) -> void:
 	# 可以在这里处理肢体效率随血量下降的逻辑
 	pass
+
+## 治疗特定肢体
+func heal_body_part(part_type: int, amount: float) -> float:
+	var part = get_body_part(part_type)
+	if part != null:
+		return part.heal(amount)
+	return 0.0
+
+## 完全恢复所有肢体
+func restore_all_body_parts() -> void:
+	for part in body_parts:
+		part.fully_restore()
+	_register_all_slots()
+
+## 将法术篆刻到肢体的指定槽位
+func engrave_to_body_part(part_type: int, slot_index: int, spell: SpellCoreData) -> bool:
+	var part = get_body_part(part_type)
+	if part == null:
+		push_warning("[EngravingManager] 找不到肢体类型: %d" % part_type)
+		return false
+	if slot_index < 0 or slot_index >= part.engraving_slots.size():
+		push_warning("[EngravingManager] 槽位索引越界: %d (肢体 %s 只有 %d 个槽位)" % [slot_index, part.part_name, part.engraving_slots.size()])
+		return false
+	var result = part.engraving_slots[slot_index].engrave_spell(spell)
+	if result:
+		_register_all_slots()
+	return result
+
+## 将法术篆刻到武器的指定槽位
+func engrave_to_weapon(slot_index: int, spell: SpellCoreData) -> bool:
+	if player == null or player.current_weapon == null:
+		push_warning("[EngravingManager] 玩家或武器为空，无法篆刻")
+		return false
+	var result = player.current_weapon.engrave_spell_to_slot(slot_index, spell)
+	if result:
+		_register_all_slots()
+	return result
 
 func get_all_engraved_spells() -> Array[SpellCoreData]:
 	var spells: Array[SpellCoreData] = []

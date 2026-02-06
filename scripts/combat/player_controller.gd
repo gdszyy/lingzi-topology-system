@@ -609,7 +609,7 @@ func can_use_weapon() -> bool:
 	var right_arm = engraving_manager.get_body_part(BodyPartData.PartType.RIGHT_ARM)
 	var left_arm = engraving_manager.get_body_part(BodyPartData.PartType.LEFT_ARM)
 	
-	if current_weapon != null and current_weapon.is_two_handed:
+	if current_weapon != null and current_weapon.is_two_handed():
 		return (right_arm != null and right_arm.is_functional) and (left_arm != null and left_arm.is_functional)
 	
 	return (right_arm != null and right_arm.is_functional) or (left_arm != null and left_arm.is_functional)

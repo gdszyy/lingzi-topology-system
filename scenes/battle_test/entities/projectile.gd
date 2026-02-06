@@ -258,7 +258,7 @@ func _execute_area_effect(area: AreaEffectActionData) -> void:
 	for result in results:
 		var collider = result.collider
 		if collider.has_method("take_damage"):
-			collider.take_damage(area.damage_value, area.damage_type)
+			collider.take_damage(area.damage_value)
 			hit_enemy.emit(collider, area.damage_value)
 
 func _on_body_entered(body: Node2D) -> void:

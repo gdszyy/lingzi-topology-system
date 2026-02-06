@@ -15,6 +15,8 @@ enum AreaShape {
 @export var width: float = 20.0
 @export var damage_value: float = 15.0
 @export var damage_falloff: float = 0.5
+@export var affect_enemies: bool = true
+@export var affect_allies: bool = false
 
 func _init():
 	action_type = ActionType.AREA_EFFECT
@@ -29,6 +31,8 @@ func clone_deep() -> ActionData:
 	copy.width = width
 	copy.damage_value = damage_value
 	copy.damage_falloff = damage_falloff
+	copy.affect_enemies = affect_enemies
+	copy.affect_allies = affect_allies
 	return copy
 
 func to_dict() -> Dictionary:
@@ -40,6 +44,8 @@ func to_dict() -> Dictionary:
 	base["width"] = width
 	base["damage_value"] = damage_value
 	base["damage_falloff"] = damage_falloff
+	base["affect_enemies"] = affect_enemies
+	base["affect_allies"] = affect_allies
 	return base
 
 static func from_dict(data: Dictionary) -> AreaEffectActionData:
@@ -51,4 +57,6 @@ static func from_dict(data: Dictionary) -> AreaEffectActionData:
 	action.width = data.get("width", 20.0)
 	action.damage_value = data.get("damage_value", 15.0)
 	action.damage_falloff = data.get("damage_falloff", 0.5)
+	action.affect_enemies = data.get("affect_enemies", true)
+	action.affect_allies = data.get("affect_allies", false)
 	return action

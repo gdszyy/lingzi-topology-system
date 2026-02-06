@@ -5,6 +5,7 @@ extends ActionData
 @export var explosion_radius: float = 100.0
 @export var damage_falloff: float = 0.5
 @export var explosion_damage_type: int = 0
+@export var knockback_force: float = 100.0
 
 func _init():
 	action_type = ActionType.SPAWN_ENTITY
@@ -19,6 +20,7 @@ func clone_deep() -> ActionData:
 	copy.explosion_radius = explosion_radius
 	copy.damage_falloff = damage_falloff
 	copy.explosion_damage_type = explosion_damage_type
+	copy.knockback_force = knockback_force
 	return copy
 
 func to_dict() -> Dictionary:
@@ -27,6 +29,7 @@ func to_dict() -> Dictionary:
 	base["explosion_radius"] = explosion_radius
 	base["damage_falloff"] = damage_falloff
 	base["explosion_damage_type"] = explosion_damage_type
+	base["knockback_force"] = knockback_force
 	return base
 
 static func from_dict(data: Dictionary) -> SpawnExplosionActionData:
@@ -35,4 +38,5 @@ static func from_dict(data: Dictionary) -> SpawnExplosionActionData:
 	action.explosion_radius = data.get("explosion_radius", 100.0)
 	action.damage_falloff = data.get("damage_falloff", 0.5)
 	action.explosion_damage_type = data.get("explosion_damage_type", 0)
+	action.knockback_force = data.get("knockback_force", 100.0)
 	return action

@@ -328,7 +328,7 @@ func apply_knockback(knockback: Vector2) -> void:
 	global_position += knockback * 0.1
 
 ## 生成状态效果VFX
-func _spawn_status_vfx(status_type: int, duration: float, value: float) -> void:
+func _spawn_status_vfx(status_type: ApplyStatusActionData.StatusType, duration: float, value: float) -> void:
 	# 先移除旧的VFX（如果有）
 	_remove_status_vfx(status_type)
 	

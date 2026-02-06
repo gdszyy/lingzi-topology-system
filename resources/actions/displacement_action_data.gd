@@ -24,6 +24,7 @@ enum DirectionReference {
 @export var fixed_direction: Vector2 = Vector2.RIGHT
 @export var stun_after_displacement: float = 0.0
 @export var damage_on_collision: float = 0.0
+@export var apply_to_self: bool = false
 
 func _init():
 	action_type = ActionType.DISPLACEMENT
@@ -53,6 +54,7 @@ func clone_deep() -> ActionData:
 	copy.fixed_direction = fixed_direction
 	copy.stun_after_displacement = stun_after_displacement
 	copy.damage_on_collision = damage_on_collision
+	copy.apply_to_self = apply_to_self
 	return copy
 
 func to_dict() -> Dictionary:
@@ -66,6 +68,7 @@ func to_dict() -> Dictionary:
 	base["fixed_direction_y"] = fixed_direction.y
 	base["stun_after_displacement"] = stun_after_displacement
 	base["damage_on_collision"] = damage_on_collision
+	base["apply_to_self"] = apply_to_self
 	return base
 
 static func from_dict(data: Dictionary) -> DisplacementActionData:
@@ -81,4 +84,5 @@ static func from_dict(data: Dictionary) -> DisplacementActionData:
 	)
 	action.stun_after_displacement = data.get("stun_after_displacement", 0.0)
 	action.damage_on_collision = data.get("damage_on_collision", 0.0)
+	action.apply_to_self = data.get("apply_to_self", false)
 	return action

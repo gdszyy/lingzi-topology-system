@@ -159,7 +159,7 @@ func _spawn_status_vfx(target: Node2D, status_type: ApplyStatusActionData.Status
 func _execute_displacement_action(action: DisplacementActionData, context: Dictionary) -> void:
 	var target = context.get("target", null) as Node2D
 	var direction = context.get("direction", Vector2.RIGHT)
-	var force = action.force * effect_multiplier
+	var force = action.displacement_force * effect_multiplier
 	var position = context.get("position", Vector2.ZERO)
 
 	if target != null and target.has_method("apply_knockback"):
@@ -221,10 +221,10 @@ func _execute_spawn_zone_action(action: SpawnDamageZoneActionData, context: Dict
 
 	if zone.has_method("setup"):
 		zone.setup(
-			action.damage_per_tick * effect_multiplier,
+			action.zone_damage * effect_multiplier,
 			action.tick_interval,
-			action.duration,
-			action.radius * effect_multiplier
+			action.zone_duration,
+			action.zone_radius * effect_multiplier
 		)
 
 	area_effect_created.emit(zone)
@@ -232,11 +232,11 @@ func _execute_spawn_zone_action(action: SpawnDamageZoneActionData, context: Dict
 
 func _execute_explosion_action(action: SpawnExplosionActionData, context: Dictionary) -> void:
 	var position = context.get("target_position", context.get("position", Vector2.ZERO))
-	var radius = action.radius * effect_multiplier
-	var damage = action.damage * effect_multiplier
+	var radius = action.explosion_radius * effect_multiplier
+	var damage = action.explosion_damage * effect_multiplier
 	
 	# 播放爆炸特效
-	var phase = _damage_type_to_phase(action.damage_type)
+	var phase = _damage_type_to_phase(action.explosion_damage_type)
 	var explosion_vfx = VFXFactory.create_explosion_vfx(phase, radius, action.damage_falloff)
 	if explosion_vfx:
 		VFXFactory.spawn_at(explosion_vfx, position, get_tree().current_scene)
@@ -324,8 +324,22 @@ func _execute_area_effect_action(action: AreaEffectActionData, context: Dictiona
 	if action.affect_allies:
 		targets.append_array(_get_nearby_allies(position, radius))
 
+	# 播放区域效果特效
+	var area_vfx = VFXFactory.create_explosion_vfx(current_phase, radius, 0.5)
+	if area_vfx:
+		VFXFactory.spawn_at(area_vfx, position, get_tree().current_scene)
+	
 	for target in targets:
-		pass
+		if target == null or not is_instance_valid(target):
+			continue
+		
+		var dist = position.distance_to(target.global_position)
+		var falloff = 1.0 - (dist / radius) * 0.5
+		var damage = action.damage_value * effect_multiplier * max(0.1, falloff)
+		
+		if target.has_method("take_damage"):
+			target.take_damage(damage)
+			damage_dealt.emit(target, damage, "area_effect")
 
 func _execute_summon_action(action: SummonActionData, context: Dictionary) -> void:
 	var position = context.get("position", Vector2.ZERO)
