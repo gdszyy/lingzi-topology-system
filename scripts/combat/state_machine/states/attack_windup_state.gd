@@ -5,6 +5,7 @@ class_name AttackWindupState
 ## 包含两个阶段：
 ## 1. REPOSITIONING - 武器从当前位置移动到攻击起始位置
 ## 2. WINDUP - 在攻击起始位置等待前摇时间
+## 【优化】消除重复类型转换、缓存 visuals 引用
 
 enum Phase {
 	REPOSITIONING,  ## 武器回正阶段
@@ -26,15 +27,21 @@ var current_phase: Phase = Phase.REPOSITIONING
 var max_reposition_time: float = 0.5
 var reposition_timer: float = 0.0
 
+## 【优化】缓存 PlayerVisuals 引用，避免每次都做 as 类型转换
+var _cached_visuals: PlayerVisuals = null
+
 func initialize(_owner: Node) -> void:
 	super.initialize(_owner)
 	player = _owner as PlayerController
 
 func enter(params: Dictionary = {}) -> void:
-	player.can_move = true  ## 【修改】允许攻击时移动
+	player.can_move = true
 	player.can_rotate = false
 	player.is_attacking = true
-	player.current_attack_phase = "windup"  ## 【优化】设置政击阶段
+	player.current_attack_phase = "windup"
+
+	## 【优化】一次性缓存 visuals 引用
+	_cached_visuals = player.visuals as PlayerVisuals if player.visuals != null else null
 
 	var input = params.get("input", null)
 	if input != null:
@@ -50,7 +57,7 @@ func enter(params: Dictionary = {}) -> void:
 	from_fly = params.get("from_fly", false)
 
 	current_attack = _get_attack_data()
-	player.current_attack = current_attack  ## 【优化】设置玩家当前攻击
+	player.current_attack = current_attack
 
 	if current_attack == null:
 		transition_to("Idle")
@@ -74,7 +81,8 @@ func exit() -> void:
 	reposition_timer = 0.0
 	current_attack = null
 	current_phase = Phase.REPOSITIONING
-	player.current_attack_phase = ""  ## 【优化】清除攻击阶段
+	player.current_attack_phase = ""
+	_cached_visuals = null
 
 func physics_update(delta: float) -> void:
 	match current_phase:
@@ -85,10 +93,10 @@ func physics_update(delta: float) -> void:
 
 func _update_repositioning_phase(delta: float) -> void:
 	reposition_timer += delta
-	
+
 	## 检查武器是否已经到位
 	var weapon_settled = _is_weapon_settled()
-	
+
 	## 超时或武器到位，进入前摇阶段
 	if weapon_settled or reposition_timer >= max_reposition_time:
 		current_phase = Phase.WINDUP
@@ -106,50 +114,39 @@ func _update_windup_phase(delta: float) -> void:
 		})
 
 func _needs_repositioning() -> bool:
-	## 检查武器当前位置是否已经接近攻击起始位置
-	if player.visuals == null:
+	## 【优化】使用缓存的 visuals 引用
+	if _cached_visuals == null or _cached_visuals.weapon_physics == null:
 		return false
-	
-	var visuals = player.visuals as PlayerVisuals
-	if visuals == null or visuals.weapon_physics == null:
-		return false
-	
-	var weapon_physics = visuals.weapon_physics
-	var current_rotation = weapon_physics.rotation
+
+	var weapon_phys = _cached_visuals.weapon_physics
+	var current_rotation = weapon_phys.rotation
 	var target_rotation = current_attack.get_reposition_target_rotation()
-	
+
 	## 如果角度差距大于阈值，需要回正
 	var angle_diff = abs(angle_difference(current_rotation, target_rotation))
 	return rad_to_deg(angle_diff) > 20.0
 
 func _start_weapon_repositioning() -> void:
-	if player.visuals == null:
+	## 【优化】使用缓存的 visuals 引用
+	if _cached_visuals == null:
 		return
-	
-	var visuals = player.visuals as PlayerVisuals
-	if visuals == null:
-		return
-	
+
 	## 设置武器物理系统的目标位置
 	var target_pos = current_attack.get_reposition_target_position()
 	var target_rot = current_attack.get_reposition_target_rotation()
-	
-	visuals.start_weapon_repositioning(target_pos, target_rot)
-	
+
+	_cached_visuals.start_weapon_repositioning(target_pos, target_rot)
+
 	## 根据武器重量调整最大回正时间
 	if player.current_weapon != null:
 		max_reposition_time = 0.3 + player.current_weapon.weight * 0.05
 		max_reposition_time *= current_attack.reposition_time_multiplier
 
 func _is_weapon_settled() -> bool:
-	if player.visuals == null:
+	## 【优化】使用缓存的 visuals 引用
+	if _cached_visuals == null:
 		return true
-	
-	var visuals = player.visuals as PlayerVisuals
-	if visuals == null:
-		return true
-	
-	return visuals.is_weapon_settled()
+	return _cached_visuals.is_weapon_settled()
 
 func _start_windup_phase() -> void:
 	## 开始前摇动画
@@ -170,51 +167,48 @@ func _get_attack_data() -> AttackData:
 func _select_best_attack(attacks: Array[AttackData]) -> AttackData:
 	if attacks.size() == 0:
 		return null
-	
+
 	## 基本情况：使用连击索引
 	var index = combo_index % attacks.size()
 	var base_attack = attacks[index]
-	
+
 	## 高级选择：根据武器当前位置选择最优攻击方向
-	if player.visuals != null:
-		var visuals = player.visuals as PlayerVisuals
-		if visuals != null and visuals.weapon_physics != null:
-			var current_rotation = visuals.weapon_physics.rotation
-			
-			## 查找最适合当前武器位置的攻击
-			var best_attack: AttackData = null
-			var best_score: float = -1.0
-			
-			for attack in attacks:
-				var score = _calculate_attack_suitability(attack, current_rotation)
-				if score > best_score:
-					best_score = score
-					best_attack = attack
-			
-			if best_attack != null and best_score > 0.7:
-				return best_attack
-	
+	## 【优化】使用缓存的 visuals 引用
+	if _cached_visuals != null and _cached_visuals.weapon_physics != null:
+		var current_rotation = _cached_visuals.weapon_physics.rotation
+
+		## 查找最适合当前武器位置的攻击
+		var best_attack: AttackData = null
+		var best_score: float = -1.0
+
+		for attack in attacks:
+			var score = _calculate_attack_suitability(attack, current_rotation)
+			if score > best_score:
+				best_score = score
+				best_attack = attack
+
+		if best_attack != null and best_score > 0.7:
+			return best_attack
+
 	return base_attack
 
 func _calculate_attack_suitability(attack: AttackData, current_weapon_rotation: float) -> float:
 	## 计算攻击与当前武器位置的适合度（0-1）
 	var target_rotation = attack.get_reposition_target_rotation()
 	var angle_diff = abs(angle_difference(current_weapon_rotation, target_rotation))
-	
+
 	## 角度差越小，适合度越高
 	var angle_score = 1.0 - clamp(rad_to_deg(angle_diff) / 180.0, 0.0, 1.0)
-	
+
 	return angle_score
 
 func _play_windup_animation() -> void:
 	if current_attack == null:
 		return
-	
-	## 通知视觉系统播放前摇动画
-	if player.visuals != null:
-		var visuals = player.visuals as PlayerVisuals
-		if visuals != null:
-			## 在前摇阶段，武器保持在起始位置
-			var target_pos = current_attack.get_reposition_target_position()
-			var target_rot = current_attack.get_reposition_target_rotation()
-			visuals.start_weapon_repositioning(target_pos, target_rot)
+
+	## 【优化】使用缓存的 visuals 引用
+	if _cached_visuals != null:
+		## 在前摇阶段，武器保持在起始位置
+		var target_pos = current_attack.get_reposition_target_position()
+		var target_rot = current_attack.get_reposition_target_rotation()
+		_cached_visuals.start_weapon_repositioning(target_pos, target_rot)

@@ -68,6 +68,10 @@ enum GripType {
 ## 运行时状态
 var last_attack_direction: int = 0  ## 0=正向, 1=反向
 
+## 【优化】缓存特质修正器，避免每次 get_trait_modifier() 都重新创建
+var _cached_trait_modifier: WeaponTraitModifier = null
+var _trait_modifier_dirty: bool = true
+
 func get_turn_speed_modifier() -> float:
 	## 武器重量影响转身速度
 	## 重武器转身更慢
@@ -181,13 +185,25 @@ func reset_attack_direction() -> void:
 
 ## ==================== 武器特质修正器相关方法 ====================
 
-## 获取武器特质修正器
+## 获取武器特质修正器（带缓存）
 func get_trait_modifier() -> WeaponTraitModifier:
+	if not _trait_modifier_dirty and _cached_trait_modifier != null:
+		return _cached_trait_modifier
+	
 	if trait_modifier != null and not use_preset_modifier:
-		return trait_modifier
-	if use_preset_modifier:
-		return WeaponTraitPresets.get_modifier_for_type(weapon_type)
-	return WeaponTraitModifier.new()
+		_cached_trait_modifier = trait_modifier
+	elif use_preset_modifier:
+		_cached_trait_modifier = WeaponTraitPresets.get_modifier_for_type(weapon_type)
+	else:
+		_cached_trait_modifier = WeaponTraitModifier.new()
+	
+	_trait_modifier_dirty = false
+	return _cached_trait_modifier
+
+## 标记特质修正器需要刷新（当武器类型或修正器设置改变时调用）
+func invalidate_trait_modifier_cache() -> void:
+	_trait_modifier_dirty = true
+	_cached_trait_modifier = null
 
 ## 获取特质名称
 func get_trait_name() -> String:
@@ -276,26 +292,23 @@ func get_trait_summary() -> String:
 
 ## ==================== 篆刻槽位相关方法 ====================
 
+## 【优化】使用查找表替代 match 链
+static var _engraving_config: Dictionary = {
+	WeaponType.UNARMED: [0, 0.0],
+	WeaponType.DAGGER: [1, 50.0],
+	WeaponType.SWORD: [2, 80.0],
+	WeaponType.DUAL_BLADE: [2, 80.0],
+	WeaponType.GREATSWORD: [3, 120.0],
+	WeaponType.SPEAR: [3, 120.0],
+	WeaponType.STAFF: [4, 150.0],
+}
+
 func initialize_engraving_slots(slot_count: int = 2) -> void:
 	engraving_slots.clear()
 
-	var capacity = max_engraving_capacity
-	match weapon_type:
-		WeaponType.UNARMED:
-			slot_count = 0
-			capacity = 0
-		WeaponType.DAGGER:
-			slot_count = 1
-			capacity = 50.0
-		WeaponType.SWORD, WeaponType.DUAL_BLADE:
-			slot_count = 2
-			capacity = 80.0
-		WeaponType.GREATSWORD, WeaponType.SPEAR:
-			slot_count = 3
-			capacity = 120.0
-		WeaponType.STAFF:
-			slot_count = 4
-			capacity = 150.0
+	var config = _engraving_config.get(weapon_type, [slot_count, max_engraving_capacity])
+	slot_count = config[0]
+	var capacity: float = config[1]
 
 	for i in range(slot_count):
 		var slot = EngravingSlot.new()

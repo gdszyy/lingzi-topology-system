@@ -6,6 +6,7 @@ class_name AttackRecoveryState
 ## - 武器从攻击结束位置恢复到休息位置
 ## - 检测连击输入
 ## - 允许有限的旋转
+## 【优化】消除重复类型转换、缓存 visuals 引用
 
 var player: PlayerController
 
@@ -21,18 +22,24 @@ var next_input: InputBuffer.BufferedInput = null
 ## 武器恢复状态
 var weapon_recovery_started: bool = false
 
+## 【优化】缓存 PlayerVisuals 引用
+var _cached_visuals: PlayerVisuals = null
+
 func initialize(_owner: Node) -> void:
 	super.initialize(_owner)
 	player = _owner as PlayerController
 
 func enter(params: Dictionary = {}) -> void:
-	player.can_move = true  ## 【修改】允许攻击时移动
+	player.can_move = true
 	player.can_rotate = true  ## 恢复阶段允许旋转
 	player.is_attacking = true
-	player.current_attack_phase = "recovery"  ## 【优化】设置政击阶段
+	player.current_attack_phase = "recovery"
+
+	## 【优化】一次性缓存 visuals 引用
+	_cached_visuals = player.visuals as PlayerVisuals if player.visuals != null else null
 
 	current_attack = params.get("attack", null)
-	player.current_attack = current_attack  ## 【优化】设置玩家当前攻击
+	player.current_attack = current_attack
 	input_type = params.get("input_type", 0)
 	combo_index = params.get("combo_index", 0)
 	from_fly = params.get("from_fly", false)
@@ -46,6 +53,10 @@ func enter(params: Dictionary = {}) -> void:
 		transition_to("Idle")
 		return
 
+	## 切换攻击方向（用于双手武器交替攻击）
+	if player.current_weapon != null:
+		player.current_weapon.toggle_attack_direction()
+
 	## 开始武器恢复动画
 	_start_weapon_recovery()
 
@@ -55,8 +66,9 @@ func exit() -> void:
 	next_input = null
 	weapon_recovery_started = false
 	player.is_attacking = false
-	player.current_attack = null  ## 【优化】清除当前攻击
-	player.current_attack_phase = ""  ## 【优化】清除攻击阶段
+	player.current_attack = null
+	player.current_attack_phase = ""
+	_cached_visuals = null
 
 func physics_update(delta: float) -> void:
 	recovery_timer += delta
@@ -71,13 +83,11 @@ func physics_update(delta: float) -> void:
 func _start_weapon_recovery() -> void:
 	if weapon_recovery_started:
 		return
-	
-	## 让武器回到休息位置
-	if player.visuals != null:
-		var visuals = player.visuals as PlayerVisuals
-		if visuals != null and visuals.weapon_physics != null:
-			visuals.weapon_physics.set_to_rest()
-	
+
+	## 【优化】使用缓存的 visuals 引用
+	if _cached_visuals != null and _cached_visuals.weapon_physics != null:
+		_cached_visuals.weapon_physics.set_to_rest()
+
 	weapon_recovery_started = true
 
 func _check_combo_input() -> void:
@@ -121,7 +131,7 @@ func _on_recovery_complete() -> void:
 	else:
 		## 确保武器回到休息位置
 		_ensure_weapon_at_rest()
-		
+
 		if from_fly and player.is_flying:
 			transition_to("Fly")
 		elif player.input_direction.length_squared() > 0.01:
@@ -130,10 +140,8 @@ func _on_recovery_complete() -> void:
 			transition_to("Idle")
 
 func _ensure_weapon_at_rest() -> void:
-	## 确保武器已经回到休息位置
-	if player.visuals != null:
-		var visuals = player.visuals as PlayerVisuals
-		if visuals != null and visuals.weapon_physics != null:
-			if not visuals.weapon_physics.get_is_settled():
-				## 如果还没稳定，强制设置到休息位置
-				visuals.weapon_physics.set_to_rest()
+	## 【优化】使用缓存的 visuals 引用
+	if _cached_visuals != null and _cached_visuals.weapon_physics != null:
+		if not _cached_visuals.weapon_physics.get_is_settled():
+			## 如果还没稳定，强制设置到休息位置
+			_cached_visuals.weapon_physics.set_to_rest()
