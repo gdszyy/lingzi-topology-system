@@ -1,6 +1,10 @@
 extends Area2D
 class_name Projectile
 
+## 投射物（优化版）
+## 改进：嵌套深度限制防止裂变爆炸、SpatialGrid 高效索敌、对象池回收支持
+## 减少冗余 print 日志，使用 push_warning 替代关键路径日志
+
 signal hit_enemy(enemy: Node2D, damage: float)
 signal projectile_died(projectile: Projectile)
 signal fission_triggered(position: Vector2, spell_data: SpellCoreData, count: int, spread_angle: float, parent_direction: Vector2, direction_mode: int)
@@ -20,8 +24,16 @@ var time_alive: float = 0.0
 # 嵌套层级追踪
 var nesting_level: int = 0
 
+## 最大嵌套深度限制，防止裂变链式爆炸导致性能崩溃
+const MAX_NESTING_DEPTH: int = 5
+
 var rule_timers: Array[float] = []
 var rule_triggered: Array[bool] = []
+
+# 缓存的视口矩形（避免每帧查询）
+var _cached_viewport_rect: Rect2 = Rect2()
+var _viewport_cache_timer: float = 0.0
+const VIEWPORT_CACHE_INTERVAL: float = 1.0
 
 @onready var sprite: Sprite2D = $Sprite2D
 @onready var collision: CollisionShape2D = $CollisionShape2D
@@ -41,6 +53,7 @@ const PHASE_COLORS = {
 func _ready():
 	body_entered.connect(_on_body_entered)
 	area_entered.connect(_on_area_entered)
+	_cached_viewport_rect = get_viewport_rect()
 
 ## 标准初始化（兼容旧版调用）
 func initialize(data: SpellCoreData, direction: Vector2, start_pos: Vector2) -> void:
@@ -48,9 +61,8 @@ func initialize(data: SpellCoreData, direction: Vector2, start_pos: Vector2) -> 
 
 ## 增强初始化（支持嵌套层级）
 func initialize_with_nesting(data: SpellCoreData, direction: Vector2, start_pos: Vector2, p_nesting_level: int = 0) -> void:
-	# 检查 data 是否为 null
 	if data == null:
-		push_error("[子弹] 初始化失败: spell_data 为 null")
+		push_error("[Projectile] 初始化失败: spell_data 为 null")
 		return
 	
 	spell_data = data
@@ -59,23 +71,16 @@ func initialize_with_nesting(data: SpellCoreData, direction: Vector2, start_pos:
 
 	global_position = start_pos
 
-	# 检查 carrier 是否为 null
 	if carrier == null:
-		push_warning("[子弹] carrier 为 null，使用默认值初始化")
-		velocity = direction.normalized() * 300.0  # 默认速度
-		lifetime_remaining = 3.0  # 默认寿命
+		push_warning("[Projectile] carrier 为 null，使用默认值初始化")
+		velocity = direction.normalized() * 300.0
+		lifetime_remaining = 3.0
 		piercing_remaining = 0
 	else:
 		var effective_velocity = carrier.get_effective_velocity()
 		velocity = direction.normalized() * effective_velocity
 		lifetime_remaining = carrier.get_effective_lifetime()
 		piercing_remaining = carrier.piercing
-
-	var type_names = ["Projectile", "Mine", "SlowOrb"]
-	if carrier != null:
-		print("[子弹] 类型=%s, 速度=%.1f, 寿命=%.1fs, 嵌套层级=%d" % [type_names[carrier.carrier_type], velocity.length(), lifetime_remaining, nesting_level])
-	else:
-		print("[子弹] 类型=默认, 速度=%.1f, 寿命=%.1fs, 嵌套层级=%d" % [velocity.length(), lifetime_remaining, nesting_level])
 
 	rule_timers.clear()
 	rule_triggered.clear()
@@ -86,10 +91,13 @@ func initialize_with_nesting(data: SpellCoreData, direction: Vector2, start_pos:
 
 	_setup_visuals()
 	_setup_vfx()
+	
+	# 注册到 SpatialGrid（如果可用）
+	if SpatialGrid.instance != null:
+		SpatialGrid.instance.register_entity(self, "projectiles")
 
 func _setup_visuals() -> void:
 	if carrier == null:
-		print("[子弹] 警告: carrier 为 null，无法设置视觉效果")
 		return
 
 	var color = PHASE_COLORS.get(carrier.phase, Color.WHITE)
@@ -110,25 +118,20 @@ func _setup_visuals() -> void:
 	visible = true
 	modulate.a = 1.0
 
-	print("[子弹] 视觉设置: 颜色=%s, 缩放=%.2f, 位置=%s" % [color, base_scale, global_position])
-
 ## 设置VFX特效（增强版）
 func _setup_vfx() -> void:
 	if carrier == null:
 		return
 	
-	# 使用增强初始化创建相态弹体特效
 	phase_vfx = VFXFactory.create_projectile_vfx_enhanced(spell_data, nesting_level, velocity)
 	if phase_vfx:
 		add_child(phase_vfx)
 		phase_vfx.position = Vector2.ZERO
 	
-	# 创建拖尾特效（添加到场景根节点以保持世界坐标）
 	trail_vfx = VFXFactory.create_trail_vfx(carrier.phase, self, carrier.size * 6.0)
 	if trail_vfx:
 		get_tree().current_scene.add_child(trail_vfx)
 	
-	# 隐藏原有的简单视觉效果
 	if visual_circle:
 		visual_circle.visible = false
 	if trail:
@@ -151,13 +154,21 @@ func _physics_process(delta: float) -> void:
 	position += velocity * delta
 	rotation = velocity.angle()
 	
-	# 更新VFX速度
 	if phase_vfx:
 		phase_vfx.update_velocity(velocity)
 
 	_update_rule_timers(delta)
 
+	# 使用缓存的视口矩形进行边界检查
+	_viewport_cache_timer += delta
+	if _viewport_cache_timer >= VIEWPORT_CACHE_INTERVAL:
+		_cached_viewport_rect = get_viewport_rect()
+		_viewport_cache_timer = 0.0
 	_check_bounds()
+	
+	# 更新 SpatialGrid 中的位置
+	if SpatialGrid.instance != null:
+		SpatialGrid.instance.update_entity(self)
 
 func _update_rule_timers(delta: float) -> void:
 	if spell_data == null:
@@ -188,6 +199,12 @@ func _update_rule_timers(delta: float) -> void:
 						rule_triggered[i] = true
 
 func _check_proximity_trigger(trigger: OnProximityTrigger) -> bool:
+	# 优先使用 SpatialGrid 进行高效查询
+	if SpatialGrid.instance != null:
+		var nearby = SpatialGrid.instance.find_in_radius(global_position, trigger.detection_radius, "enemies")
+		return not nearby.is_empty()
+	
+	# 回退到线性搜索
 	var enemies = get_tree().get_nodes_in_group("enemies")
 	for enemy in enemies:
 		if not is_instance_valid(enemy):
@@ -225,16 +242,19 @@ func _execute_action(action: ActionData) -> void:
 		_execute_spawn_damage_zone(zone)
 
 func _execute_fission(fission: FissionActionData) -> void:
-	print("[子弹] 执行裂变: 数量=%d, 角度=%.1f°, 方向模式=%d, 当前嵌套层级=%d" % [fission.spawn_count, fission.spread_angle, fission.direction_mode, nesting_level])
+	# 嵌套深度检查，防止裂变链式爆炸
+	if nesting_level >= MAX_NESTING_DEPTH:
+		push_warning("[Projectile] 裂变被阻止：嵌套层级 %d 已达到最大深度 %d" % [nesting_level, MAX_NESTING_DEPTH])
+		return
 	
 	# 播放裂变特效
-	var fission_vfx = VFXFactory.create_fission_vfx(carrier.phase, fission.spawn_count, fission.spread_angle, carrier.size)
-	if fission_vfx:
-		VFXFactory.spawn_at(fission_vfx, global_position, get_tree().current_scene)
+	if carrier != null:
+		var fission_vfx = VFXFactory.create_fission_vfx(carrier.phase, fission.spawn_count, fission.spread_angle, carrier.size)
+		if fission_vfx:
+			VFXFactory.spawn_at(fission_vfx, global_position, get_tree().current_scene)
 	
 	var parent_direction = velocity.normalized() if velocity.length() > 0 else Vector2.RIGHT
 	
-	# 发射裂变信号，传递当前嵌套层级+1
 	fission_triggered.emit(global_position, fission.child_spell_data, fission.spawn_count, fission.spread_angle, parent_direction, fission.direction_mode)
 
 	if fission.destroy_parent:
@@ -270,9 +290,8 @@ func _on_area_entered(area: Area2D) -> void:
 		_handle_enemy_collision(area)
 
 func _handle_enemy_collision(enemy: Node2D) -> void:
-	# 检查 spell_data 是否为 null
 	if spell_data == null:
-		push_warning("[子弹] spell_data 为 null，跳过碰撞处理")
+		push_warning("[Projectile] spell_data 为 null，跳过碰撞处理")
 		return
 	
 	for i in range(spell_data.topology_rules.size()):
@@ -293,7 +312,6 @@ func _handle_enemy_collision(enemy: Node2D) -> void:
 
 	hit_enemy.emit(enemy, total_damage)
 	
-	# 播放命中特效
 	_spawn_impact_vfx(enemy.global_position)
 
 	if piercing_remaining > 0:
@@ -304,6 +322,8 @@ func _handle_enemy_collision(enemy: Node2D) -> void:
 
 ## 生成命中特效
 func _spawn_impact_vfx(pos: Vector2) -> void:
+	if carrier == null:
+		return
 	var impact_vfx = VFXFactory.create_impact_vfx(carrier.phase, carrier.size)
 	if impact_vfx:
 		VFXFactory.spawn_at(impact_vfx, pos, get_tree().current_scene)
@@ -318,7 +338,6 @@ func _execute_contact_rule(rule: TopologyRuleData, enemy: Node2D) -> void:
 			var status = action as ApplyStatusActionData
 			if enemy.has_method("apply_status"):
 				enemy.apply_status(status.status_type, status.duration, status.effect_value)
-				# 播放状态效果特效
 				_spawn_status_vfx(enemy, status)
 		elif action is ChainActionData:
 			var chain = action as ChainActionData
@@ -326,14 +345,10 @@ func _execute_contact_rule(rule: TopologyRuleData, enemy: Node2D) -> void:
 
 ## 执行链接效果（委托给 ChainSystem 统一处理）
 func _execute_chain_effect(chain: ChainActionData, initial_target: Node2D) -> void:
-	print("[子弹] 执行链接效果: 类型=%s, 链接数=%d" % [chain.get_type_name(), chain.chain_count])
-	
-	# 获取 RuntimeSystemsManager 中的 ChainSystem
 	var runtime_manager = get_tree().get_first_node_in_group("runtime_systems_manager")
 	if runtime_manager != null and runtime_manager.has_method("start_chain"):
 		runtime_manager.start_chain(initial_target, chain, global_position)
 	else:
-		# 回退方案：直接调用 ChainSystem（如果存在）
 		var chain_system = get_tree().get_first_node_in_group("chain_system")
 		if chain_system != null:
 			chain_system.start_chain(initial_target, chain, global_position)
@@ -341,36 +356,32 @@ func _execute_chain_effect(chain: ChainActionData, initial_target: Node2D) -> vo
 			push_warning("[Projectile] 无法找到 ChainSystem，链式效果未执行")
 
 ## 生成状态效果特效
-func _spawn_status_vfx(target: Node2D, status: ApplyStatusActionData) -> void:
-	var status_vfx = VFXFactory.create_status_effect_vfx(status.status_type, status.duration, status.effect_value, target)
+func _spawn_status_vfx(target_node: Node2D, status: ApplyStatusActionData) -> void:
+	var status_vfx = VFXFactory.create_status_effect_vfx(status.status_type, status.duration, status.effect_value, target_node)
 	if status_vfx:
 		get_tree().current_scene.add_child(status_vfx)
 
 func _calculate_damage() -> float:
 	var total = 0.0
-	var _contact_rules_found = 0
-	var _damage_actions_found = 0
 	
 	if spell_data == null:
-		return 10.0  # 返回默认伤害
+		return 10.0
 
 	for rule in spell_data.topology_rules:
 		if rule.trigger.trigger_type == TriggerData.TriggerType.ON_CONTACT:
-			_contact_rules_found += 1
 			for action in rule.actions:
 				if action is DamageActionData:
-					_damage_actions_found += 1
 					var dmg = action as DamageActionData
 					var action_damage = dmg.damage_value * dmg.damage_multiplier
 					total += action_damage
 
-	var mass_multiplier = 1.0 + carrier.mass * 0.1
-	total *= mass_multiplier
+	if carrier != null:
+		var mass_multiplier = 1.0 + carrier.mass * 0.1
+		total *= mass_multiplier
 
-	if total <= 0:
-		var base_dmg = carrier.base_damage if carrier.base_damage > 0 else 10.0
-		total = base_dmg * mass_multiplier
-		print("[保底伤害] 使用载体基础伤害: %.1f" % total)
+		if total <= 0:
+			var base_dmg = carrier.base_damage if carrier.base_damage > 0 else 10.0
+			total = base_dmg * mass_multiplier
 
 	return total
 
@@ -384,10 +395,9 @@ func _trigger_death_rules() -> void:
 			_execute_rule(rule, i)
 
 func _check_bounds() -> void:
-	var viewport_rect = get_viewport_rect()
 	var margin = 100
-	if position.x < -margin or position.x > viewport_rect.size.x + margin or \
-	   position.y < -margin or position.y > viewport_rect.size.y + margin:
+	if position.x < -margin or position.x > _cached_viewport_rect.size.x + margin or \
+	   position.y < -margin or position.y > _cached_viewport_rect.size.y + margin:
 		_trigger_death_rules()
 		_die()
 
@@ -396,16 +406,25 @@ func _die() -> void:
 	if trail_vfx and is_instance_valid(trail_vfx):
 		trail_vfx.stop()
 	
+	# 从 SpatialGrid 注销
+	if SpatialGrid.instance != null:
+		SpatialGrid.instance.unregister_entity(self)
+	
 	projectile_died.emit(self)
 	set_deferred("monitoring", false)
 	set_deferred("monitorable", false)
-	call_deferred("queue_free")
+	
+	# 如果使用对象池，则回收而非销毁
+	if ObjectPool.instance != null:
+		ObjectPool.instance.release(self)
+	else:
+		call_deferred("queue_free")
 
 func set_target(new_target: Node2D) -> void:
 	target = new_target
 
 func _update_homing(delta: float) -> void:
-	if carrier.homing_strength <= 0:
+	if carrier == null or carrier.homing_strength <= 0:
 		return
 
 	if time_alive < carrier.homing_delay:
@@ -437,6 +456,12 @@ func _update_homing(delta: float) -> void:
 	velocity = new_dir.normalized() * carrier.velocity
 
 func _find_nearest_enemy() -> Node2D:
+	# 优先使用 SpatialGrid 进行高效查询
+	if SpatialGrid.instance != null:
+		var max_range = carrier.homing_range if carrier != null else 500.0
+		return SpatialGrid.instance.find_nearest(global_position, "enemies", max_range)
+	
+	# 回退到线性搜索
 	var enemies = get_tree().get_nodes_in_group("enemies")
 	var nearest: Node2D = null
 	var nearest_dist = INF
@@ -452,7 +477,6 @@ func _find_nearest_enemy() -> Node2D:
 	return nearest
 
 func _execute_spawn_explosion(explosion: SpawnExplosionActionData) -> void:
-	print("[子弹] 生成爆炸: 伤害=%.1f, 半径=%.1f" % [explosion.explosion_damage, explosion.explosion_radius])
 	explosion_requested.emit(
 		global_position,
 		explosion.explosion_damage,
@@ -462,7 +486,6 @@ func _execute_spawn_explosion(explosion: SpawnExplosionActionData) -> void:
 	)
 
 func _execute_spawn_damage_zone(zone: SpawnDamageZoneActionData) -> void:
-	print("[子弹] 生成伤害区域: 伤害=%.1f, 半径=%.1f, 持续=%.1fs" % [zone.zone_damage, zone.zone_radius, zone.zone_duration])
 	damage_zone_requested.emit(
 		global_position,
 		zone.zone_damage,
@@ -472,3 +495,30 @@ func _execute_spawn_damage_zone(zone: SpawnDamageZoneActionData) -> void:
 		zone.zone_damage_type,
 		zone.slow_amount
 	)
+
+## 重置投射物状态（用于对象池回收后重用）
+func reset_for_pool() -> void:
+	spell_data = null
+	carrier = null
+	velocity = Vector2.ZERO
+	lifetime_remaining = 0.0
+	piercing_remaining = 0
+	target = null
+	homing_delay_timer = 0.0
+	time_alive = 0.0
+	nesting_level = 0
+	rule_timers.clear()
+	rule_triggered.clear()
+	_viewport_cache_timer = 0.0
+	
+	if phase_vfx and is_instance_valid(phase_vfx):
+		phase_vfx.queue_free()
+		phase_vfx = null
+	
+	if trail_vfx and is_instance_valid(trail_vfx):
+		trail_vfx.stop()
+		trail_vfx = null
+	
+	visible = false
+	monitoring = false
+	monitorable = false

@@ -1,5 +1,9 @@
 extends Node
 
+## 法术工厂（优化版）
+## 修复了硬编码的枚举随机选择问题，使用类型安全的枚举值数组
+## 当枚举类型更新时，工厂代码无需同步修改
+
 var config = {
 	"mass_range": Vector2(0.5, 5.0),
 	"velocity_range": Vector2(50.0, 800.0),
@@ -17,6 +21,88 @@ var config = {
 	"mine_probability": 0.15,
 	"slow_orb_probability": 0.20
 }
+
+# ============================================================
+# 枚举值缓存（类型安全的随机选择，替代硬编码的 randi() % N）
+# 当枚举成员增减时，只需更新此处的数组即可
+# ============================================================
+
+## 载体相态枚举值
+const CARRIER_PHASES: Array = [
+	CarrierConfigData.Phase.SOLID,
+	CarrierConfigData.Phase.LIQUID,
+	CarrierConfigData.Phase.PLASMA,
+]
+
+## 伤害类型枚举值
+const DAMAGE_TYPES: Array = [
+	CarrierConfigData.DamageType.KINETIC_IMPACT,
+	CarrierConfigData.DamageType.ENTROPY_BURST,
+	CarrierConfigData.DamageType.VOID_EROSION,
+	CarrierConfigData.DamageType.CRYO_SHATTER,
+]
+
+## 投射物触发器类型（用于随机法术生成）
+const PROJECTILE_TRIGGER_TYPES: Array = [
+	TriggerData.TriggerType.ON_CONTACT,
+	TriggerData.TriggerType.ON_TIMER,
+	TriggerData.TriggerType.ON_PROXIMITY,
+	TriggerData.TriggerType.ON_DEATH,
+]
+
+## 区域形状枚举值
+const AREA_SHAPES: Array = [0, 1, 2, 3]  # AreaEffectActionData 的 area_shape
+
+## 召唤类型枚举值
+const SUMMON_TYPES: Array = [
+	SummonActionData.SummonType.TURRET,
+	SummonActionData.SummonType.MINION,
+	SummonActionData.SummonType.ORBITER,
+	SummonActionData.SummonType.DECOY,
+	SummonActionData.SummonType.BARRIER,
+	SummonActionData.SummonType.TOTEM,
+]
+
+## 召唤行为模式枚举值
+const BEHAVIOR_MODES: Array = [0, 1, 2, 3]  # AGGRESSIVE, DEFENSIVE, PASSIVE, FOLLOW
+
+## 链式类型枚举值
+const CHAIN_TYPES: Array = [
+	ChainActionData.ChainType.LIGHTNING,
+	ChainActionData.ChainType.FIRE,
+	ChainActionData.ChainType.ICE,
+	ChainActionData.ChainType.VOID,
+]
+
+## 链式目标选择策略枚举值
+const CHAIN_TARGET_SELECTIONS: Array = [
+	ChainActionData.TargetSelection.NEAREST,
+	ChainActionData.TargetSelection.RANDOM,
+	ChainActionData.TargetSelection.LOWEST_HEALTH,
+	ChainActionData.TargetSelection.HIGHEST_HEALTH,
+]
+
+## 状态效果类型枚举值（前6种用于随机生成）
+const STATUS_TYPES: Array = [0, 1, 2, 3, 4, 5]
+
+## 可随机生成的动作类型及其权重
+const RANDOM_ACTION_TYPES: Array = [
+	ActionData.ActionType.DAMAGE,
+	ActionData.ActionType.FISSION,
+	ActionData.ActionType.APPLY_STATUS,
+	ActionData.ActionType.AREA_EFFECT,
+	ActionData.ActionType.SPAWN_EXPLOSION,
+	ActionData.ActionType.SPAWN_DAMAGE_ZONE,
+	ActionData.ActionType.SUMMON,
+	ActionData.ActionType.CHAIN,
+]
+
+## 辅助函数：从数组中安全地随机选取一个元素
+static func _pick_random(arr: Array):
+	if arr.is_empty():
+		push_error("[SpellFactory] 尝试从空数组中随机选取")
+		return null
+	return arr[randi() % arr.size()]
 
 func generate_random_spell() -> SpellCoreData:
 	var spell = SpellCoreData.new()
@@ -40,7 +126,7 @@ func generate_random_spell() -> SpellCoreData:
 
 func _generate_random_carrier() -> CarrierConfigData:
 	var carrier = CarrierConfigData.new()
-	carrier.phase = randi() % 3
+	carrier.phase = _pick_random(CARRIER_PHASES)
 
 	var type_roll = randf()
 	if type_roll < config.mine_probability:
@@ -92,7 +178,7 @@ func _generate_random_rule() -> TopologyRuleData:
 	return rule
 
 func _generate_random_trigger() -> TriggerData:
-	var trigger_type = randi() % 4
+	var trigger_type = _pick_random(PROJECTILE_TRIGGER_TYPES)
 	var trigger: TriggerData
 
 	match trigger_type:
@@ -116,7 +202,7 @@ func _generate_random_trigger() -> TriggerData:
 	return trigger
 
 func _generate_random_action(allow_fission: bool = true) -> ActionData:
-	var action_type = randi() % 8  # 扩展为8种动作类型
+	var action_type = _pick_random(RANDOM_ACTION_TYPES)
 
 	if action_type == ActionData.ActionType.FISSION and (not allow_fission or randf() > 0.4):
 		action_type = ActionData.ActionType.DAMAGE
@@ -132,13 +218,13 @@ func _generate_random_action(allow_fission: bool = true) -> ActionData:
 			action = _generate_status_action()
 		ActionData.ActionType.AREA_EFFECT:
 			action = _generate_area_effect_action()
-		4:
+		ActionData.ActionType.SPAWN_EXPLOSION:
 			action = _generate_explosion_action()
-		5:
+		ActionData.ActionType.SPAWN_DAMAGE_ZONE:
 			action = _generate_damage_zone_action()
-		6:  # 召唤动作 - 支持所有召唤实体类型
+		ActionData.ActionType.SUMMON:
 			action = _generate_summon_action()
-		7:  # 链式动作 - 华丽视觉效果
+		ActionData.ActionType.CHAIN:
 			action = _generate_chain_action()
 		_:
 			action = _generate_damage_action()
@@ -148,7 +234,7 @@ func _generate_random_action(allow_fission: bool = true) -> ActionData:
 func _generate_damage_action() -> DamageActionData:
 	var action = DamageActionData.new()
 	action.damage_value = randf_range(config.damage_range.x, config.damage_range.y)
-	action.damage_type = randi() % 4
+	action.damage_type = _pick_random(DAMAGE_TYPES)
 	action.use_carrier_kinetic = randf() > 0.5
 	action.damage_multiplier = randf_range(0.8, 1.5)
 	return action
@@ -170,7 +256,7 @@ func _generate_simple_child_spell() -> SpellCoreData:
 	spell.spell_name = "子弹"
 
 	spell.carrier = CarrierConfigData.new()
-	spell.carrier.phase = randi() % 3
+	spell.carrier.phase = _pick_random(CARRIER_PHASES)
 	spell.carrier.mass = randf_range(0.3, 1.5)
 	spell.carrier.velocity = randf_range(300.0, 600.0)
 	spell.carrier.lifetime = randf_range(1.5, 4.0)
@@ -187,7 +273,7 @@ func _generate_simple_child_spell() -> SpellCoreData:
 
 func _generate_status_action() -> ApplyStatusActionData:
 	var action = ApplyStatusActionData.new()
-	action.status_type = randi() % 6
+	action.status_type = _pick_random(STATUS_TYPES)
 	action.duration = randf_range(1.0, 5.0)
 	action.tick_interval = randf_range(0.3, 1.0)
 	action.effect_value = randf_range(3.0, 15.0)
@@ -196,7 +282,7 @@ func _generate_status_action() -> ApplyStatusActionData:
 
 func _generate_area_effect_action() -> AreaEffectActionData:
 	var action = AreaEffectActionData.new()
-	action.area_shape = randi() % 4
+	action.area_shape = _pick_random(AREA_SHAPES)
 	action.radius = randf_range(config.radius_range.x, config.radius_range.y)
 	action.angle = randf_range(45.0, 180.0)
 	action.length = randf_range(50.0, 150.0)
@@ -210,7 +296,7 @@ func _generate_explosion_action() -> SpawnExplosionActionData:
 	action.explosion_damage = randf_range(config.damage_range.x * 0.8, config.damage_range.y * 1.5)
 	action.explosion_radius = randf_range(60.0, 150.0)
 	action.damage_falloff = randf_range(0.3, 0.7)
-	action.explosion_damage_type = randi() % 4
+	action.explosion_damage_type = _pick_random(DAMAGE_TYPES)
 	return action
 
 func _generate_damage_zone_action() -> SpawnDamageZoneActionData:
@@ -219,16 +305,15 @@ func _generate_damage_zone_action() -> SpawnDamageZoneActionData:
 	action.zone_radius = randf_range(50.0, 120.0)
 	action.zone_duration = randf_range(2.0, 6.0)
 	action.tick_interval = randf_range(0.3, 0.8)
-	action.zone_damage_type = randi() % 4
+	action.zone_damage_type = _pick_random(DAMAGE_TYPES)
 	action.slow_amount = randf_range(0.0, 0.5) if randf() < 0.4 else 0.0
 	return action
 
 ## 生成召唤动作 - 支持所有召唤实体类型
 func _generate_summon_action() -> SummonActionData:
 	var action = SummonActionData.new()
-	# 随机选择召唤类型（包括所有最新类型）
-	action.summon_type = randi() % 6  # TURRET, MINION, ORBITER, DECOY, BARRIER, TOTEM
-	action.behavior_mode = randi() % 4  # AGGRESSIVE, DEFENSIVE, PASSIVE, FOLLOW
+	action.summon_type = _pick_random(SUMMON_TYPES)
+	action.behavior_mode = _pick_random(BEHAVIOR_MODES)
 	action.summon_count = randi_range(1, 3)
 	action.summon_duration = randf_range(5.0, 15.0)
 	action.summon_health = randf_range(30.0, 100.0)
@@ -247,7 +332,7 @@ func _generate_summon_action() -> SummonActionData:
 		SummonActionData.SummonType.ORBITER:
 			action.orbit_radius = randf_range(50.0, 120.0)
 			action.orbit_speed = randf_range(1.5, 4.0)
-			action.summon_count = randi_range(2, 5)  # 环绕体通常多个
+			action.summon_count = randi_range(2, 5)
 		SummonActionData.SummonType.DECOY:
 			action.summon_health = randf_range(50.0, 150.0)
 			action.summon_damage = 0.0
@@ -260,7 +345,6 @@ func _generate_summon_action() -> SummonActionData:
 			action.totem_effect_interval = randf_range(0.5, 1.5)
 			action.summon_move_speed = 0.0
 	
-	# 小概率继承法术
 	action.inherit_spell = randf() < 0.15
 	
 	return action
@@ -268,17 +352,16 @@ func _generate_summon_action() -> SummonActionData:
 ## 生成链式动作 - 视觉华丽效果
 func _generate_chain_action() -> ChainActionData:
 	var action = ChainActionData.new()
-	action.chain_type = randi() % 4  # LIGHTNING, FIRE, ICE, VOID
+	action.chain_type = _pick_random(CHAIN_TYPES)
 	action.chain_count = randi_range(2, 6)
 	action.chain_range = randf_range(150.0, 300.0)
 	action.chain_damage = randf_range(15.0, 40.0)
 	action.chain_damage_decay = randf_range(0.6, 0.9)
 	action.chain_delay = randf_range(0.05, 0.2)
 	action.chain_can_return = randf() < 0.2
-	action.target_selection = randi() % 4  # NEAREST, RANDOM, LOWEST_HEALTH, HIGHEST_HEALTH
-	action.chain_visual_width = randf_range(2.0, 5.0)
+	action.target_selection = _pick_random(CHAIN_TARGET_SELECTIONS)
 	
-	# 小概率分叉（更加华丽）
+	# 小概率分叉
 	if randf() < 0.25:
 		action.fork_chance = randf_range(0.2, 0.5)
 		action.fork_count = randi_range(1, 2)
@@ -319,7 +402,6 @@ func _generate_summon_spell_name(summon_type: int = -1) -> String:
 	var middles: Array
 	var suffixes: Array
 	
-	# 根据召唤类型选择不同的命名风格
 	match summon_type:
 		SummonActionData.SummonType.TURRET:
 			prefixes = ["守", "镇", "封", "征", "战"]
@@ -350,7 +432,7 @@ func _generate_summon_spell_name(summon_type: int = -1) -> String:
 			middles = ["灵", "魂", "影", "光", "玄"]
 			suffixes = ["体", "灵", "影", "象", "使"]
 	
-	return "召唤法术-" + prefixes[randi() % prefixes.size()] + middles[randi() % middles.size()] + suffixes[randi() % suffixes.size()]
+	return "召唤法术-" + _pick_random(prefixes) + _pick_random(middles) + _pick_random(suffixes)
 
 ## 生成华丽法术专有名称
 func _generate_flashy_spell_name(flashy_type: String = "") -> String:
@@ -358,48 +440,44 @@ func _generate_flashy_spell_name(flashy_type: String = "") -> String:
 	var middles: Array
 	var suffixes: Array
 	
-	# 根据华丽效果类型选择不同的命名风格
 	match flashy_type:
-		"chain":  # 链式效果
+		"chain":
 			prefixes = ["电", "雷", "闪", "弧", "绝"]
 			middles = ["光", "焰", "霜", "影", "灵"]
 			suffixes = ["链", "索", "弧", "网", "纪"]
-		"fission":  # 裂变效果
+		"fission":
 			prefixes = ["爆", "裂", "散", "分", "绽"]
 			middles = ["灵", "光", "焰", "星", "影"]
 			suffixes = ["爆", "裂", "雨", "花", "散"]
-		"explosion":  # 爆炸效果
+		"explosion":
 			prefixes = ["爆", "烈", "血", "天", "灭"]
 			middles = ["炎", "焰", "光", "雷", "灵"]
 			suffixes = ["爆", "灭", "天", "毁", "崩"]
-		"plasma":  # 等离子相态
+		"plasma":
 			prefixes = ["灵", "天", "圣", "神", "元"]
 			middles = ["灵", "光", "焰", "电", "元"]
 			suffixes = ["焰", "光", "耀", "辉", "华"]
-		"combo":  # 组合华丽效果
+		"combo":
 			prefixes = ["天", "神", "圣", "绝", "灭"]
 			middles = ["灵", "光", "焰", "雷", "影"]
 			suffixes = ["天罡", "神威", "圣裁", "绝律", "灭世"]
-		_:  # 默认华丽效果
+		_:
 			prefixes = ["绚", "耀", "瑰", "玄", "妙"]
 			middles = ["灵", "光", "影", "焰", "晶"]
 			suffixes = ["舞", "耀", "彩", "华", "光"]
 	
-	return "华丽法术-" + prefixes[randi() % prefixes.size()] + middles[randi() % middles.size()] + suffixes[randi() % suffixes.size()]
+	return "华丽法术-" + _pick_random(prefixes) + _pick_random(middles) + _pick_random(suffixes)
 
 ## 根据法术内容自动选择合适的命名
 func _generate_spell_name_by_content(spell: SpellCoreData) -> String:
-	# 检查是否为召唤法术
 	var summon_type = _detect_summon_type(spell)
 	if summon_type >= 0:
 		return _generate_summon_spell_name(summon_type)
 	
-	# 检查是否为华丽法术
 	var flashy_type = _detect_flashy_type(spell)
 	if flashy_type != "":
 		return _generate_flashy_spell_name(flashy_type)
 	
-	# 默认命名
 	return _generate_spell_name_with_scenario(-1)
 
 ## 检测法术的召唤类型
@@ -437,11 +515,9 @@ func _detect_flashy_type(spell: SpellCoreData) -> String:
 	if has_plasma:
 		flashy_count += 1
 	
-	# 多种华丽效果组合
 	if flashy_count >= 2:
 		return "combo"
 	
-	# 单一华丽效果
 	if has_chain:
 		return "chain"
 	if has_fission:
@@ -485,15 +561,15 @@ func _generate_spell_name_with_scenario(scenario: int = -1) -> String:
 			prefixes = ["伏", "潜", "隐", "陷", "诡"]
 			middles = ["暗", "毒", "影", "灵", "玄"]
 			suffixes = ["雷", "阱", "伏", "网", "陷"]
-		7:  # 召唤法术场景
+		7:
 			return _generate_summon_spell_name(-1)
-		8:  # 链式/华丽法术场景
+		8:
 			return _generate_flashy_spell_name("chain")
 		_:
 			var scenario_prefixes = ["消耗法术-", "单体法术-", "近战法术-", "群伤法术-", "埋伏法术-"]
-			scenario_prefix = scenario_prefixes[randi() % scenario_prefixes.size()]
+			scenario_prefix = _pick_random(scenario_prefixes)
 			prefixes = ["炎", "冰", "雷", "风", "暗", "光", "毒", "灵", "玄", "天"]
 			middles = ["焐", "霜", "电", "刃", "影", "芒", "蚀", "魂", "元", "罡"]
 			suffixes = ["弹", "箭", "球", "波", "刺", "爆", "环", "雨", "阵", "诀"]
 
-	return scenario_prefix + prefixes[randi() % prefixes.size()] + middles[randi() % middles.size()] + suffixes[randi() % suffixes.size()]
+	return scenario_prefix + _pick_random(prefixes) + _pick_random(middles) + _pick_random(suffixes)

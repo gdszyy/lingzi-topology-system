@@ -43,18 +43,41 @@ func calculate_windup_time(proficiency: float = 0.0, is_engraved_cast: bool = fa
 
 	return clampf(final_time, min_windup_time, max_windup_time)
 
-func calculate_total_instability() -> float:
+## 计算法术总不稳定性（修复版：增加循环引用检测，防止无限递归）
+## visited_ids: 已访问的法术 ID 集合，用于检测循环引用
+## max_depth: 最大递归深度，防止过深的嵌套导致性能问题
+func calculate_total_instability(visited_ids: Dictionary = {}, max_depth: int = 10) -> float:
+	# 安全检查：防止无限递归
+	if max_depth <= 0:
+		push_warning("[SpellCoreData] 计算不稳定性时达到最大递归深度，中断计算: %s" % spell_id)
+		return 0.0
+	
+	# 循环引用检测
+	if spell_id != "" and visited_ids.has(spell_id):
+		push_warning("[SpellCoreData] 检测到循环引用，中断计算: %s" % spell_id)
+		return 0.0
+	
+	# 将当前法术 ID 加入已访问集合
+	var current_visited = visited_ids.duplicate()
+	if spell_id != "":
+		current_visited[spell_id] = true
+	
 	var total = 0.0
 	if carrier != null:
 		total += carrier.instability_cost
 
 	for rule in topology_rules:
+		if rule == null:
+			continue
 		for action in rule.actions:
+			if action == null:
+				continue
 			if action is FissionActionData:
 				var fission = action as FissionActionData
 				total += fission.spawn_count * 0.5
 				if fission.child_spell_data != null and fission.child_spell_data is SpellCoreData:
-					total += fission.child_spell_data.calculate_total_instability() * 0.3
+					var child_spell = fission.child_spell_data as SpellCoreData
+					total += child_spell.calculate_total_instability(current_visited, max_depth - 1) * 0.3
 
 	return total
 
@@ -201,6 +224,10 @@ func validate() -> Dictionary:
 
 	for i in range(topology_rules.size()):
 		var rule = topology_rules[i]
+		if rule == null:
+			result.valid = false
+			result.errors.append("规则 %d 为 null" % i)
+			continue
 		if rule.trigger == null:
 			result.valid = false
 			result.errors.append("规则 %d 缺少触发器" % i)

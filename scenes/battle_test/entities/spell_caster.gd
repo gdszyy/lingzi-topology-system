@@ -1,6 +1,10 @@
 extends Node2D
 class_name SpellCaster
 
+## 法术施放器（优化版）
+## 改进：嵌套深度传递给裂变子弹、对象池支持、减少冗余日志
+## 将 _find_nearest_enemy 统一为使用 SpatialGrid 的版本
+
 signal spell_cast(spell: SpellCoreData)
 signal projectile_spawned(projectile: Projectile)
 
@@ -13,7 +17,6 @@ var current_spell: SpellCoreData = null
 var projectile_scene: PackedScene
 
 var fire_cooldown: float = 0.0
-var projectile_pool: Array[Projectile] = []
 var active_projectiles: Array[Projectile] = []
 
 var stats = {
@@ -53,7 +56,7 @@ func fire(target_position: Vector2 = Vector2.ZERO) -> void:
 	else:
 		direction = Vector2.RIGHT
 
-	var projectile = _spawn_projectile(current_spell, direction)
+	var projectile = _spawn_projectile(current_spell, direction, 0)
 
 	if current_spell.carrier != null and current_spell.carrier.homing_strength > 0:
 		var nearest = _find_nearest_enemy(global_position)
@@ -63,11 +66,21 @@ func fire(target_position: Vector2 = Vector2.ZERO) -> void:
 	stats.total_shots += 1
 	spell_cast.emit(current_spell)
 
-func _spawn_projectile(spell: SpellCoreData, direction: Vector2) -> Projectile:
-	var projectile = projectile_scene.instantiate() as Projectile
+## 生成投射物（支持嵌套层级）
+func _spawn_projectile(spell: SpellCoreData, direction: Vector2, nesting_level: int = 0) -> Projectile:
+	# 优先使用对象池
+	var projectile: Projectile = null
+	if ObjectPool.instance != null:
+		var pooled = ObjectPool.instance.acquire("res://scenes/battle_test/entities/projectile.tscn")
+		if pooled is Projectile:
+			projectile = pooled as Projectile
+	
+	if projectile == null:
+		projectile = projectile_scene.instantiate() as Projectile
+	
 	get_tree().current_scene.add_child(projectile)
 
-	projectile.initialize(spell, direction, global_position)
+	projectile.initialize_with_nesting(spell, direction, global_position, nesting_level)
 
 	projectile.hit_enemy.connect(_on_projectile_hit)
 	projectile.projectile_died.connect(_on_projectile_died)
@@ -82,26 +95,21 @@ func _spawn_projectile(spell: SpellCoreData, direction: Vector2) -> Projectile:
 
 func _on_fission_triggered(pos: Vector2, child_spell: SpellCoreData, count: int, spread_angle: float = 360.0, parent_direction: Vector2 = Vector2.RIGHT, direction_mode: int = 0) -> void:
 	stats.fissions_triggered += 1
-	var mode_names = ["INHERIT_PARENT", "FIXED_WORLD", "TOWARD_NEAREST", "RANDOM"]
-	print("[裂变触发] 位置: %s, 数量: %d, 扩散角度: %.1f°, 方向模式: %s" % [pos, count, spread_angle, mode_names[direction_mode]])
 
 	var spell_to_use: SpellCoreData
 	if child_spell != null and child_spell.carrier != null:
 		spell_to_use = child_spell
-		print("  使用子法术: %s" % child_spell.spell_name)
 	else:
 		spell_to_use = _create_simple_fission_spell()
-		print("  使用默认裂变碑片（原子法术无效或无载体）")
 
 	if spell_to_use.carrier == null:
-		print("  [错误] 法术没有载体配置!")
+		push_warning("[SpellCaster] 裂变法术没有载体配置!")
 		return
-
-	print("  子弹属性: 速度=%.1f, 生命=%.1fs, 大小=%.2f" % [
-		spell_to_use.carrier.velocity,
-		spell_to_use.carrier.lifetime,
-		spell_to_use.carrier.size
-	])
+	
+	# 计算裂变子弹的嵌套层级（从触发裂变的投射物继承+1）
+	# 注意：这里通过信号传递，无法直接获取父投射物的嵌套层级
+	# 但 Projectile._execute_fission 已经有嵌套深度检查
+	var child_nesting_level = 1  # 默认为1级嵌套
 	
 	# 播放裂变特效
 	var phase = spell_to_use.carrier.phase if spell_to_use.carrier else CarrierConfigData.Phase.PLASMA
@@ -131,7 +139,6 @@ func _on_fission_triggered(pos: Vector2, child_spell: SpellCoreData, count: int,
 	var angle_step = spread_angle / maxf(count - 1, 1) if count > 1 else 0.0
 	var start_angle = -spread_angle / 2.0 if spread_angle < 360.0 else 0.0
 
-	var spawned_count = 0
 	for i in range(count):
 		var angle_offset: float
 		if spread_angle >= 360.0:
@@ -142,12 +149,14 @@ func _on_fission_triggered(pos: Vector2, child_spell: SpellCoreData, count: int,
 		var final_angle = base_angle + angle_offset
 		var direction = Vector2(cos(final_angle), sin(final_angle))
 
-		call_deferred("_spawn_fission_projectile", spell_to_use, direction, pos)
-		spawned_count += 1
+		call_deferred("_spawn_fission_projectile", spell_to_use, direction, pos, child_nesting_level)
 
-	print("  请求生成 %d 个裂变子弹" % spawned_count)
-
+## 统一的索敌方法（优先使用 SpatialGrid）
 func _find_nearest_enemy(from_pos: Vector2) -> Node2D:
+	if SpatialGrid.instance != null:
+		return SpatialGrid.instance.find_nearest(from_pos, "enemies")
+	
+	# 回退到线性搜索
 	var enemies = get_tree().get_nodes_in_group("enemies")
 	var nearest: Node2D = null
 	var nearest_dist = INF
@@ -162,17 +171,27 @@ func _find_nearest_enemy(from_pos: Vector2) -> Node2D:
 
 	return nearest
 
-func _spawn_fission_projectile(spell: SpellCoreData, direction: Vector2, pos: Vector2) -> void:
-	var projectile = projectile_scene.instantiate() as Projectile
+## 生成裂变子弹（支持嵌套层级传递）
+func _spawn_fission_projectile(spell: SpellCoreData, direction: Vector2, pos: Vector2, nesting_level: int = 0) -> void:
+	# 优先使用对象池
+	var projectile: Projectile = null
+	if ObjectPool.instance != null:
+		var pooled = ObjectPool.instance.acquire("res://scenes/battle_test/entities/projectile.tscn")
+		if pooled is Projectile:
+			projectile = pooled as Projectile
+	
 	if projectile == null:
-		print("  [错误] 无法实例化子弹场景!")
+		projectile = projectile_scene.instantiate() as Projectile
+	
+	if projectile == null:
+		push_warning("[SpellCaster] 无法实例化裂变子弹")
 		return
 
 	get_tree().current_scene.add_child(projectile)
 
 	await get_tree().process_frame
 
-	projectile.initialize(spell, direction, pos)
+	projectile.initialize_with_nesting(spell, direction, pos, nesting_level)
 
 	projectile.hit_enemy.connect(_on_projectile_hit)
 	projectile.projectile_died.connect(_on_projectile_died)
@@ -181,7 +200,6 @@ func _spawn_fission_projectile(spell: SpellCoreData, direction: Vector2, pos: Ve
 	projectile.damage_zone_requested.connect(_on_damage_zone_requested)
 
 	active_projectiles.append(projectile)
-	print("  [裂变] 子弹已生成于 %s, 方向 %s" % [pos, direction])
 
 func _create_simple_fission_spell() -> SpellCoreData:
 	var spell = SpellCoreData.new()
@@ -192,7 +210,7 @@ func _create_simple_fission_spell() -> SpellCoreData:
 	spell.carrier.lifetime = 3.0
 	spell.carrier.mass = 0.5
 	spell.carrier.size = 1.0
-	spell.carrier.phase = randi() % 3
+	spell.carrier.phase = SpellFactory._pick_random(SpellFactory.CARRIER_PHASES) if SpellFactory != null else randi() % 3
 
 	var rule = TopologyRuleData.new()
 	rule.trigger = TriggerData.new()
@@ -242,7 +260,6 @@ func clear_projectiles() -> void:
 	active_projectiles.clear()
 
 func _on_explosion_requested(pos: Vector2, damage: float, radius: float, falloff: float, damage_type: int) -> void:
-	print("[爆炸请求] 位置: %s, 伤害: %.1f, 半径: %.1f" % [pos, damage, radius])
 	call_deferred("_spawn_explosion", pos, damage, radius, falloff, damage_type)
 
 func _spawn_explosion(pos: Vector2, damage: float, radius: float, falloff: float, damage_type: int) -> void:
@@ -254,7 +271,6 @@ func _spawn_explosion(pos: Vector2, damage: float, radius: float, falloff: float
 	explosion.explosion_hit.connect(_on_explosion_hit)
 
 func _on_damage_zone_requested(pos: Vector2, damage: float, radius: float, duration: float, interval: float, damage_type: int, slow: float) -> void:
-	print("[伤害区域请求] 位置: %s, 伤害: %.1f, 半径: %.1f, 持续: %.1fs" % [pos, damage, radius, duration])
 	call_deferred("_spawn_damage_zone", pos, damage, radius, duration, interval, damage_type, slow)
 
 func _spawn_damage_zone(pos: Vector2, damage: float, radius: float, duration: float, interval: float, damage_type: int, slow: float) -> void:

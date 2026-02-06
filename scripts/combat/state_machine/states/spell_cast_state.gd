@@ -1,6 +1,10 @@
 extends State
 class_name SpellCastState
 
+## 施法状态（优化版）
+## 改进：接入 SpatialGrid 高效索敌、EventBus 事件通知、对象池支持
+## 增加施法前能量检查、施法中断恢复机制、施法进度事件通知
+
 enum CastPhase {
 	WINDUP,
 	RELEASE,
@@ -58,6 +62,12 @@ func enter(params: Dictionary = {}) -> void:
 	casting_spell = params.get("spell", player.current_spell)
 	if casting_spell == null:
 		casting_spell = player.current_spell
+	
+	# 施法前能量检查
+	if casting_spell != null and not _check_resource_cost():
+		push_warning("[SpellCastState] 能量不足，无法施放 %s" % casting_spell.spell_name)
+		_cancel_cast()
+		return
 
 	_calculate_windup_time()
 
@@ -69,6 +79,13 @@ func enter(params: Dictionary = {}) -> void:
 
 	if casting_spell != null and proficiency_manager != null:
 		proficiency_manager.record_spell_use(casting_spell.spell_id)
+	
+	# 通过 EventBus 通知施法开始
+	_publish_cast_event("cast_started", {
+		"spell": casting_spell,
+		"windup_duration": windup_duration,
+		"is_engraved": is_engraved_cast
+	})
 
 func exit() -> void:
 	phase_timer = 0.0
@@ -97,6 +114,20 @@ func handle_input(event: InputEvent) -> void:
 			if event.button_index == MOUSE_BUTTON_RIGHT:
 				_cancel_cast()
 
+## 检查资源消耗是否满足
+func _check_resource_cost() -> bool:
+	if casting_spell == null:
+		return false
+	
+	# 如果玩家有能量系统，检查能量是否足够
+	if player.has_method("get_energy_system"):
+		var energy_system = player.get_energy_system()
+		if energy_system != null:
+			return energy_system.current_energy >= casting_spell.resource_cost
+	
+	# 如果没有能量系统，默认允许施法
+	return true
+
 func _calculate_windup_time() -> void:
 	if casting_spell == null:
 		windup_duration = 0.5
@@ -107,15 +138,6 @@ func _calculate_windup_time() -> void:
 		proficiency = proficiency_manager.get_proficiency_value(casting_spell.spell_id)
 
 	windup_duration = casting_spell.calculate_windup_time(proficiency, is_engraved_cast)
-
-	var normal_windup = casting_spell.calculate_windup_time(proficiency, false)
-	print("[施法] %s | 熟练度: %.0f%% | 普通前摇: %.2fs | 实际前摇: %.2fs%s" % [
-		casting_spell.spell_name,
-		proficiency * 100,
-		normal_windup,
-		windup_duration,
-		" (刻录)" if is_engraved_cast else ""
-	])
 
 func _update_windup_phase(_delta: float) -> void:
 	if phase_timer >= windup_duration:
@@ -141,6 +163,9 @@ func _fire_spell() -> void:
 	if casting_spell == null:
 		return
 
+	# 扣除资源消耗
+	_consume_resource_cost()
+
 	if not casting_spell.is_projectile_spell():
 		_trigger_spell_effects()
 		return
@@ -158,6 +183,23 @@ func _fire_spell() -> void:
 		player.stats.spells_cast += 1
 
 		player.spell_cast.emit(casting_spell)
+	
+	# 通过 EventBus 通知法术释放
+	_publish_cast_event("spell_released", {
+		"spell": casting_spell,
+		"direction": direction,
+		"position": player.global_position
+	})
+
+## 扣除资源消耗
+func _consume_resource_cost() -> void:
+	if casting_spell == null:
+		return
+	
+	if player.has_method("get_energy_system"):
+		var energy_system = player.get_energy_system()
+		if energy_system != null:
+			energy_system.consume_energy(casting_spell.resource_cost)
 
 func _trigger_spell_effects() -> void:
 	if player.engraving_manager != null:
@@ -177,7 +219,16 @@ func _trigger_spell_effects() -> void:
 	player.spell_cast.emit(casting_spell)
 
 func _spawn_projectile(spell: SpellCoreData, direction: Vector2) -> Projectile:
-	var projectile = projectile_scene.instantiate() as Projectile
+	# 优先使用对象池
+	var projectile: Projectile = null
+	if ObjectPool.instance != null:
+		var pooled = ObjectPool.instance.acquire("res://scenes/battle_test/entities/projectile.tscn")
+		if pooled is Projectile:
+			projectile = pooled as Projectile
+	
+	if projectile == null:
+		projectile = projectile_scene.instantiate() as Projectile
+	
 	if projectile == null:
 		return null
 
@@ -189,7 +240,12 @@ func _spawn_projectile(spell: SpellCoreData, direction: Vector2) -> Projectile:
 
 	return projectile
 
+## 统一的索敌方法（优先使用 SpatialGrid）
 func _find_nearest_enemy(from_pos: Vector2) -> Node2D:
+	if SpatialGrid.instance != null:
+		return SpatialGrid.instance.find_nearest(from_pos, "enemies")
+	
+	# 回退到线性搜索
 	var enemies = player.get_tree().get_nodes_in_group("enemies")
 	var nearest: Node2D = null
 	var nearest_dist = INF
@@ -205,7 +261,11 @@ func _find_nearest_enemy(from_pos: Vector2) -> Node2D:
 	return nearest
 
 func _cancel_cast() -> void:
-	print("[施法取消] %s" % (casting_spell.spell_name if casting_spell else "未知"))
+	# 通过 EventBus 通知施法取消
+	_publish_cast_event("cast_cancelled", {
+		"spell": casting_spell,
+		"phase": current_phase
+	})
 
 	if player.input_direction.length_squared() > 0.01:
 		if player.is_flying:
@@ -216,6 +276,11 @@ func _cancel_cast() -> void:
 		transition_to("Idle")
 
 func _on_cast_complete() -> void:
+	# 通过 EventBus 通知施法完成
+	_publish_cast_event("cast_completed", {
+		"spell": casting_spell
+	})
+
 	if player.input_direction.length_squared() > 0.01:
 		if player.is_flying:
 			transition_to("Fly")
@@ -223,6 +288,12 @@ func _on_cast_complete() -> void:
 			transition_to("Move")
 	else:
 		transition_to("Idle")
+
+## 通过 EventBus 发布施法事件
+func _publish_cast_event(event_name: String, data: Dictionary) -> void:
+	if EventBus.instance == null:
+		return
+	EventBus.instance.publish(event_name, data)
 
 func _play_windup_animation() -> void:
 	pass
